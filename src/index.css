@@ -69,8 +69,34 @@ body {
   font-family: 'Plus Jakarta Sans', sans-serif;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
-  overflow: hidden; /* Hide main scroll, we'll scroll specific areas */
+  /* NO overflow hidden here — Login page must scroll freely */
 }
+
+html, body {
+  height: 100%;
+  width: 100%;
+}
+
+#root {
+  height: 100%;
+  width: 100%;
+  /* AppLayout manages its own overflow internally */
+}
+
+/* Desktop topbar is 64px; mobile is 56px — override via media query */
+@media (min-width: 768px) {
+  main[class*="overflow-y-auto"] {
+    padding-top: 64px !important;
+    padding-bottom: 0 !important;
+  }
+}
+
+/* Input color fix for dark theme date pickers */
+input[type="date"],
+input[type="month"] {
+  color-scheme: dark;
+}
+
 
 h1, h2, h3, h4, h5, h6 {
   font-family: 'Plus Jakarta Sans', sans-serif;

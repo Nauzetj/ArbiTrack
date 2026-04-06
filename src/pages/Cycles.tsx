@@ -39,7 +39,7 @@ export const Cycles: React.FC = () => {
   return (
     <div className="flex flex-col gap-[24px] max-w-[1200px] mx-auto pb-[40px] animate-fade-in-up">
       {/* Header */}
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-[16px]">
         <div>
           <h1 className="text-[24px] font-bold">Historial de Ciclos</h1>
           <p className="text-[14px] text-[var(--text-secondary)] mt-[4px]">
@@ -49,12 +49,12 @@ export const Cycles: React.FC = () => {
           </p>
         </div>
 
-        <div className="flex items-center gap-[12px]">
+        <div className="flex flex-wrap items-center gap-[8px]">
           {/* View toggle */}
           <div className="flex bg-[var(--bg-surface-3)] p-[4px] rounded-[10px] border border-[var(--border-strong)]">
             <button
               onClick={() => setView('table')}
-              className={`flex items-center gap-[6px] px-[14px] py-[6px] rounded-[6px] text-[13px] font-medium transition-colors ${
+              className={`flex items-center gap-[6px] px-[12px] py-[6px] rounded-[6px] text-[13px] font-medium transition-colors ${
                 view === 'table'
                   ? 'bg-[var(--bg-surface-4)] text-[var(--text-primary)] shadow-sm border border-[var(--border)]'
                   : 'text-[var(--text-tertiary)] hover:text-[var(--text-secondary)] border border-transparent'
@@ -65,7 +65,7 @@ export const Cycles: React.FC = () => {
             </button>
             <button
               onClick={() => setView('calendar')}
-              className={`flex items-center gap-[6px] px-[14px] py-[6px] rounded-[6px] text-[13px] font-medium transition-colors ${
+              className={`flex items-center gap-[6px] px-[12px] py-[6px] rounded-[6px] text-[13px] font-medium transition-colors ${
                 view === 'calendar'
                   ? 'bg-[var(--bg-surface-4)] text-[var(--text-primary)] shadow-sm border border-[var(--border)]'
                   : 'text-[var(--text-tertiary)] hover:text-[var(--text-secondary)] border border-transparent'
@@ -81,12 +81,12 @@ export const Cycles: React.FC = () => {
 
           {/* Status filter (only in table view) */}
           {view === 'table' && (
-            <div className="flex bg-[var(--bg-surface-3)] p-[4px] rounded-[10px] border border-[var(--border-strong)]">
+            <div className="flex flex-wrap bg-[var(--bg-surface-3)] p-[4px] rounded-[10px] border border-[var(--border-strong)] gap-[2px]">
               {(['Todo', 'En curso', 'Completado', 'Con pérdida'] as const).map(f => (
                 <button
                   key={f}
                   onClick={() => setFilter(f)}
-                  className={`px-[16px] py-[6px] rounded-[6px] text-[13px] font-medium transition-colors ${
+                  className={`px-[12px] py-[6px] rounded-[6px] text-[12px] font-medium transition-colors ${
                     filter === f
                       ? 'bg-[var(--bg-surface-4)] text-[var(--text-primary)] shadow-sm border border-[var(--border)]'
                       : 'text-[var(--text-tertiary)] hover:text-[var(--text-secondary)] border border-transparent'
@@ -99,6 +99,7 @@ export const Cycles: React.FC = () => {
           )}
         </div>
       </div>
+
 
       {/* Calendar view */}
       {view === 'calendar' && (

@@ -53,61 +53,58 @@ export const Dashboard: React.FC = () => {
   const profitMonthUsdt = completedMonth.reduce((sum, c) => sum + c.ganancia_usdt, 0);
 
   return (
-    <div className="flex flex-col gap-[20px] max-w-[1400px] mx-auto pb-[40px]">
-      <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-[16px]">
+    <div className="flex flex-col gap-[12px] md:gap-[20px] max-w-[1400px] mx-auto">
+      {/* Metric cards: 2 columns on mobile, 4 on desktop */}
+      <div className="grid grid-cols-2 xl:grid-cols-4 gap-[10px] md:gap-[16px]">
         <MetricCard
-          title="Ganancia Hoy (USDT)"
-          icon={<DollarSign size={16} />}
+          title="Ganancia Hoy"
+          icon={<DollarSign size={14} />}
           mainValue={profitTodayUsdt}
-          subValue={`Bs. ${profitTodayVes.toFixed(2)} VES`}
+          subValue={`Bs. ${profitTodayVes.toFixed(2)}`}
           delayMs={0}
         />
         <MetricCard
-          title="Ciclos Completados (Hoy)"
-          icon={<Layers size={16} />}
+          title="Ciclos Hoy"
+          icon={<Layers size={14} />}
           mainValue={completedToday.length}
-          subValue="Sincronizado en la nube"
-          delayMs={80}
+          subValue="Completados"
+          delayMs={60}
         />
         <MetricCard
-          title="Ganancia del Mes"
-          icon={<AreaChart size={16} />}
+          title="Mes (USDT)"
+          icon={<AreaChart size={14} />}
           mainValue={profitMonthUsdt}
-          subValue="Días acumulados"
-          delayMs={160}
+          subValue="Acumulado"
+          delayMs={120}
         />
         <MetricCard
-          title="USDT Total Operado Hoy"
-          icon={<Clock size={16} />}
+          title="Operado Hoy"
+          icon={<Clock size={14} />}
           mainValue={usdtTotalOperated}
-          delayMs={240}
+          subValue="USDT vendido"
+          delayMs={180}
         />
       </div>
 
-      <div className="grid grid-cols-1 xl:grid-cols-12 gap-[20px]">
-        <div className="xl:col-span-7 flex flex-col gap-[20px] min-h-[0]">
-          <div className="flex-none">
-            <ActiveCyclePanel />
-          </div>
-        </div>
+      {/* Active Cycle Panel */}
+      <ActiveCyclePanel />
 
-        <div className="xl:col-span-5 flex flex-col gap-[20px] min-h-[0]">
-          <div className="flex-none">
-            <MiniChart />
-          </div>
-          <div className="bg-[var(--bg-surface-2)] rounded-[16px] border border-[var(--border)] p-[24px] flex-1 animate-fade-in-up delay-200 min-h-[120px]">
-            <h3 className="font-semibold text-[14px]">Información</h3>
-            <p className="text-[13px] text-[var(--text-secondary)] mt-[8px]">
-              Tus datos están sincronizados en la nube. Tus credenciales de Binance se mantienen
-              exclusivamente en memoria durante la sesión y nunca se almacenan en el servidor.
-            </p>
-          </div>
+      {/* Chart + Info: side by side on XL, stacked on mobile */}
+      <div className="grid grid-cols-1 xl:grid-cols-12 gap-[12px] md:gap-[20px]">
+        <div className="xl:col-span-7">
+          <MiniChart />
+        </div>
+        <div className="xl:col-span-5 bg-[var(--bg-surface-2)] rounded-[16px] border border-[var(--border)] p-[16px] md:p-[24px] animate-fade-in-up">
+          <h3 className="font-semibold text-[13px] md:text-[14px]">Seguridad de datos</h3>
+          <p className="text-[12px] md:text-[13px] text-[var(--text-secondary)] mt-[8px]">
+            Tus datos están sincronizados en la nube. Las credenciales de Binance se mantienen
+            exclusivamente en memoria durante la sesión y nunca se almacenan en el servidor.
+          </p>
         </div>
       </div>
 
-      <div className="w-full flex-none block">
-        <RecentCyclesTable />
-      </div>
+      {/* Recent cycles table */}
+      <RecentCyclesTable />
     </div>
   );
 };

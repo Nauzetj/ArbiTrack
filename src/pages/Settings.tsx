@@ -68,7 +68,7 @@ export const Settings: React.FC = () => {
           Tus APIs de Binance nunca se almacenan en la nube. Solo viven temporalmente en RAM durante tu sesión activa.
         </p>
         <div className="flex flex-col gap-[16px]">
-          <div className="flex items-center justify-between p-[16px] bg-[var(--bg-surface-3)] rounded-[8px] border border-[var(--border-strong)]">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-[12px] p-[16px] bg-[var(--bg-surface-3)] rounded-[8px] border border-[var(--border-strong)]">
             <div className="flex flex-col">
               <span className="font-medium text-[14px]">Perfil Activo</span>
               <span className="text-[12px] text-[var(--text-secondary)]">{currentUser?.fullName} (@{currentUser?.username})</span>
@@ -83,7 +83,7 @@ export const Settings: React.FC = () => {
       <div className="bg-[var(--bg-surface-2)] rounded-[16px] border border-[var(--border)] p-[24px]">
         <h2 className="text-[16px] font-semibold mb-[16px]">Datos y Respaldo</h2>
         <div className="flex flex-col gap-[16px]">
-          <div className="flex items-center justify-between p-[16px] bg-[var(--bg-surface-3)] rounded-[8px] border border-[var(--border-strong)]">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-[12px] p-[16px] bg-[var(--bg-surface-3)] rounded-[8px] border border-[var(--border-strong)]">
             <div className="flex flex-col gap-[4px]">
               <span className="font-medium text-[14px]">Exportar Datos (JSON)</span>
               <span className="text-[12px] text-[var(--text-secondary)]">Descarga un archivo JSON con todos tus ciclos y órdenes como respaldo local.</span>
@@ -91,7 +91,7 @@ export const Settings: React.FC = () => {
             <Button variant="secondary" onClick={handleExportData}>Exportar</Button>
           </div>
 
-          <div className="flex items-center justify-between p-[16px] border border-[rgba(255,76,106,0.2)] bg-[var(--loss-bg)] rounded-[8px]">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-[12px] p-[16px] border border-[rgba(255,76,106,0.2)] bg-[var(--loss-bg)] rounded-[8px]">
             <div className="flex flex-col gap-[4px] max-w-[400px]">
               <span className="font-medium text-[14px] text-[var(--loss)]">Limpiar mis datos</span>
               <span className="text-[12px] text-[var(--loss)] opacity-80">Borra TODOS los ciclos y órdenes de tu cuenta en la nube. Esta acción es irreversible.</span>

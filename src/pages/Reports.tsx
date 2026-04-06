@@ -116,8 +116,8 @@ export const Reports: React.FC = () => {
       </div>
 
       <div className="flex flex-col gap-[24px] animate-fade-in-up">
-         <div className="flex items-center justify-between">
-           <div className="flex items-center gap-[12px]">
+         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-[12px]">
+           <div className="flex flex-wrap items-center gap-[12px]">
              {activeTab === 'DIARIO' && (
                <>
                  <label className="text-[13px] text-[var(--text-secondary)] font-medium">Seleccionar Día:</label>
@@ -156,13 +156,13 @@ export const Reports: React.FC = () => {
            </div>
          </div>
 
-         <div className="bg-[var(--accent-muted)] border border-[var(--accent-border)] rounded-[16px] p-[32px] flex items-center justify-between shadow-[0_0_20px_rgba(0,229,195,0.06)] flex-wrap gap-[20px]">
+         <div className="bg-[var(--accent-muted)] border border-[var(--accent-border)] rounded-[16px] p-[24px] md:p-[32px] flex flex-col sm:flex-row sm:items-center justify-between shadow-[0_0_20px_rgba(0,229,195,0.06)] gap-[20px]">
            <div className="flex flex-col gap-[16px]">
              <h2 className="text-[14px] text-[var(--accent)] font-bold uppercase tracking-[1px]">Resumen ({activeTab})</h2>
              <div className="flex items-end gap-[40px] flex-wrap">
                <div className="flex flex-col">
                  <span className="text-[11px] text-[var(--text-secondary)] uppercase">Ganancia Bruta VES</span>
-                 <span className="mono text-[36px] font-medium text-[var(--text-primary)] leading-none">Bs. {profitVes.toFixed(2)}</span>
+                 <span className="mono text-[28px] md:text-[36px] font-medium text-[var(--text-primary)] leading-none">Bs. {profitVes.toFixed(2)}</span>
                </div>
                <div className="flex flex-col pb-[4px]">
                  <span className="text-[11px] text-[var(--text-secondary)] uppercase">Equivalencia USDT</span>
@@ -172,7 +172,7 @@ export const Reports: React.FC = () => {
              <p className="text-[12px] text-[var(--text-secondary)] mt-[8px]">Basado en {periodCycles.length} ciclos cerrados. Tasa BCV ponderada del periodo: Bs. {avgBcvRate.toFixed(2)}.</p>
            </div>
            
-           <Button onClick={generatePDF} className="h-fit px-[24px] py-[12px]">
+           <Button onClick={generatePDF} className="h-fit px-[24px] py-[12px] w-full sm:w-auto">
              <Download size={18} />
              Generar PDF
            </Button>
@@ -187,5 +187,6 @@ export const Reports: React.FC = () => {
          </div>
       </div>
     </div>
+
   );
 };

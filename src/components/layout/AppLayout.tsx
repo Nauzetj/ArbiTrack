@@ -3,6 +3,7 @@ import { Outlet, useNavigate } from 'react-router-dom';
 import toast from 'react-hot-toast';
 import { Sidebar } from './Sidebar';
 import { Topbar } from './Topbar';
+import { BottomNav } from './BottomNav';
 import { useAppStore } from '../../store/useAppStore';
 import { getOrdersForUser, getCyclesForUser, getActiveCycleForUser } from '../../services/dbOperations';
 import { fetchBCVRate } from '../../services/bcv';
@@ -10,7 +11,7 @@ import { AlertTriangle, Clock, ArrowRight } from 'lucide-react';
 
 // ── Plan expiry check ─────────────────────────────────────────────────────────
 function isPlanExpired(planExpiresAt: string | null, role: string): boolean {
-  if (role === 'admin' || role === 'free') return false; // admin y free nunca expiran
+  if (role === 'admin' || role === 'free') return false;
   if (!planExpiresAt) return false;
   return new Date(planExpiresAt) < new Date();
 }
@@ -35,20 +36,15 @@ const ExpiredWall: React.FC<{ role: string; planExpiresAt: string | null; onLogo
   return (
     <div className="h-screen w-screen bg-[var(--bg-base)] flex items-center justify-center p-[24px]">
       <div className="max-w-[480px] w-full text-center flex flex-col items-center gap-[24px] animate-fade-in-up">
-        {/* Icon */}
         <div className="w-[80px] h-[80px] rounded-[24px] bg-[var(--warning-bg)] border border-[var(--warning)]/30 flex items-center justify-center">
           <Clock size={40} className="text-[var(--warning)]" />
         </div>
-
-        {/* Title */}
         <div>
           <h1 className="text-[28px] font-bold text-[var(--text-primary)]">Plan Vencido</h1>
           <p className="text-[15px] text-[var(--text-secondary)] mt-[8px] max-w-[360px] mx-auto">
             Tu período {planLabel} venció el <strong>{expiredDate}</strong>. Para continuar usando ArbiTrack debes renovar tu suscripción.
           </p>
         </div>
-
-        {/* Warning box */}
         <div className="w-full bg-[var(--warning-bg)] border border-[var(--warning)]/30 rounded-[14px] p-[20px] flex items-start gap-[14px] text-left">
           <AlertTriangle size={18} className="text-[var(--warning)] flex-shrink-0 mt-[1px]" />
           <div>
@@ -58,14 +54,12 @@ const ExpiredWall: React.FC<{ role: string; planExpiresAt: string | null; onLogo
             </p>
           </div>
         </div>
-
-        {/* CTA — contact admin */}
         <div className="w-full flex flex-col gap-[12px]">
           <a
             href="https://wa.me/584121176731?text=Hola,%20quiero%20renovar%20mi%20plan%20de%20ArbiTrack"
             target="_blank"
             rel="noopener noreferrer"
-            className="w-full flex items-center justify-center gap-[10px] py-[14px] bg-[var(--accent)] text-white font-bold text-[15px] rounded-[12px] hover:opacity-90 transition-all shadow-[0_4px_20px_var(--accent-muted)] hover:-translate-y-[1px]"
+            className="w-full flex items-center justify-center gap-[10px] py-[14px] bg-[var(--accent)] text-white font-bold text-[15px] rounded-[12px] hover:opacity-90 transition-all shadow-[0_4px_20px_var(--accent-muted)]"
           >
             <ArrowRight size={18} />
             Renovar suscripción →
@@ -77,7 +71,6 @@ const ExpiredWall: React.FC<{ role: string; planExpiresAt: string | null; onLogo
             Cerrar sesión
           </button>
         </div>
-
         <p className="text-[11px] text-[var(--text-tertiary)]">ArbiTrack P2P © 2026</p>
       </div>
     </div>
@@ -86,7 +79,7 @@ const ExpiredWall: React.FC<{ role: string; planExpiresAt: string | null; onLogo
 
 // ─────────────────────────────────────────────────────────────────────────────
 export const AppLayout: React.FC = () => {
-  const { currentUser, binanceKeys, setOrders, setCycles, setActiveCycle, setBcvRate, logout, isMobileMenuOpen, setMobileMenuOpen } = useAppStore();
+  const { currentUser, binanceKeys, setOrders, setCycles, setActiveCycle, setBcvRate, logout } = useAppStore();
   const navigate = useNavigate();
   const hasHydrated = useRef(false);
 
@@ -96,7 +89,6 @@ export const AppLayout: React.FC = () => {
       return;
     }
 
-    // Si el plan está vencido, no cargamos datos (ahorramos queries)
     if (isPlanExpired(currentUser.planExpiresAt, currentUser.role)) return;
 
     if (!hasHydrated.current) {
@@ -118,7 +110,6 @@ export const AppLayout: React.FC = () => {
       })();
     }
 
-    // BCV Rate Polling every 10 seconds
     const updateBcv = () => {
       fetchBCVRate()
         .then(rate => setBcvRate(rate))
@@ -132,7 +123,6 @@ export const AppLayout: React.FC = () => {
 
   if (!currentUser || !binanceKeys) return null;
 
-  // ── Plan vencido → mostrar pared de bloqueo ───────────────────────────────
   if (isPlanExpired(currentUser.planExpiresAt, currentUser.role)) {
     return (
       <ExpiredWall
@@ -147,23 +137,35 @@ export const AppLayout: React.FC = () => {
   }
 
   return (
-    <div className="h-screen w-screen overflow-hidden flex text-[var(--text-primary)]">
-      {/* Mobile Backdrop */}
-      {isMobileMenuOpen && (
-        <div 
-          className="fixed inset-0 bg-black/60 z-40 md:hidden backdrop-blur-sm"
-          onClick={() => setMobileMenuOpen(false)}
-        />
-      )}
+    <div className="h-screen w-screen overflow-hidden flex bg-[var(--bg-base)] text-[var(--text-primary)]">
 
-      {/* Reemplacé mr-[220px] y relative para asegurar Sidebar responsivo */}
-      <Sidebar />
-      <div className="flex-1 md:ml-[220px] flex flex-col w-full">
+      {/* ── Desktop sidebar (hidden on mobile) ── */}
+      <div className="hidden md:block">
+        <Sidebar />
+      </div>
+
+      {/* ── Main column ── */}
+      <div className="flex-1 md:ml-[220px] flex flex-col w-full min-w-0 overflow-hidden">
         <Topbar />
-        <main className="flex-1 mt-[64px] p-[16px] md:p-[32px] overflow-y-auto custom-scrollbar relative w-full overflow-x-hidden">
-          <Outlet />
+
+        {/* Scrollable content area */}
+        <main
+          className="flex-1 overflow-y-auto overflow-x-hidden custom-scrollbar"
+          style={{
+            /* Mobile: topbar is 56px. Desktop: 64px but we override in desktop‑only div below */
+            paddingTop: '56px',
+            /* Space for bottom nav on mobile */
+            paddingBottom: 'calc(64px + env(safe-area-inset-bottom, 8px))',
+          }}
+        >
+          <div className="p-[14px] md:p-[32px] md:pt-[16px]">
+            <Outlet />
+          </div>
         </main>
       </div>
+
+      {/* ── Mobile bottom navigation ── */}
+      <BottomNav />
     </div>
   );
 };

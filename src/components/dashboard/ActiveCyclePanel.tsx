@@ -11,44 +11,54 @@ export const ActiveCyclePanel: React.FC = () => {
 
   const handleOpenCycle = async () => {
     if (!currentUser) return;
-    const newCycle: Cycle = {
-      id: generateUUID(),
-      cycleNumber: Date.now(), 
-      openedAt: new Date().toISOString(),
-      closedAt: null,
-      status: 'En curso',
-      usdt_vendido: 0,
-      usdt_recomprado: 0,
-      ves_recibido: 0,
-      ves_pagado: 0,
-      comision_total: 0,
-      ganancia_usdt: 0,
-      ganancia_ves: 0,
-      tasa_venta_prom: 0,
-      tasa_compra_prom: 0,
-      diferencial_tasa: 0,
-      roi_percent: 0,
-      tasa_bcv_dia: 0,
-      notas: '',
-      userId: currentUser.id
-    };
-    await saveCycle(newCycle);
-    setActiveCycle(newCycle);
-    setCycles([newCycle, ...cycles]);
+    try {
+      const newCycle: Cycle = {
+        id: generateUUID(),
+        cycleNumber: Date.now(), 
+        openedAt: new Date().toISOString(),
+        closedAt: null,
+        status: 'En curso',
+        usdt_vendido: 0,
+        usdt_recomprado: 0,
+        ves_recibido: 0,
+        ves_pagado: 0,
+        comision_total: 0,
+        ganancia_usdt: 0,
+        ganancia_ves: 0,
+        tasa_venta_prom: 0,
+        tasa_compra_prom: 0,
+        diferencial_tasa: 0,
+        roi_percent: 0,
+        tasa_bcv_dia: bcvRate ? bcvRate.tasa_bcv : 0,
+        notas: '',
+        userId: currentUser.id
+      };
+      await saveCycle(newCycle);
+      setActiveCycle(newCycle);
+      setCycles([newCycle, ...cycles]);
+    } catch (err: any) {
+      console.error('Error opening cycle:', err);
+      alert('Error al abrir ciclo: ' + err.message);
+    }
   };
 
   const handleCloseCycle = async () => {
     if (!activeCycle || !currentUser) return;
-    const closedCycle = { 
-      ...activeCycle, 
-      status: 'Completado' as const, 
-      closedAt: new Date().toISOString(),
-      tasa_bcv_dia: bcvRate ? bcvRate.tasa_bcv : activeCycle.tasa_bcv_dia
-    };
-    await saveCycle(closedCycle);
-    setActiveCycle(null);
-    // Reflect closed status in the cycles[] list immediately
-    setCycles(cycles.map(c => c.id === closedCycle.id ? closedCycle : c));
+    try {
+      const closedCycle = { 
+        ...activeCycle, 
+        status: 'Completado' as const, 
+        closedAt: new Date().toISOString(),
+        tasa_bcv_dia: bcvRate ? bcvRate.tasa_bcv : activeCycle.tasa_bcv_dia
+      };
+      await saveCycle(closedCycle);
+      setActiveCycle(null);
+      // Reflect closed status in the cycles[] list immediately
+      setCycles(cycles.map(c => c.id === closedCycle.id ? closedCycle : c));
+    } catch (err: any) {
+      console.error('Error closing cycle:', err);
+      alert('Error al cerrar ciclo: ' + err.message);
+    }
   };
 
   if (!activeCycle) {
