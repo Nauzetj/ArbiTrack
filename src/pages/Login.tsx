@@ -188,7 +188,6 @@ export const Login: React.FC = () => {
     }
   };
 
-  // ── Login ─────────────────────────────────────────────────────────────────
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
@@ -197,14 +196,25 @@ export const Login: React.FC = () => {
       if (!loginApiKey || !loginSecretKey) throw new Error('API Key y Secret Key son requeridos.');
       if (!loginEmail || !loginPassword) throw new Error('Email y contraseña son requeridos.');
 
-      const { data, error: signInError } = await supabase.auth.signInWithPassword({
+      const signInPromise = supabase.auth.signInWithPassword({
         email: loginEmail.trim().toLowerCase(),
         password: loginPassword,
       });
-      if (signInError) throw new Error('Credenciales incorrectas.');
+
+      const timeoutPromise = new Promise<{data: any, error: any}>((_, reject) => 
+        setTimeout(() => reject(new Error('Tiempo de espera agotado. Tu conexión o caché local puede estar bloqueando la app. Por favor intenta otra vez.')), 10000)
+      );
+
+      const { data, error: signInError } = await Promise.race([signInPromise, timeoutPromise]);
+
+      if (signInError) throw new Error('Credenciales incorrectas o problema de red.');
       if (!data.session || !data.user) throw new Error('Error al iniciar sesión.');
 
-      const { data: profileData } = await supabase.from('profiles').select('*').eq('id', data.user.id).single();
+      const profilePromise = supabase.from('profiles').select('*').eq('id', data.user.id).single();
+      const profileTimeout = new Promise<{data: any}>((_, reject) => setTimeout(() => reject(new Error('Tiempo agotado al cargar perfil.')), 5000));
+      
+      const { data: profileData } = await Promise.race([profilePromise, profileTimeout]).catch(() => ({ data: null })) as any;
+      
       const profile = profileData || {
         role: 'free', created_at: new Date().toISOString(),
         username: data.user.email?.split('@')[0], full_name: '',
