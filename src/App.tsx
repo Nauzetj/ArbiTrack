@@ -22,8 +22,15 @@ function App() {
     const t = localStorage.getItem('arbitrack_theme') || 'ocean';
     document.documentElement.setAttribute('data-theme', t);
 
+    // Guard against silent hangs in PWA storage on Windows/Mobile
+    const rescueTimeout = setTimeout(() => {
+      console.warn("Auth initialization timed out, forcing ready state to unblock UI.");
+      if (authStatus === 'loading') setAuthStatus('ready');
+    }, 3500);
+
     // Check for existing Supabase session on startup
     supabase.auth.getSession().then(async ({ data: { session } }) => {
+      clearTimeout(rescueTimeout);
       try {
         if (session) {
           setSession(session);
@@ -49,6 +56,7 @@ function App() {
         setAuthStatus('ready');
       }
     }).catch((fatalErr) => {
+      clearTimeout(rescueTimeout);
       console.error("Fallo masivo de Auth:", fatalErr);
       setAuthStatus('ready');
     });
