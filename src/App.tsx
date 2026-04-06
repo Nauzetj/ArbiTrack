@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { lazy, Suspense, useEffect, useRef, useState } from 'react';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { AppLayout } from './components/layout/AppLayout';
 import { Login } from './pages/Login';
@@ -6,101 +6,140 @@ import { supabase } from './lib/supabase';
 import { useAppStore } from './store/useAppStore';
 import { getUserProfile } from './services/dbOperations';
 
+// Dashboard carga eagerly (es la primera pantalla post-login)
 import { Dashboard } from './pages/Dashboard';
-import { Cycles } from './pages/Cycles';
-import { Orders } from './pages/Orders';
-import { Reports } from './pages/Reports';
-import { Settings } from './pages/Settings';
-import { AdminPanel } from './pages/AdminPanel';
+
+// Páginas pesadas → lazy (solo se descargan cuando se navega a ellas)
+const Cycles     = lazy(() => import('./pages/Cycles').then(m => ({ default: m.Cycles })));
+const Orders     = lazy(() => import('./pages/Orders').then(m => ({ default: m.Orders })));
+const Reports    = lazy(() => import('./pages/Reports').then(m => ({ default: m.Reports })));
+const Settings   = lazy(() => import('./pages/Settings').then(m => ({ default: m.Settings })));
+const AdminPanel = lazy(() => import('./pages/AdminPanel').then(m => ({ default: m.AdminPanel })));
+
+import type { Session } from '@supabase/supabase-js';
+
+/** Spinner reutilizable para Suspense fallback */
+const PageLoader = () => (
+  <div className="flex-1 flex items-center justify-center h-full">
+    <div className="w-[32px] h-[32px] border-[3px] border-[var(--accent)] border-t-transparent rounded-full animate-spin" />
+  </div>
+);
+
+// ── Helpers ──────────────────────────────────────────────────────────────────
+
+/** Construye un perfil de fallback a partir de los metadatos de sesión */
+function buildFallbackProfile(session: Session) {
+  return {
+    id: session.user.id,
+    username:
+      session.user.user_metadata?.username ||
+      session.user.email?.split('@')[0] ||
+      'Usuario',
+    fullName:
+      session.user.user_metadata?.full_name ||
+      session.user.user_metadata?.name ||
+      '',
+    passwordHash: '',
+    createdAt: new Date().toISOString(),
+    role: 'free' as const,
+    planExpiresAt: null,
+  };
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
 
 function App() {
   const [authStatus, setAuthStatus] = useState<'loading' | 'ready'>('loading');
+  const [showRecoveryBtn, setShowRecoveryBtn] = useState(false);
   const { setSession, setCurrentUser } = useAppStore();
 
-  const [showRecoveryBtn, setShowRecoveryBtn] = useState(false);
+  // Usamos ref para evitar duplicados desde onAuthStateChange durante montura inicial
+  const initialSessionHandled = useRef(false);
 
   useEffect(() => {
-    // Theme init
+    // Tema inicial
     const t = localStorage.getItem('arbitrack_theme') || 'ocean';
     document.documentElement.setAttribute('data-theme', t);
 
-    // After 2s, we show a recovery button just in case
+    // Botón de recuperación visible a los 2s si la app cuelga
     const recoveryUiTid = setTimeout(() => setShowRecoveryBtn(true), 2000);
 
-    // Timeout of 7s: If app hangs, auto-wipe PWA cache and force full DOM reload
+    // Timeout de rescate: si en 7s la app no arrancó, borra caché PWA
     const rescueTimeout = setTimeout(() => {
-      console.warn("Auth initialization completely hung. Auto-clearing PWA caches.");
-      
+      // Solo actúa si todavía estamos en "loading"
+      console.warn('Auth completamente colgado. Limpiando caché PWA...');
       let needsReload = false;
+
       if ('serviceWorker' in navigator) {
-        navigator.serviceWorker.getRegistrations().then(regs => {
-          for (const reg of regs) { reg.unregister(); needsReload = true; }
-        });
+        navigator.serviceWorker
+          .getRegistrations()
+          .then(regs => {
+            for (const reg of regs) {
+              reg.unregister();
+              needsReload = true;
+            }
+            if (needsReload) window.location.reload();
+          })
+          .catch(() => {});
       }
+
       Object.keys(localStorage).forEach(k => {
-        if (k.startsWith('sb-') || k.includes('workbox')) { localStorage.removeItem(k); needsReload = true; }
+        if (k.startsWith('sb-') || k.includes('workbox')) {
+          localStorage.removeItem(k);
+          needsReload = true;
+        }
       });
-      
-      if (needsReload) {
-        window.location.reload();
-      } else {
-        if (authStatus === 'loading') setAuthStatus('ready');
+
+      if (!needsReload) {
+        // No había caché que limpiar, simplemente desbloquear la UI
+        setAuthStatus('ready');
       }
     }, 7000);
 
-    // Check for existing Supabase session on startup
-    supabase.auth.getSession().then(async ({ data: { session } }) => {
-      clearTimeout(rescueTimeout);
-      clearTimeout(recoveryUiTid);
+    /** Carga el perfil de Supabase, con fallback si no existe */
+    const loadProfile = async (session: Session) => {
       try {
+        let profile = await getUserProfile(session.user.id);
+        if (!profile) profile = buildFallbackProfile(session);
+        setCurrentUser(profile);
+      } catch (err) {
+        console.error('Error cargando perfil:', err);
+        // Fallback para que la app no se quede bloqueada
+        setCurrentUser(buildFallbackProfile(session));
+      }
+    };
+
+    // Sesión inicial (source-of-truth al arrancar)
+    supabase.auth
+      .getSession()
+      .then(async ({ data: { session } }) => {
+        clearTimeout(rescueTimeout);
+        clearTimeout(recoveryUiTid);
+        initialSessionHandled.current = true;
+
         if (session) {
           setSession(session);
-          let profile = await getUserProfile(session.user.id);
-          if (!profile) {
-            profile = {
-              id: session.user.id,
-              username: session.user.user_metadata?.username || session.user.email?.split('@')[0] || 'Usuario',
-              fullName: session.user.user_metadata?.full_name || session.user.user_metadata?.name || '',
-              passwordHash: '',
-              createdAt: new Date().toISOString(),
-              role: 'free',
-              planExpiresAt: null,
-            };
-          }
-          setCurrentUser(profile);
+          await loadProfile(session);
         }
-      } catch (err) {
-        console.error("Error durante session init:", err);
-      } finally {
         setAuthStatus('ready');
-      }
-    }).catch((fatalErr) => {
-      clearTimeout(rescueTimeout);
-      clearTimeout(recoveryUiTid);
-      console.error("Fallo masivo de Auth:", fatalErr);
-      setAuthStatus('ready');
-    });
+      })
+      .catch(fatalErr => {
+        clearTimeout(rescueTimeout);
+        clearTimeout(recoveryUiTid);
+        console.error('Fallo masivo de Auth:', fatalErr);
+        setAuthStatus('ready');
+      });
 
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (_event, session) => {
+    // Cambios de sesión posteriores (login, logout, refresh de token)
+    const {
+      data: { subscription },
+    } = supabase.auth.onAuthStateChange(async (_event, session) => {
+      // Ignorar el primer disparo duplicado con la sesión inicial
+      if (!initialSessionHandled.current) return;
+
       setSession(session);
       if (session) {
-        try {
-          let profile = await getUserProfile(session.user.id);
-          if (!profile) {
-            profile = {
-              id: session.user.id,
-              username: session.user.user_metadata?.username || session.user.email?.split('@')[0] || 'Usuario',
-              fullName: session.user.user_metadata?.full_name || session.user.user_metadata?.name || '',
-              passwordHash: '',
-              createdAt: new Date().toISOString(),
-              role: 'free',
-              planExpiresAt: null,
-            };
-          }
-          setCurrentUser(profile);
-        } catch (err) {
-          console.error("Error on auth state change:", err);
-        }
+        await loadProfile(session);
       } else {
         setCurrentUser(null);
       }
@@ -120,14 +159,16 @@ function App() {
           <div className="w-[40px] h-[40px] border-[3px] border-[var(--accent)] border-t-transparent rounded-full animate-spin" />
           <span className="text-[14px] text-[var(--text-secondary)]">Iniciando ArbiTrack...</span>
         </div>
-        
+
         {showRecoveryBtn && (
           <div className="absolute bottom-[40px] animate-fade-in-up text-center px-4">
             <p className="text-[12px] text-[var(--text-tertiary)] mb-2">¿Problemas al cargar en escritorio o móvil?</p>
-            <button 
+            <button
               onClick={() => {
                 if ('serviceWorker' in navigator) {
-                  navigator.serviceWorker.getRegistrations().then(rs => rs.forEach(r => r.unregister()));
+                  navigator.serviceWorker
+                    .getRegistrations()
+                    .then(rs => rs.forEach(r => r.unregister()));
                 }
                 localStorage.clear();
                 window.location.reload();
@@ -149,11 +190,12 @@ function App() {
 
         <Route element={<AppLayout />}>
           <Route path="/" element={<Dashboard />} />
-          <Route path="/ciclos" element={<Cycles />} />
-          <Route path="/ordenes" element={<Orders />} />
-          <Route path="/reportes" element={<Reports />} />
-          <Route path="/configuracion" element={<Settings />} />
-          <Route path="/admin" element={<AdminPanel />} />
+          {/* Rutas lazy — se cargan bajo demanda */}
+          <Route path="/ciclos"        element={<Suspense fallback={<PageLoader />}><Cycles /></Suspense>} />
+          <Route path="/ordenes"       element={<Suspense fallback={<PageLoader />}><Orders /></Suspense>} />
+          <Route path="/reportes"      element={<Suspense fallback={<PageLoader />}><Reports /></Suspense>} />
+          <Route path="/configuracion" element={<Suspense fallback={<PageLoader />}><Settings /></Suspense>} />
+          <Route path="/admin"         element={<Suspense fallback={<PageLoader />}><AdminPanel /></Suspense>} />
         </Route>
 
         <Route path="*" element={<Navigate to="/" replace />} />

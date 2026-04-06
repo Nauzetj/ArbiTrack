@@ -40,7 +40,7 @@ function mapOrder(row: any): Order {
 function mapCycle(row: any): Cycle {
   return {
     id: row.id,
-    cycleNumber: Number(row.cycleNumber),
+    cycleNumber: Number(row.cycle_number),
     openedAt: row.opened_at,
     closedAt: row.closed_at ?? null,
     status: row.status,
@@ -229,7 +229,7 @@ export const getActiveCycleForUser = async (userId: string): Promise<Cycle | nul
 export const saveCycle = async (cycle: Cycle) => {
   const { error } = await supabase.from('cycles').upsert({
     id: cycle.id,
-    cycleNumber: cycle.cycleNumber,
+    cycle_number: cycle.cycleNumber,
     opened_at: cycle.openedAt,
     closed_at: cycle.closedAt,
     status: cycle.status,
@@ -278,11 +278,14 @@ export const recalculateCycleMetrics = async (cycleId: string, userId: string): 
   const ganancia_ves = ganancia_ves_bruta - (comision_total * tasa_compra_prom);
   const ganancia_usdt = tasa_compra_prom > 0 ? (ganancia_ves_bruta / tasa_compra_prom) - comision_total : -comision_total;
 
+  // ROI calculado sobre el volumen de venta (capital desplegado)
+  const roi_percent = usdt_vendido > 0 ? (ganancia_usdt / usdt_vendido) * 100 : 0;
+
   await saveCycle({
     ...cycle,
     usdt_vendido, usdt_recomprado, ves_recibido, ves_pagado,
     comision_total, tasa_venta_prom, tasa_compra_prom,
-    diferencial_tasa, ganancia_ves, ganancia_usdt,
+    diferencial_tasa, ganancia_ves, ganancia_usdt, roi_percent,
   });
 };
 

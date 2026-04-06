@@ -11,8 +11,7 @@ export const Topbar: React.FC = () => {
   const { bcvRate, isSyncing, setIsSyncing, setLastSyncTime, binanceKeys, currentUser, setOrders, setActiveCycle } = useAppStore();
   const [syncStatus, setSyncStatus] = useState<'idle' | 'syncing' | 'success' | 'error'>('idle');
 
-  const handleSync = async (isManualParam?: any) => {
-    const isManual = isManualParam && typeof isManualParam !== 'boolean' ? true : isManualParam === true;
+  const handleSync = async (isManual: boolean = false) => {
     const currentState = useAppStore.getState();
     const user = currentState.currentUser;
     if (!currentState.binanceKeys || !user) {
@@ -124,9 +123,10 @@ export const Topbar: React.FC = () => {
   useEffect(() => {
     if (!currentUser || !binanceKeys) return;
 
+    // Auto-sync en background cada 30s (suf. para capturar cambios sin riesgo de ban IP)
     const interval = setInterval(() => {
-      handleSync();
-    }, 7000); // 7 segundos es un límite balanceado para evitar baneos IP de Binance.
+      handleSync(false);
+    }, 30_000);
 
     return () => clearInterval(interval);
   }, [currentUser, binanceKeys]);
@@ -166,7 +166,7 @@ export const Topbar: React.FC = () => {
 
         {/* Sync Button */}
         <button 
-          onClick={handleSync}
+          onClick={() => handleSync(true)}
           disabled={isSyncing}
           title="Sincronizar con Binance"
           className="flex items-center gap-[8px] text-[13px] font-medium text-[var(--text-secondary)] hover:text-[var(--text-primary)] transition-colors disabled:opacity-50 p-[6px] md:p-0 hover:bg-[var(--bg-surface-3)] md:hover:bg-transparent rounded-[8px] md:rounded-none"

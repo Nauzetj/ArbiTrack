@@ -1,7 +1,7 @@
 import React, { useState, useMemo } from 'react';
 import { useAppStore } from '../../store/useAppStore';
 import type { Order } from '../../types';
-import { Search, X, ChevronUp, ChevronDown, ListFilter, Download } from 'lucide-react';
+import { Search, X, ChevronUp, ChevronDown, ListFilter, Download, ChevronLeft, ChevronRight } from 'lucide-react';
 import { Badge } from '../ui/Badge';
 import { saveOrder, recalculateCycleMetrics, getCyclesForUser, getOrdersForUser } from '../../services/dbOperations';
 import jsPDF from 'jspdf';
@@ -10,8 +10,12 @@ import autoTable from 'jspdf-autotable';
 type SortField = 'createTime_local' | 'counterPartNickName' | 'tradeType' | 'unitPrice' | 'totalPrice' | 'amount' | 'cycleId';
 type SortDirection = 'asc' | 'desc' | null;
 
+/** Registros por página — evita renders lentos con catálogos grandes */
+const ITEMS_PER_PAGE = 50;
+
 export const TransactionsTable: React.FC = () => {
   const { orders, currentUser, activeCycle, setOrders, setCycles, setActiveCycle } = useAppStore();
+  const [currentPage, setCurrentPage] = useState(1);
 
   // Filtros
   const [search, setSearch] = useState('');
@@ -105,7 +109,13 @@ export const TransactionsTable: React.FC = () => {
       if (aVal > bVal) return sortDirection === 'asc' ? 1 : -1;
       return 0;
     });
+    });
   }, [filteredOrders, sortField, sortDirection]);
+
+  // Paginación lógica
+  const totalPages = Math.ceil(sortedOrders.length / ITEMS_PER_PAGE);
+  const startIndex = (currentPage - 1) * ITEMS_PER_PAGE;
+  const paginatedOrders = sortedOrders.slice(startIndex, startIndex + ITEMS_PER_PAGE);
 
   const activeTags = [
     search && `Nombre: ${search}`,
@@ -130,33 +140,34 @@ export const TransactionsTable: React.FC = () => {
     return '';
   };
 
-  // Función de asignación rápida para integrarla en la misma tabla si pones un botón
-  const handleAssign = async (order: Order) => {
-    if (!activeCycle || !currentUser) return;
-    const updatedOrder = { ...order, cycleId: activeCycle.id };
-    await saveOrder(updatedOrder);
-    
-    // Almacenamiento y recalculado global (como en el Topbar/Dashboard)
-    await recalculateCycleMetrics(activeCycle.id, currentUser.id);
-    const freshOrders = await getOrdersForUser(currentUser.id);
-    const freshCycles = await getCyclesForUser(currentUser.id);
+  /**
+   * Batch refresh: guarda la orden actualizada, recalcula el ciclo afectado
+   * y actualiza el store en una sola pasada — elimina el patrón N+1 anterior.
+   */
+  const refreshAfterOrderChange = async (cycleId: string) => {
+    if (!currentUser) return;
+    // Recalcular primero, luego fetch batch paralelo
+    await recalculateCycleMetrics(cycleId, currentUser.id);
+    const [freshOrders, freshCycles] = await Promise.all([
+      getOrdersForUser(currentUser.id),
+      getCyclesForUser(currentUser.id),
+    ]);
     setOrders(freshOrders);
     setCycles(freshCycles);
-    setActiveCycle(freshCycles.find((c: any) => c.status === 'En curso') || null);
+    setActiveCycle(freshCycles.find(c => c.status === 'En curso') || null);
+  };
+
+  const handleAssign = async (order: Order) => {
+    if (!activeCycle || !currentUser) return;
+    await saveOrder({ ...order, cycleId: activeCycle.id });
+    await refreshAfterOrderChange(activeCycle.id);
   };
 
   const handleUnassign = async (order: Order) => {
     if (!currentUser || !order.cycleId) return;
     const oldCycleId = order.cycleId;
-    const updatedOrder = { ...order, cycleId: null };
-    await saveOrder(updatedOrder);
-    
-    await recalculateCycleMetrics(oldCycleId, currentUser.id);
-    const freshOrders = await getOrdersForUser(currentUser.id);
-    const freshCycles = await getCyclesForUser(currentUser.id);
-    setOrders(freshOrders);
-    setCycles(freshCycles);
-    setActiveCycle(freshCycles.find((c: any) => c.status === 'En curso') || null);
+    await saveOrder({ ...order, cycleId: null });
+    await refreshAfterOrderChange(oldCycleId);
   };
 
   const exportPDF = () => {
@@ -226,7 +237,7 @@ export const TransactionsTable: React.FC = () => {
               placeholder="Buscar contraparte..." 
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              className="w-full bg-transparent border-none text-[13px]text-[var(--text-primary)] py-[8px] pl-[32px] pr-[12px] outline-none placeholder:text-[var(--text-tertiary)]"
+              className="w-full bg-transparent border-none text-[13px] text-[var(--text-primary)] py-[8px] pl-[32px] pr-[12px] outline-none placeholder:text-[var(--text-tertiary)]"
             />
           </div>
 
@@ -269,8 +280,8 @@ export const TransactionsTable: React.FC = () => {
             </tr>
           </thead>
           <tbody className="divide-y divide-[var(--border)]/50">
-            {sortedOrders.length > 0 ? (
-              sortedOrders.map((o) => {
+            {paginatedOrders.length > 0 ? (
+              paginatedOrders.map((o) => {
                 const assignedText = o.cycleId ? `Asignado (${o.cycleId.slice(0,4)})` : 'Sin Asignar';
                 const isAssigned = o.cycleId !== null;
                 
@@ -353,6 +364,27 @@ export const TransactionsTable: React.FC = () => {
              </span>
            ))}
         </div>
+        {totalPages > 1 && (
+          <div className="flex items-center gap-[6px]">
+            <button 
+              onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
+              disabled={currentPage === 1}
+              className="p-[4px] rounded hover:bg-[var(--bg-surface-4)] text-[var(--text-primary)] disabled:opacity-30 disabled:hover:bg-transparent"
+            >
+              <ChevronLeft size={16} />
+            </button>
+            <span className="font-mono text-[12px] bg-[var(--bg-surface-1)] border-[0.5px] border-[var(--border)] px-[8px] py-[2px] rounded">
+              {currentPage} / {totalPages}
+            </span>
+            <button 
+              onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
+              disabled={currentPage === totalPages}
+              className="p-[4px] rounded hover:bg-[var(--bg-surface-4)] text-[var(--text-primary)] disabled:opacity-30 disabled:hover:bg-transparent"
+            >
+              <ChevronRight size={16} />
+            </button>
+          </div>
+        )}
       </div>
 
     </div>

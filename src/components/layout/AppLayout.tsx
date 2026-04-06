@@ -79,12 +79,13 @@ const ExpiredWall: React.FC<{ role: string; planExpiresAt: string | null; onLogo
 
 // ─────────────────────────────────────────────────────────────────────────────
 export const AppLayout: React.FC = () => {
-  const { currentUser, binanceKeys, setOrders, setCycles, setActiveCycle, setBcvRate, logout } = useAppStore();
+  const { currentUser, setOrders, setCycles, setActiveCycle, setBcvRate, logout } = useAppStore();
   const navigate = useNavigate();
   const hasHydrated = useRef(false);
 
   useEffect(() => {
-    if (!currentUser || !binanceKeys) {
+    // Solo redirigir si no hay usuario autenticado
+    if (!currentUser) {
       navigate('/login');
       return;
     }
@@ -110,6 +111,7 @@ export const AppLayout: React.FC = () => {
       })();
     }
 
+    // BCV cambia una vez al día — polling cada 5 minutos es más que suficiente
     const updateBcv = () => {
       fetchBCVRate()
         .then(rate => setBcvRate(rate))
@@ -117,11 +119,11 @@ export const AppLayout: React.FC = () => {
     };
 
     updateBcv();
-    const bcvInterval = setInterval(updateBcv, 10000);
+    const bcvInterval = setInterval(updateBcv, 5 * 60 * 1000); // 5 minutos
     return () => clearInterval(bcvInterval);
-  }, [currentUser, binanceKeys, navigate, setOrders, setCycles, setActiveCycle, setBcvRate]);
+  }, [currentUser, navigate, setOrders, setCycles, setActiveCycle, setBcvRate]);
 
-  if (!currentUser || !binanceKeys) return null;
+  if (!currentUser) return null;
 
   if (isPlanExpired(currentUser.planExpiresAt, currentUser.role)) {
     return (

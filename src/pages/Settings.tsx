@@ -42,13 +42,16 @@ export const Settings: React.FC = () => {
     if (!currentUser) return;
     setIsClearing(true);
     try {
-      // Delete all orders and cycles for this user from Supabase
-      await supabase.from('orders').delete().eq('user_id', currentUser.id);
-      await supabase.from('cycles').delete().eq('user_id', currentUser.id);
+      const { error: ordersErr } = await supabase.from('orders').delete().eq('user_id', currentUser.id);
+      if (ordersErr) throw new Error(`Error al borrar órdenes: ${ordersErr.message}`);
+
+      const { error: cyclesErr } = await supabase.from('cycles').delete().eq('user_id', currentUser.id);
+      if (cyclesErr) throw new Error(`Error al borrar ciclos: ${cyclesErr.message}`);
+
       setShowClearModal(false);
       await logout();
-    } catch (e) {
-      alert('Error al limpiar los datos.');
+    } catch (e: any) {
+      alert(e.message || 'Error al limpiar los datos.');
     } finally {
       setIsClearing(false);
     }

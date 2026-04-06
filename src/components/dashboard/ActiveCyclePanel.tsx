@@ -4,6 +4,7 @@ import { Button } from '../ui/Button';
 import { Badge } from '../ui/Badge';
 import { saveCycle } from '../../services/dbOperations';
 import { generateUUID } from '../../crypto/auth';
+import toast from 'react-hot-toast';
 import type { Cycle } from '../../types';
 
 export const ActiveCyclePanel: React.FC = () => {
@@ -38,7 +39,7 @@ export const ActiveCyclePanel: React.FC = () => {
       setCycles([newCycle, ...cycles]);
     } catch (err: any) {
       console.error('Error opening cycle:', err);
-      alert('Error al abrir ciclo: ' + err.message);
+      toast.error('Error al abrir ciclo: ' + err.message);
     }
   };
 
@@ -57,7 +58,7 @@ export const ActiveCyclePanel: React.FC = () => {
       setCycles(cycles.map(c => c.id === closedCycle.id ? closedCycle : c));
     } catch (err: any) {
       console.error('Error closing cycle:', err);
-      alert('Error al cerrar ciclo: ' + err.message);
+      toast.error('Error al cerrar ciclo: ' + err.message);
     }
   };
 

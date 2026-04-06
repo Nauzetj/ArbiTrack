@@ -39,6 +39,8 @@ interface AppState {
 }
 
 const getInitialTheme = () => {
+  // Guard: en SSR o tests puede no existir el DOM
+  if (typeof document === 'undefined') return 'ocean';
   const t = localStorage.getItem('arbitrack_theme') || 'ocean';
   document.documentElement.setAttribute('data-theme', t);
   return t;

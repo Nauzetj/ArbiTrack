@@ -5,36 +5,31 @@ import { MetricCard } from '../components/ui/MetricCard';
 import { ActiveCyclePanel } from '../components/dashboard/ActiveCyclePanel';
 import { MiniChart } from '../components/dashboard/MiniChart';
 import { RecentCyclesTable } from '../components/dashboard/RecentCyclesTable';
-import { getOrdersForUser, getCyclesForUser, recalculateCycleMetrics } from '../services/dbOperations';
+import { getCyclesForUser, recalculateCycleMetrics } from '../services/dbOperations';
 
 export const Dashboard: React.FC = () => {
-  const { currentUser, setOrders, orders, setCycles, setActiveCycle, cycles } = useAppStore();
+  const { currentUser, orders, setCycles, setActiveCycle, cycles, activeCycle } = useAppStore();
 
   useEffect(() => {
-    if (!currentUser) return;
+    // AppLayout ya hidrata orders y cycles al montar. Aquí solo recalculamos
+    // el ciclo activo si existe (por si llegaron órdenes nuevas desde el sync).
+    if (!currentUser || !activeCycle) return;
 
-    const loadData = async () => {
+    const refreshActiveCycle = async () => {
       try {
-        const userOrders = await getOrdersForUser(currentUser.id);
-        let userCycles = await getCyclesForUser(currentUser.id);
-
-        const active = userCycles.find(c => c.status === 'En curso');
-        if (active) {
-          await recalculateCycleMetrics(active.id, currentUser.id);
-          userCycles = await getCyclesForUser(currentUser.id);
-        }
-
-        setOrders(userOrders);
-        setCycles(userCycles);
-        const updatedActive = userCycles.find(c => c.status === 'En curso');
-        setActiveCycle(updatedActive || null);
+        await recalculateCycleMetrics(activeCycle.id, currentUser.id);
+        const updatedCycles = await getCyclesForUser(currentUser.id);
+        setCycles(updatedCycles);
+        setActiveCycle(updatedCycles.find(c => c.status === 'En curso') || null);
       } catch (err) {
-        console.error('Error loading dashboard data:', err);
+        console.error('Error recalculando ciclo activo:', err);
       }
     };
 
-    loadData();
-  }, [currentUser]);
+    refreshActiveCycle();
+  // Solo se ejecuta cuando cambia el ciclo activo (nuevo ciclo abierto, etc.)
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [currentUser?.id, activeCycle?.id]);
 
   const todayStart = new Date();
   todayStart.setHours(0, 0, 0, 0);

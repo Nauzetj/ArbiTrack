@@ -37,7 +37,7 @@ CREATE TABLE IF NOT EXISTS payment_requests (
 -- 4. Crear tabla de Ciclos
 CREATE TABLE IF NOT EXISTS cycles (
   id UUID PRIMARY KEY,
-  "cycleNumber" BIGINT NOT NULL,
+  cycle_number BIGINT NOT NULL,
   opened_at TIMESTAMP WITH TIME ZONE NOT NULL,
   closed_at TIMESTAMP WITH TIME ZONE,
   status TEXT NOT NULL,
