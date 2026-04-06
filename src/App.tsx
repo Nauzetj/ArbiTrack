@@ -24,10 +24,10 @@ function App() {
     const t = localStorage.getItem('arbitrack_theme') || 'ocean';
     document.documentElement.setAttribute('data-theme', t);
 
-    // After 4s, we show a recovery button just in case
-    const recoveryUiTid = setTimeout(() => setShowRecoveryBtn(true), 4000);
+    // After 2s, we show a recovery button just in case
+    const recoveryUiTid = setTimeout(() => setShowRecoveryBtn(true), 2000);
 
-    // Timeout of 6s: If app hangs, auto-wipe PWA cache and force reload
+    // Timeout of 3s: If app hangs, auto-wipe PWA cache and force reload
     const rescueTimeout = setTimeout(() => {
       console.warn("Auth initialization completely hung. Auto-clearing PWA caches.");
       
@@ -43,7 +43,7 @@ function App() {
       if (authStatus === 'loading') {
         setAuthStatus('ready');
       }
-    }, 6000);
+    }, 3000);
 
     // Check for existing Supabase session on startup
     supabase.auth.getSession().then(async ({ data: { session } }) => {
