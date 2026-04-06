@@ -126,13 +126,13 @@ export const Cycles: React.FC = () => {
 
       {/* Table view */}
       {view === 'table' && (
-        <div className="bg-[var(--bg-surface-2)] rounded-[16px] border border-[var(--border)] overflow-hidden">
-          <table className="w-full text-left border-collapse">
+        <div className="bg-[var(--bg-surface-2)] rounded-[16px] border border-[var(--border)] overflow-x-auto custom-scrollbar">
+          <table className="w-full min-w-[800px] text-left border-collapse">
             <thead>
               <tr className="bg-[var(--bg-surface-3)] text-[10px] uppercase font-semibold text-[var(--text-tertiary)] tracking-[1px]">
                 <th className="p-[16px] border-b border-[var(--border-strong)]"># Ciclo</th>
-                <th className="p-[16px] border-b border-[var(--border-strong)]">Apertura</th>
-                <th className="p-[16px] border-b border-[var(--border-strong)]">Cierre</th>
+                <th className="p-[16px] border-b border-[var(--border-strong)] min-w-[140px]">Apertura</th>
+                <th className="p-[16px] border-b border-[var(--border-strong)] min-w-[140px]">Cierre</th>
                 <th className="p-[16px] border-b border-[var(--border-strong)] text-right">USDT Vendido</th>
                 <th className="p-[16px] border-b border-[var(--border-strong)] text-right">Ganancia (USDT)</th>
                 <th className="p-[16px] border-b border-[var(--border-strong)] text-center">ROI</th>

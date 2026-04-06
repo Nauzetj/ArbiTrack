@@ -9,7 +9,7 @@ import type { Cycle } from '../../types';
 export const ActiveCyclePanel: React.FC = () => {
   const { activeCycle, setActiveCycle, currentUser, bcvRate, cycles, setCycles } = useAppStore();
 
-  const handleOpenCycle = () => {
+  const handleOpenCycle = async () => {
     if (!currentUser) return;
     const newCycle: Cycle = {
       id: generateUUID(),
@@ -32,12 +32,12 @@ export const ActiveCyclePanel: React.FC = () => {
       notas: '',
       userId: currentUser.id
     };
-    saveCycle(newCycle);
+    await saveCycle(newCycle);
     setActiveCycle(newCycle);
     setCycles([newCycle, ...cycles]);
   };
 
-  const handleCloseCycle = () => {
+  const handleCloseCycle = async () => {
     if (!activeCycle || !currentUser) return;
     const closedCycle = { 
       ...activeCycle, 
@@ -45,7 +45,7 @@ export const ActiveCyclePanel: React.FC = () => {
       closedAt: new Date().toISOString(),
       tasa_bcv_dia: bcvRate ? bcvRate.tasa_bcv : activeCycle.tasa_bcv_dia
     };
-    saveCycle(closedCycle);
+    await saveCycle(closedCycle);
     setActiveCycle(null);
     // Reflect closed status in the cycles[] list immediately
     setCycles(cycles.map(c => c.id === closedCycle.id ? closedCycle : c));

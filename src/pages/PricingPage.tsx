@@ -30,17 +30,17 @@ export const PricingPage: React.FC<PricingPageProps> = ({ onPromoValidated, onRe
   const [promoError, setPromoError] = useState('');
   const [promoSuccess, setPromoSuccess] = useState('');
 
-  const handleValidatePromo = () => {
+  const handleValidatePromo = async () => {
     setPromoError('');
     setPromoSuccess('');
     if (!promoCode.trim()) { setPromoError('Ingresa un código.'); return; }
 
-    const result = validatePromoCode(promoCode);
+    const result = await validatePromoCode(promoCode);
     if (!result.valid || !result.code) {
       setPromoError(result.error || 'Código inválido.');
       return;
     }
-    setPromoSuccess(`✓ Código válido — Plan ${result.code.plan === 'vip_annual' ? 'Anual' : result.code.plan === 'vip_semiannual' ? 'Semestral' : 'Mensual'} activado.`);
+    setPromoSuccess(`✓ Código válido — Plan ${result.code!.plan === 'vip_annual' ? 'Anual' : result.code!.plan === 'vip_semiannual' ? 'Semestral' : 'Mensual'} activado.`);
     setTimeout(() => onPromoValidated(result.code!, result.code!.plan), 900);
   };
 

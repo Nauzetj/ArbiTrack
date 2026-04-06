@@ -32,12 +32,12 @@ export const RecentCyclesTable: React.FC = () => {
       </div>
 
       {/* Sticky thead + scrollable tbody */}
-      <div className="flex-1 min-h-0 overflow-y-auto custom-scrollbar">
-        <table className="w-full text-left border-collapse">
+      <div className="flex-1 min-h-0 overflow-x-auto overflow-y-auto custom-scrollbar w-full">
+        <table className="w-full min-w-[700px] text-left border-collapse">
           <thead className="sticky top-0 z-10">
             <tr className="bg-[var(--bg-surface-3)] text-[10px] uppercase font-semibold text-[var(--text-tertiary)] tracking-[1px]">
               <th className="p-[14px] border-b border-[var(--border-strong)] font-semibold"># Ciclo</th>
-              <th className="p-[14px] border-b border-[var(--border-strong)] font-semibold">Apertura</th>
+              <th className="p-[14px] border-b border-[var(--border-strong)] font-semibold min-w-[140px]">Apertura</th>
               <th className="p-[14px] border-b border-[var(--border-strong)] font-semibold text-right">USDT Vendido</th>
               <th className="p-[14px] border-b border-[var(--border-strong)] font-semibold text-right">Ganancia</th>
               <th className="p-[14px] border-b border-[var(--border-strong)] font-semibold text-center">ROI</th>

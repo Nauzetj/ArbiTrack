@@ -1,5 +1,5 @@
 import React, { useState, useRef } from 'react';
-import { Upload, ImageIcon, ArrowLeft, Send, Check } from 'lucide-react';
+import { ImageIcon, ArrowLeft, Send, Check } from 'lucide-react';
 import { createPaymentRequest } from '../services/dbOperations';
 import { generateUUID } from '../crypto/auth';
 
@@ -42,14 +42,14 @@ export const PaymentRequestForm: React.FC<PaymentRequestFormProps> = ({ onBack }
     reader.readAsDataURL(file);
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
     if (!name.trim()) { setError('Ingresa tu nombre.'); return; }
     if (!contact.trim()) { setError('Ingresa tu contacto (WhatsApp o correo).'); return; }
     if (!imageData) { setError('Adjunta la captura del comprobante de pago.'); return; }
 
-    createPaymentRequest({
+    await createPaymentRequest({
       id: generateUUID(),
       name: name.trim(),
       contact: contact.trim(),

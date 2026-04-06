@@ -1,7 +1,7 @@
 export type TradeType = "SELL" | "BUY";
 export type CycleStatus = "En curso" | "Completado" | "Con pérdida" | "Neutral";
 
-export type UserRole = 'admin' | 'vip_annual' | 'vip_semiannual' | 'vip_monthly' | 'free';
+export type UserRole = 'admin' | 'vip_annual' | 'vip_semiannual' | 'vip_monthly' | 'vip_promo' | 'free';
 
 export interface User {
   id: string; // uuid
@@ -16,7 +16,7 @@ export interface User {
 export interface PromoCode {
   id: string;
   code: string;
-  plan: 'vip_monthly' | 'vip_semiannual' | 'vip_annual';
+  plan: 'vip_promo' | 'vip_monthly' | 'vip_semiannual' | 'vip_annual';
   createdAt: string; // ISO
   expiresAt: string;  // ISO (+15 days)
   usedAt: string | null;

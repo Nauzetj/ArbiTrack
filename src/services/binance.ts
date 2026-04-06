@@ -1,18 +1,14 @@
 export const fetchP2POrders = async (
-  apiKey: string, 
-  secretKey: string, 
+  apiKey: string,
+  secretKey: string,
   page: number = 1
 ): Promise<any> => {
-  const res = await fetch("http://localhost:3001/api/p2p-orders", {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json"
-    },
-    body: JSON.stringify({
-      apiKey,
-      secretKey,
-      page
-    })
+  // In production: /api/binance (Vercel Serverless Function)
+  // In development: /api/binance (proxied by Vite to localhost)
+  const res = await fetch('/api/binance', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ apiKey, secretKey, page }),
   });
 
   if (!res.ok) {

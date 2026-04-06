@@ -9,11 +9,11 @@ export const UnassignedOrdersPool: React.FC = () => {
 
   const unassigned = orders.filter(o => !o.cycleId && o.orderStatus === 'COMPLETED');
 
-  const handleAssign = (order: Order) => {
+  const handleAssign = async (order: Order) => {
     if (!activeCycle) return;
     
     const updatedOrder = { ...order, cycleId: activeCycle.id };
-    saveOrder(updatedOrder);
+    await saveOrder(updatedOrder);
     
     const updatedOrders = orders.map(o => o.id === order.id ? updatedOrder : o);
     setOrders(updatedOrders);
@@ -59,7 +59,7 @@ export const UnassignedOrdersPool: React.FC = () => {
     newCycle.roi_percent      = roi_percent;
     // ----------------------------------------
 
-    saveCycle(newCycle);
+    await saveCycle(newCycle);
     setActiveCycle(newCycle);
     // Sync the cycles[] array in the store so all consumers see fresh data
     setCycles(cycles.map(c => c.id === newCycle.id ? newCycle : c));

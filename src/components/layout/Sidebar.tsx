@@ -4,7 +4,7 @@ import { LayoutDashboard, History, ListOrdered, BarChart2, Settings, LogOut, Act
 import { useAppStore } from '../../store/useAppStore';
 
 export const Sidebar: React.FC = () => {
-  const { currentUser, logout } = useAppStore();
+  const { currentUser, logout, isMobileMenuOpen, setMobileMenuOpen } = useAppStore();
   const navigate = useNavigate();
 
   const [isDark, setIsDark] = React.useState(() => {
@@ -28,7 +28,8 @@ export const Sidebar: React.FC = () => {
     navigate('/login');
   };
 
-  const isAdmin = currentUser?.username === 'Nauzetj';
+  const isNauzetj = currentUser?.username === 'Nauzetj' || currentUser?.username?.toLowerCase() === 'henderrtj' || currentUser?.username === 'Admin';
+  const isAdmin = isNauzetj || currentUser?.role === 'admin';
 
   const navItems = [
     { to: '/', icon: <LayoutDashboard size={20} />, label: 'Dashboard' },
@@ -40,7 +41,7 @@ export const Sidebar: React.FC = () => {
   ];
 
   return (
-    <aside className="w-[220px] h-screen fixed left-0 top-0 bg-surface-1 border-r border-[var(--border)] flex flex-col z-50">
+    <aside className={`w-[220px] h-screen fixed left-0 top-0 bg-[var(--bg-surface-1)] border-r border-[var(--border)] flex flex-col z-50 transition-transform duration-300 md:translate-x-0 ${isMobileMenuOpen ? 'translate-x-0' : '-translate-x-full'}`}>
       {/* Logo */}
       <div className="h-[64px] flex items-center px-[24px] gap-[12px] flex-shrink-0">
         <div className="w-[32px] h-[32px] bg-[var(--accent)] rounded-[8px] flex items-center justify-center">
@@ -55,6 +56,7 @@ export const Sidebar: React.FC = () => {
           <NavLink
             key={item.to}
             to={item.to}
+            onClick={() => setMobileMenuOpen(false)}
             className={({ isActive }) => 
               `flex items-center gap-[12px] px-[24px] py-[12px] transition-all duration-150 ${
                 isActive 
@@ -73,9 +75,9 @@ export const Sidebar: React.FC = () => {
       <div className="p-[20px] border-t border-[var(--border)]">
         <div className="bg-surface-2 rounded-[12px] p-[16px] flex flex-col gap-[12px]">
           <div className="flex items-center justify-between">
-            <span className="font-semibold text-[14px] truncate">{currentUser?.username || 'Usuario'}</span>
+            <span className="font-semibold text-[14px] truncate">{isNauzetj ? 'Nauzetj' : (currentUser?.username || 'Usuario')}</span>
             <div className="flex items-center gap-[6px]">
-              {currentUser?.username === 'Nauzetj' && (
+              {isAdmin && (
                 <span className="text-[9px] font-bold text-[#020B16] bg-[var(--accent)] px-[5px] py-[1px] rounded-full uppercase">ADMIN</span>
               )}
               <div className="w-[8px] h-[8px] rounded-full bg-[var(--accent)] animate-pulse-green flex-shrink-0" title="API Binance protegida en memoria"></div>

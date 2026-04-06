@@ -131,29 +131,29 @@ export const TransactionsTable: React.FC = () => {
   };
 
   // Función de asignación rápida para integrarla en la misma tabla si pones un botón
-  const handleAssign = (order: Order) => {
+  const handleAssign = async (order: Order) => {
     if (!activeCycle || !currentUser) return;
     const updatedOrder = { ...order, cycleId: activeCycle.id };
-    saveOrder(updatedOrder);
+    await saveOrder(updatedOrder);
     
     // Almacenamiento y recalculado global (como en el Topbar/Dashboard)
-    recalculateCycleMetrics(activeCycle.id, currentUser.id);
-    const freshOrders = getOrdersForUser(currentUser.id);
-    const freshCycles = getCyclesForUser(currentUser.id);
+    await recalculateCycleMetrics(activeCycle.id, currentUser.id);
+    const freshOrders = await getOrdersForUser(currentUser.id);
+    const freshCycles = await getCyclesForUser(currentUser.id);
     setOrders(freshOrders);
     setCycles(freshCycles);
     setActiveCycle(freshCycles.find((c: any) => c.status === 'En curso') || null);
   };
 
-  const handleUnassign = (order: Order) => {
+  const handleUnassign = async (order: Order) => {
     if (!currentUser || !order.cycleId) return;
     const oldCycleId = order.cycleId;
     const updatedOrder = { ...order, cycleId: null };
-    saveOrder(updatedOrder);
+    await saveOrder(updatedOrder);
     
-    recalculateCycleMetrics(oldCycleId, currentUser.id);
-    const freshOrders = getOrdersForUser(currentUser.id);
-    const freshCycles = getCyclesForUser(currentUser.id);
+    await recalculateCycleMetrics(oldCycleId, currentUser.id);
+    const freshOrders = await getOrdersForUser(currentUser.id);
+    const freshCycles = await getCyclesForUser(currentUser.id);
     setOrders(freshOrders);
     setCycles(freshCycles);
     setActiveCycle(freshCycles.find((c: any) => c.status === 'En curso') || null);
@@ -255,8 +255,8 @@ export const TransactionsTable: React.FC = () => {
       </div>
 
       {/* Virtual Scroll Area - Height Max */}
-      <div className="max-h-[380px] overflow-y-auto bg-[var(--bg-surface-2)]">
-        <table className="w-full text-left text-[13px] border-collapse min-w-[700px]">
+      <div className="max-h-[380px] overflow-x-auto overflow-y-auto bg-[var(--bg-surface-2)] custom-scrollbar">
+        <table className="w-full text-left text-[13px] border-collapse min-w-[900px]">
           <thead className="sticky top-0 bg-[var(--bg-surface-3)] text-[11px] uppercase tracking-wider text-[var(--text-tertiary)] shadow-[0_1px_0_var(--border)] z-10">
             <tr>
               <th className="py-[12px] px-[16px] font-medium cursor-pointer hover:text-[var(--accent)] transition-colors" onClick={() => handleSort('createTime_local')}>Fecha <SortIcon field="createTime_local" /></th>
