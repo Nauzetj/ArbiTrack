@@ -109,7 +109,6 @@ export const TransactionsTable: React.FC = () => {
       if (aVal > bVal) return sortDirection === 'asc' ? 1 : -1;
       return 0;
     });
-    });
   }, [filteredOrders, sortField, sortDirection]);
 
   // Paginación lógica
