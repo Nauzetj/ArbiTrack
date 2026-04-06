@@ -13,9 +13,12 @@ export const ActiveCyclePanel: React.FC = () => {
   const handleOpenCycle = async () => {
     if (!currentUser) return;
     try {
+      // Evitar integer overflow en bd: recortamos a 9 dígitos para garantizar < 2,147,483,647 (max int postgres)
+      const safeCycleNumber = Number(Date.now().toString().slice(-9));
+      
       const newCycle: Cycle = {
         id: generateUUID(),
-        cycleNumber: Date.now(), 
+        cycleNumber: safeCycleNumber, 
         openedAt: new Date().toISOString(),
         closedAt: null,
         status: 'En curso',
