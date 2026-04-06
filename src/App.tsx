@@ -27,23 +27,26 @@ function App() {
     // After 2s, we show a recovery button just in case
     const recoveryUiTid = setTimeout(() => setShowRecoveryBtn(true), 2000);
 
-    // Timeout of 3s: If app hangs, auto-wipe PWA cache and force reload
+    // Timeout of 7s: If app hangs, auto-wipe PWA cache and force full DOM reload
     const rescueTimeout = setTimeout(() => {
       console.warn("Auth initialization completely hung. Auto-clearing PWA caches.");
       
+      let needsReload = false;
       if ('serviceWorker' in navigator) {
         navigator.serviceWorker.getRegistrations().then(regs => {
-          for (const reg of regs) reg.unregister();
+          for (const reg of regs) { reg.unregister(); needsReload = true; }
         });
       }
       Object.keys(localStorage).forEach(k => {
-        if (k.startsWith('sb-') || k.includes('workbox')) localStorage.removeItem(k);
+        if (k.startsWith('sb-') || k.includes('workbox')) { localStorage.removeItem(k); needsReload = true; }
       });
       
-      if (authStatus === 'loading') {
-        setAuthStatus('ready');
+      if (needsReload) {
+        window.location.reload();
+      } else {
+        if (authStatus === 'loading') setAuthStatus('ready');
       }
-    }, 3000);
+    }, 7000);
 
     // Check for existing Supabase session on startup
     supabase.auth.getSession().then(async ({ data: { session } }) => {

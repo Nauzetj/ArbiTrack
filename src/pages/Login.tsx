@@ -202,7 +202,7 @@ export const Login: React.FC = () => {
       });
 
       const timeoutPromise = new Promise<{data: any, error: any}>((_, reject) => 
-        setTimeout(() => reject(new Error('Súper demora de Red. Tu conexión local o PWA está bloqueando la app. ¡Por favor intenta otra vez!')), 5000)
+        setTimeout(() => reject(new Error('Súper demora de Red. Tu conexión local o PWA está bloqueando la app. ¡Por favor intenta otra vez!')), 12000)
       );
 
       const { data, error: signInError } = await Promise.race([signInPromise, timeoutPromise]);
