@@ -8,6 +8,7 @@ import { useAppStore } from '../../store/useAppStore';
 import { getOrdersForUser, getCyclesForUser, getActiveCycleForUser } from '../../services/dbOperations';
 import { fetchBCVRate } from '../../services/bcv';
 import { AlertTriangle, Clock, ArrowRight } from 'lucide-react';
+import { AssistantBot } from '../ui/AssistantBot';
 
 // ── Plan expiry check ─────────────────────────────────────────────────────────
 function isPlanExpired(planExpiresAt: string | null, role: string): boolean {
@@ -154,13 +155,11 @@ export const AppLayout: React.FC = () => {
         <main
           className="flex-1 overflow-y-auto overflow-x-hidden custom-scrollbar"
           style={{
-            /* Mobile: topbar is 56px. Desktop: 64px but we override in desktop‑only div below */
             paddingTop: '56px',
-            /* Space for bottom nav on mobile */
             paddingBottom: 'calc(64px + env(safe-area-inset-bottom, 8px))',
           }}
         >
-          <div className="p-[14px] md:p-[32px] md:pt-[16px]">
+          <div className="p-[14px] md:p-[32px] md:pt-[16px] animate-page-enter">
             <Outlet />
           </div>
         </main>
@@ -168,6 +167,9 @@ export const AppLayout: React.FC = () => {
 
       {/* ── Mobile bottom navigation ── */}
       <BottomNav />
+
+      {/* ── AI Assistant Bot (global floating) ── */}
+      <AssistantBot />
     </div>
   );
 };
