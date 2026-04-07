@@ -34,14 +34,24 @@ const Field: React.FC<{
 );
 
 // ── Message box ───────────────────────────────────────────────────────────────
-const MsgBox: React.FC<{ msg: string }> = ({ msg }) => {
+const MsgBox: React.FC<{ msg: string, onAction?: () => void, actionLabel?: string }> = ({ msg, onAction, actionLabel }) => {
   const isGood = msg.includes('exitosamente') || msg.includes('válido') || msg.startsWith('✓');
   return (
-    <div className={`p-[12px] rounded-[8px] text-[13px] border ${
+    <div className={`p-[12px] rounded-[8px] text-[13px] border flex flex-col gap-2 ${
       isGood
         ? 'bg-[var(--profit-bg)] text-[var(--profit)] border-[rgba(0,229,195,0.3)]'
         : 'bg-[var(--loss-bg)] text-[var(--loss)] border-[rgba(255,76,106,0.3)]'
-    }`}>{msg}</div>
+    }`}>
+      <div>{msg}</div>
+      {onAction && actionLabel && !isGood && (
+        <button
+          onClick={onAction}
+          className="mt-1 bg-[var(--loss)] text-white/90 text-[12px] font-bold py-1.5 px-3 rounded hover:bg-opacity-80 self-start transition-opacity"
+        >
+          {actionLabel}
+        </button>
+      )}
+    </div>
   );
 };
 
@@ -231,10 +241,41 @@ export const Login: React.FC = () => {
       }, data.session, loginApiKey, loginSecretKey);
       navigate('/');
     } catch (err: any) {
-      setError(err.message);
+      if (err.message && (err.message.includes('PWA') || err.message.includes('Red'))) {
+        setError('Interferencia del PWA detectada. Auto-reparando caché y recargando en 2 segundos...');
+        setTimeout(() => {
+          handleHardReload();
+        }, 2000);
+      } else {
+        setError(err.message);
+      }
     } finally {
       setIsLoading(false);
     }
+  };
+
+  const handleHardReload = async () => {
+    if ('serviceWorker' in navigator) {
+      try {
+        const registrations = await navigator.serviceWorker.getRegistrations();
+        for (const registration of registrations) {
+          await registration.unregister();
+        }
+      } catch (err) {
+        console.error('Error unregistering service worker', err);
+      }
+    }
+    if ('caches' in window) {
+      try {
+        const keys = await caches.keys();
+        for (const key of keys) {
+          await caches.delete(key);
+        }
+      } catch (err) {
+        console.error('Error deleting caches', err);
+      }
+    }
+    window.location.reload();
   };
 
   // ── Pricing / Payment ─────────────────────────────────────────────────────
@@ -265,7 +306,13 @@ export const Login: React.FC = () => {
         </p>
       </div>
 
-      {error && <MsgBox msg={error} />}
+      {error && (
+        <MsgBox 
+          msg={error} 
+          onAction={error.includes('PWA') || error.includes('Red') ? handleHardReload : undefined} 
+          actionLabel={error.includes('PWA') || error.includes('Red') ? '🔄 Limpiar Caché y Recargar' : undefined} 
+        />
+      )}
 
       <form onSubmit={handleLogin} className="flex flex-col gap-[14px] mt-[4px]">
         <Field label="Correo Electrónico" type="email" value={loginEmail} onChange={setLoginEmail} placeholder="tu@email.com" />
