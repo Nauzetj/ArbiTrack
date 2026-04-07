@@ -40,27 +40,6 @@ export const Dashboard: React.FC = () => {
     );
   }, { scope: containerRef });
 
-  useEffect(() => {
-    // AppLayout ya hidrata orders y cycles al montar. Aquí solo recalculamos
-    // el ciclo activo si existe (por si llegaron órdenes nuevas desde el sync).
-    if (!currentUser || !activeCycle) return;
-
-    const refreshActiveCycle = async () => {
-      try {
-        await recalculateCycleMetrics(activeCycle.id, currentUser.id);
-        const updatedCycles = await getCyclesForUser(currentUser.id);
-        setCycles(updatedCycles);
-        setActiveCycle(updatedCycles.find(c => c.status === 'En curso') || null);
-      } catch (err) {
-        console.error('Error recalculando ciclo activo:', err);
-      }
-    };
-
-    refreshActiveCycle();
-  // Solo se ejecuta cuando cambia el ciclo activo (nuevo ciclo abierto, etc.)
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [currentUser?.id, activeCycle?.id]);
-
   const todayStart = new Date();
   todayStart.setHours(0, 0, 0, 0);
 

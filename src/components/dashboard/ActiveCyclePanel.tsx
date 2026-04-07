@@ -25,16 +25,10 @@ export const ActiveCyclePanel: React.FC = () => {
         ease: "sine.inOut"
       });
     } else {
-      gsap.from('.cycle-stat-value', {
-        innerText: 0,
-        duration: 1.5,
-        snap: { innerText: 1 },
-        stagger: 0.1,
-        ease: 'power3.out',
-        modifiers: {
-          innerText: function(innerText) { return parseFloat(innerText).toFixed(2); }
-        }
-      });
+      gsap.fromTo('.cycle-stat-group', 
+        { y: 15, opacity: 0 },
+        { y: 0, opacity: 1, duration: 0.6, stagger: 0.1, ease: 'power3.out', clearProps: 'all' }
+      );
     }
   }, { dependencies: [activeCycle?.id], scope: panelRef });
 
@@ -125,26 +119,30 @@ export const ActiveCyclePanel: React.FC = () => {
         <h2 className="font-bold text-[18px]">Ciclo #{activeCycle.cycleNumber.toString().slice(-4)}</h2>
         <Badge variant="accent">EN CURSO</Badge>
       </div>
-
+      {/* Stats Grid */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-[16px] gap-y-[24px] relative z-10">
-        <div className="flex flex-col">
+        <div className="flex flex-col cycle-stat-group">
           <span className="text-[10px] text-[var(--text-tertiary)] uppercase font-semibold tracking-[1.2px] mb-[4px]">USDT Vendido</span>
-          <span className="cycle-stat-value mono text-[18px] font-medium">{activeCycle.usdt_vendido.toFixed(2)}</span>
+          <span className="mono text-[18px] font-medium">{activeCycle.usdt_vendido.toFixed(2)}</span>
         </div>
-        <div className="flex flex-col pl-[16px] border-l border-[var(--border-strong)]">
+        
+        <div className="flex flex-col cycle-stat-group">
           <span className="text-[10px] text-[var(--text-tertiary)] uppercase font-semibold tracking-[1.2px] mb-[4px]">USDT Recomprado</span>
-          <span className="cycle-stat-value mono text-[18px] font-medium">{activeCycle.usdt_recomprado.toFixed(2)}</span>
+          <span className="mono text-[18px] font-medium">{activeCycle.usdt_recomprado.toFixed(2)}</span>
         </div>
-        <div className="flex flex-col lg:pl-[16px] lg:border-l border-[var(--border-strong)]">
-          <span className="text-[10px] text-[var(--text-tertiary)] uppercase font-semibold tracking-[1.2px] mb-[4px]">Liquidez Neta (Bs.)</span>
-          <span className={`cycle-stat-value mono text-[18px] font-medium ${liquidezVES < 0 ? 'text-loss' : 'text-[var(--text-primary)]'}`}>
+
+        <div className="flex flex-col cycle-stat-group">
+          <span className="text-[10px] text-[var(--text-tertiary)] uppercase font-semibold tracking-[1.2px] mb-[4px]">Liquidez Neta</span>
+          <span className={`mono text-[18px] font-medium ${liquidezVES < 0 ? 'text-loss' : 'text-[var(--text-primary)]'}`}>
             {liquidezVES.toFixed(2)}
           </span>
+          <span className="text-[10px] text-[var(--text-tertiary)] mt-[2px]">Bolívares (VES)</span>
         </div>
-        <div className="flex flex-col pl-[16px] border-l border-[var(--border-strong)]">
-          <span className="text-[10px] text-[var(--text-tertiary)] uppercase font-semibold tracking-[1.2px] mb-[4px]">Ganancia Parcial</span>
+
+        <div className="flex flex-col cycle-stat-group">
+          <span className="text-[10px] text-[var(--text-tertiary)] uppercase font-semibold tracking-[1.2px] mb-[4px]">Resultado Parcial</span>
           <span className={`mono text-[18px] font-medium ${isLoss ? 'text-loss' : 'text-profit'}`}>
-            {resParcial > 0 ? '+' : ''}<span className="cycle-stat-value">{resParcial.toFixed(2)}</span> USDT
+            {resParcial > 0 ? '+' : ''}<span>{resParcial.toFixed(2)}</span> USDT
           </span>
         </div>
       </div>
