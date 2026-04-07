@@ -89,7 +89,7 @@ export const MetricCard: React.FC<MetricCardProps> = ({
       className={[
         'metric-card bg-surface-2 rounded-[16px] border-default p-[20px]',
         'flex flex-col gap-[12px] relative overflow-hidden',
-        'transition-shadow duration-300 cursor-default opacity-0',
+        'transition-shadow duration-300 cursor-default',
         'hover:shadow-[0_8px_30px_rgba(0,0,0,0.12)]',
         isActive
           ? 'shadow-[0_0_18px_rgba(37,99,235,0.09)] border-[var(--accent-border)]'

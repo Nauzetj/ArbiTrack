@@ -13,31 +13,18 @@ export const Dashboard: React.FC = () => {
   const containerRef = useRef<HTMLDivElement>(null);
 
   useGSAP(() => {
-    const tl = gsap.timeline({ defaults: { ease: 'power3.out' } });
+    gsap.set('.metric-card', { opacity: 0, y: 20 });
+    gsap.set('.active-cycle-panel', { opacity: 0, y: 20 });
+    gsap.set('.dashboard-chart, .dashboard-security-notice', { opacity: 0, y: 20 });
+    gsap.set('.recent-cycles-table', { opacity: 0, y: 20 });
 
-    tl.to('.metric-card', {
-      y: 0,
-      opacity: 1,
-      duration: 0.6,
-      stagger: 0.1,
-      clearProps: 'opacity,transform'
-    })
-    .fromTo('.active-cycle-panel', 
-      { y: 20, opacity: 0 }, 
-      { y: 0, opacity: 1, duration: 0.5, clearProps: 'opacity,transform' }, 
-      "-=0.3"
-    )
-    .fromTo('.dashboard-chart, .dashboard-security-notice', 
-      { y: 20, opacity: 0 }, 
-      { y: 0, opacity: 1, duration: 0.5, stagger: 0.1, clearProps: 'opacity,transform' }, 
-      "-=0.3"
-    )
-    .fromTo('.recent-cycles-table', 
-      { opacity: 0, y: 20 }, 
-      { opacity: 1, y: 0, duration: 0.5, clearProps: 'all' }, 
-      "-=0.2"
-    );
+    const tl = gsap.timeline({ defaults: { ease: 'power3.out' } });
+    tl.to('.metric-card', { y: 0, opacity: 1, duration: 0.6, stagger: 0.08 })
+      .to('.active-cycle-panel', { y: 0, opacity: 1, duration: 0.5 }, '-=0.3')
+      .to('.dashboard-chart, .dashboard-security-notice', { y: 0, opacity: 1, duration: 0.5, stagger: 0.1 }, '-=0.3')
+      .to('.recent-cycles-table', { y: 0, opacity: 1, duration: 0.5 }, '-=0.2');
   }, { scope: containerRef });
+
 
   const todayStart = new Date();
   todayStart.setHours(0, 0, 0, 0);
@@ -90,16 +77,16 @@ export const Dashboard: React.FC = () => {
       </div>
 
       {/* Active Cycle Panel */}
-      <div className="active-cycle-panel opacity-0">
+      <div className="active-cycle-panel">
         <ActiveCyclePanel />
       </div>
 
       {/* Chart + Info: side by side on XL, stacked on mobile */}
       <div className="grid grid-cols-1 xl:grid-cols-12 gap-[12px] md:gap-[20px]">
-        <div className="xl:col-span-7 dashboard-chart opacity-0">
+        <div className="xl:col-span-7 dashboard-chart">
           <MiniChart />
         </div>
-        <div className="xl:col-span-5 dashboard-security-notice opacity-0 bg-[var(--bg-surface-2)] rounded-[16px] border border-[var(--border)] p-[16px] md:p-[24px]">
+        <div className="xl:col-span-5 dashboard-security-notice bg-[var(--bg-surface-2)] rounded-[16px] border border-[var(--border)] p-[16px] md:p-[24px]">
           <h3 className="font-semibold text-[13px] md:text-[14px]">Seguridad de datos</h3>
           <p className="text-[12px] md:text-[13px] text-[var(--text-secondary)] mt-[8px]">
             Tus datos están sincronizados en la nube. Las credenciales de Binance se mantienen
@@ -109,7 +96,7 @@ export const Dashboard: React.FC = () => {
       </div>
 
       {/* Recent cycles table */}
-      <div className="recent-cycles-table opacity-0">
+      <div className="recent-cycles-table">
         <RecentCyclesTable />
       </div>
     </div>
