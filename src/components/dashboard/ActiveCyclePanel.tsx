@@ -177,7 +177,7 @@ export const ActiveCyclePanel: React.FC = () => {
 
       <div className="mt-auto flex items-center justify-between pt-[16px] border-t border-[var(--border-strong)]">
         <span className="text-[12px] text-[var(--text-secondary)]">
-          Abierto a las {new Date(activeCycle.openedAt).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}
+          Abierto el {new Date(activeCycle.openedAt).toLocaleDateString()} a las {new Date(activeCycle.openedAt).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}
         </span>
         <div className="flex gap-[12px]">
           <Button variant="danger" onClick={handleCloseCycle} disabled={activeCycle.usdt_vendido === 0 || activeCycle.usdt_recomprado === 0}>
