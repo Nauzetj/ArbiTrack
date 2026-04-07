@@ -1,4 +1,6 @@
-import React from 'react';
+import React, { useRef } from 'react';
+import { useGSAP } from '@gsap/react';
+import { gsap } from 'gsap';
 import { useAppStore } from '../../store/useAppStore';
 import { Button } from '../ui/Button';
 import { Badge } from '../ui/Badge';
@@ -9,6 +11,32 @@ import type { Cycle } from '../../types';
 
 export const ActiveCyclePanel: React.FC = () => {
   const { activeCycle, setActiveCycle, currentUser, bcvRate, cycles, setCycles } = useAppStore();
+  const panelRef = useRef<HTMLDivElement>(null);
+
+  useGSAP(() => {
+    if (!activeCycle) {
+      gsap.to('.pulse-icon', {
+        scale: 1.05,
+        boxShadow: '0 0 20px rgba(0, 229, 195, 0.4)',
+        y: -5,
+        duration: 1.5,
+        repeat: -1,
+        yoyo: true,
+        ease: "sine.inOut"
+      });
+    } else {
+      gsap.from('.cycle-stat-value', {
+        innerText: 0,
+        duration: 1.5,
+        snap: { innerText: 1 },
+        stagger: 0.1,
+        ease: 'power3.out',
+        modifiers: {
+          innerText: function(innerText) { return parseFloat(innerText).toFixed(2); }
+        }
+      });
+    }
+  }, { dependencies: [activeCycle?.id], scope: panelRef });
 
   const handleOpenCycle = async () => {
     if (!currentUser) return;
@@ -67,8 +95,9 @@ export const ActiveCyclePanel: React.FC = () => {
 
   if (!activeCycle) {
     return (
-      <div className="bg-[var(--bg-surface-2)] rounded-[16px] border border-[var(--border)] p-[32px] flex flex-col items-center justify-center gap-[20px] h-full shadow-sm animate-fade-in-up">
-        <div className="w-[64px] h-[64px] rounded-full border border-[var(--border-strong)] flex items-center justify-center text-[var(--accent)] bg-[var(--accent-muted)]">
+      <div ref={panelRef} className="bg-[var(--bg-surface-2)] rounded-[16px] border border-[var(--border)] p-[32px] flex flex-col items-center justify-center gap-[20px] h-full shadow-sm relative overflow-hidden transition-all hover:border-[var(--accent-muted)]">
+        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[150px] h-[150px] bg-[var(--accent)]/5 rounded-full blur-3xl pointer-events-none" />
+        <div className="pulse-icon w-[64px] h-[64px] rounded-full border border-[var(--border-strong)] flex items-center justify-center text-[var(--accent)] bg-[var(--accent-muted)] relative z-10 transition-colors hover:bg-[var(--accent)] hover:text-[#020B16]">
           <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h7"/><line x1="16" y1="5" x2="22" y2="5"/><line x1="19" y1="2" x2="19" y2="8"/></svg>
         </div>
         <div className="text-center">
@@ -90,31 +119,32 @@ export const ActiveCyclePanel: React.FC = () => {
   const percentComplete = activeCycle.usdt_vendido > 0 ? Math.min((activeCycle.usdt_recomprado / activeCycle.usdt_vendido) * 100, 100) : 0;
 
   return (
-    <div className="bg-[var(--bg-surface-2)] rounded-[16px] border-t-2 border-[var(--accent)] border-x border-b border-x-[var(--border)] border-b-[var(--border)] p-[24px] flex flex-col gap-[24px] h-full shadow-[0_0_20px_rgba(0,229,195,0.06)] animate-fade-in-up">
-      <div className="flex items-center justify-between">
+    <div ref={panelRef} className="bg-[var(--bg-surface-2)] rounded-[16px] border-t-2 border-[var(--accent)] border-x border-b border-x-[var(--border)] border-b-[var(--border)] p-[24px] flex flex-col gap-[24px] h-full shadow-[0_0_20px_rgba(0,229,195,0.06)] relative overflow-hidden transition-colors hover:border-[var(--accent-border)]">
+      <div className="absolute top-0 right-0 w-[200px] h-[200px] bg-[var(--accent)]/5 rounded-full blur-[80px] pointer-events-none" />
+      <div className="flex items-center justify-between relative z-10">
         <h2 className="font-bold text-[18px]">Ciclo #{activeCycle.cycleNumber.toString().slice(-4)}</h2>
         <Badge variant="accent">EN CURSO</Badge>
       </div>
 
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-[16px] gap-y-[24px]">
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-[16px] gap-y-[24px] relative z-10">
         <div className="flex flex-col">
           <span className="text-[10px] text-[var(--text-tertiary)] uppercase font-semibold tracking-[1.2px] mb-[4px]">USDT Vendido</span>
-          <span className="mono text-[18px] font-medium">{activeCycle.usdt_vendido.toFixed(2)}</span>
+          <span className="cycle-stat-value mono text-[18px] font-medium">{activeCycle.usdt_vendido.toFixed(2)}</span>
         </div>
         <div className="flex flex-col pl-[16px] border-l border-[var(--border-strong)]">
           <span className="text-[10px] text-[var(--text-tertiary)] uppercase font-semibold tracking-[1.2px] mb-[4px]">USDT Recomprado</span>
-          <span className="mono text-[18px] font-medium">{activeCycle.usdt_recomprado.toFixed(2)}</span>
+          <span className="cycle-stat-value mono text-[18px] font-medium">{activeCycle.usdt_recomprado.toFixed(2)}</span>
         </div>
         <div className="flex flex-col lg:pl-[16px] lg:border-l border-[var(--border-strong)]">
           <span className="text-[10px] text-[var(--text-tertiary)] uppercase font-semibold tracking-[1.2px] mb-[4px]">Liquidez Neta (Bs.)</span>
-          <span className={`mono text-[18px] font-medium ${liquidezVES < 0 ? 'text-loss' : 'text-[var(--text-primary)]'}`}>
+          <span className={`cycle-stat-value mono text-[18px] font-medium ${liquidezVES < 0 ? 'text-loss' : 'text-[var(--text-primary)]'}`}>
             {liquidezVES.toFixed(2)}
           </span>
         </div>
         <div className="flex flex-col pl-[16px] border-l border-[var(--border-strong)]">
           <span className="text-[10px] text-[var(--text-tertiary)] uppercase font-semibold tracking-[1.2px] mb-[4px]">Ganancia Parcial</span>
           <span className={`mono text-[18px] font-medium ${isLoss ? 'text-loss' : 'text-profit'}`}>
-            {resParcial > 0 ? '+' : ''}{resParcial.toFixed(2)} USDT
+            {resParcial > 0 ? '+' : ''}<span className="cycle-stat-value">{resParcial.toFixed(2)}</span> USDT
           </span>
         </div>
       </div>

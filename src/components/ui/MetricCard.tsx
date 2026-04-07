@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useState } from 'react';
 import { Badge } from './Badge';
 
 interface MetricCardProps {
@@ -13,6 +13,11 @@ interface MetricCardProps {
   isProfitValue?: boolean;
 }
 
+import { useGSAP } from '@gsap/react';
+import { gsap } from 'gsap';
+
+gsap.registerPlugin(useGSAP);
+
 export const MetricCard: React.FC<MetricCardProps> = ({
   title,
   icon,
@@ -21,31 +26,21 @@ export const MetricCard: React.FC<MetricCardProps> = ({
   badgeText,
   badgeVariant,
   isActive = false,
-  delayMs = 0,
   isProfitValue = false
 }) => {
   const [displayValue, setDisplayValue] = useState(0);
 
-  useEffect(() => {
+  useGSAP(() => {
     if (typeof mainValue === 'number') {
-      let start = 0;
-      const end = mainValue;
-      const duration = 1200;
-      const startTime = performance.now();
-
-      const step = (currentTime: number) => {
-        const progress = Math.min((currentTime - startTime) / duration, 1);
-        const easeOut = 1 - Math.pow(1 - progress, 5);
-        setDisplayValue(start + (end - start) * easeOut);
-
-        if (progress < 1) {
-          requestAnimationFrame(step);
-        } else {
-          setDisplayValue(end);
+      const target = { val: displayValue };
+      gsap.to(target, {
+        val: mainValue,
+        duration: 2,
+        ease: "power3.out",
+        onUpdate: () => {
+          setDisplayValue(target.val);
         }
-      };
-
-      requestAnimationFrame(step);
+      });
     }
   }, [mainValue]);
 
@@ -59,8 +54,7 @@ export const MetricCard: React.FC<MetricCardProps> = ({
 
   return (
     <div 
-      className={`bg-surface-2 rounded-[16px] border-default p-[20px] animate-fade-in-up flex flex-col gap-[12px] relative overflow-hidden transition-all duration-200 hover:border-[var(--border-strong)] ${isActive ? 'shadow-[0_0_20px_rgba(0,229,195,0.06)] border-[var(--accent-border)] hover:border-[var(--accent-border)]' : ''}`}
-      style={{ animationDelay: `${delayMs}ms` }}
+      className={`metric-card bg-surface-2 rounded-[16px] border-default p-[20px] flex flex-col gap-[12px] relative overflow-hidden transition-all duration-300 hover:border-[var(--border-strong)] opacity-0 ${isActive ? 'shadow-[0_0_20px_rgba(0,229,195,0.06)] border-[var(--accent-border)] hover:border-[var(--accent-border)]' : ''}`}
     >
       {isActive && (
          <div className="absolute top-0 left-0 w-full h-[2px] bg-[var(--accent)]" />

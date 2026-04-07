@@ -1,5 +1,7 @@
-import React from 'react';
+import React, { useRef } from 'react';
 import { useAppStore } from '../../store/useAppStore';
+import { useGSAP } from '@gsap/react';
+import { gsap } from 'gsap';
 import { Badge } from '../ui/Badge';
 import { Link } from 'react-router-dom';
 
@@ -7,9 +9,20 @@ export const RecentCyclesTable: React.FC = () => {
   const { cycles } = useAppStore();
   const recent = cycles.slice(0, 10); // show up to 10 recent cycles
 
+  const tableRef = useRef<HTMLDivElement>(null);
+
+  useGSAP(() => {
+    if (recent.length > 0) {
+      gsap.fromTo('.recent-row', 
+        { opacity: 0, x: -15 },
+        { opacity: 1, x: 0, duration: 0.4, stagger: 0.05, ease: 'power2.out', delay: 0.8, clearProps: 'all' }
+      );
+    }
+  }, { scope: tableRef, dependencies: [recent] });
+
   if (recent.length === 0) {
     return (
-      <div className="h-full bg-[var(--bg-surface-2)] rounded-[16px] border border-[var(--border)] p-[32px] flex items-center justify-center animate-fade-in-up">
+      <div className="h-full bg-[var(--bg-surface-2)] rounded-[16px] border border-[var(--border)] p-[32px] flex items-center justify-center">
         <p className="text-[var(--text-secondary)] text-[14px]">No hay ciclos registrados aún.</p>
       </div>
     );
@@ -21,7 +34,7 @@ export const RecentCyclesTable: React.FC = () => {
      * The header row (title + link) is flex-none.
      * The table wrapper is flex-1 min-h-0 overflow-y-auto → only the rows scroll.
      */
-    <div className="h-full flex flex-col bg-[var(--bg-surface-2)] rounded-[16px] border border-[var(--border)] overflow-hidden animate-fade-in-up">
+    <div ref={tableRef} className="h-full flex flex-col bg-[var(--bg-surface-2)] rounded-[16px] border border-[var(--border)] overflow-hidden">
 
       {/* Card header — pinned */}
       <div className="flex-none flex items-center justify-between px-[20px] py-[16px] border-b border-[var(--border-strong)] bg-[var(--bg-surface-2)]">
@@ -48,7 +61,7 @@ export const RecentCyclesTable: React.FC = () => {
             {recent.map((c) => (
               <tr
                 key={c.id}
-                className="hover:bg-[var(--bg-surface-4)] transition-colors border-b border-[var(--border)] last:border-none"
+                className="recent-row hover:bg-[var(--bg-surface-4)] transition-colors border-b border-[var(--border)] last:border-none opacity-0"
               >
                 <td className="p-[14px] mono text-[13px] text-[var(--text-primary)] font-medium">
                   {c.cycleNumber.toString().slice(-4)}

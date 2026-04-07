@@ -1,5 +1,7 @@
-import React, { useMemo } from 'react';
+import React, { useMemo, useRef } from 'react';
 import { useAppStore } from '../../store/useAppStore';
+import { useGSAP } from '@gsap/react';
+import { gsap } from 'gsap';
 
 export const MiniChart: React.FC = () => {
   const { cycles } = useAppStore();
@@ -25,9 +27,17 @@ export const MiniChart: React.FC = () => {
   }, [cycles]);
 
   const maxVal = Math.max(...chartData.map(d => Math.abs(d.profit))) * 1.2 || 1;
+  const containerRef = useRef<HTMLDivElement>(null);
+
+  useGSAP(() => {
+    gsap.fromTo('.chart-bar', 
+      { scaleY: 0 }, 
+      { scaleY: 1, transformOrigin: 'bottom', duration: 1, stagger: 0.08, ease: 'back.out(1.4)', delay: 0.6, clearProps: 'transform' }
+    );
+  }, { scope: containerRef, dependencies: [chartData] });
 
   return (
-    <div className="bg-[var(--bg-surface-2)] rounded-[16px] border border-[var(--border)] p-[20px] animate-fade-in-up flex flex-col h-full min-h-[220px]">
+    <div ref={containerRef} className="bg-[var(--bg-surface-2)] rounded-[16px] border border-[var(--border)] p-[20px] flex flex-col h-full min-h-[220px]">
       <h3 className="text-[13px] font-semibold text-[var(--text-secondary)] mb-[16px]">Ganancias últimos 7 días (USDT)</h3>
       <div className="flex-1 flex items-end justify-between pt-[10px] pb-[4px]">
         {chartData.map((d, i) => {
@@ -41,7 +51,7 @@ export const MiniChart: React.FC = () => {
                </div>
                {/* Bar */}
                <div 
-                 className={`w-[60%] rounded-t-[4px] transition-all duration-300 opacity-80 group-hover:opacity-100 ${d.profit === 0 ? 'bg-[var(--bg-surface-4)]' : isProfit ? 'bg-[var(--profit)]' : 'bg-[var(--loss)]'}`}
+                 className={`chart-bar w-[60%] rounded-t-[4px] transition-all duration-300 opacity-80 group-hover:opacity-100 ${d.profit === 0 ? 'bg-[var(--bg-surface-4)]' : isProfit ? 'bg-[var(--profit)]' : 'bg-[var(--loss)]'}`}
                  style={{ height: d.profit === 0 ? '5px' : `${height}%` }}
                />
                <span className="text-[10px] text-[var(--text-tertiary)]">{d.day}</span>
