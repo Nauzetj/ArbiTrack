@@ -43,15 +43,27 @@ export const Topbar: React.FC = () => {
         let requiresRecalc = false;
 
         const activeCycle = await getActiveCycleForUser(user.id);
-        const cycleOpenedAt = activeCycle ? new Date(activeCycle.openedAt).getTime() : null;
 
         for (const o of allBinanceOrders) {
           const existingOrder = existingOrders.find(ex => ex.orderNumber === o.orderNumber);
           
           if (existingOrder) {
+            let isUpdated = false;
+            let updatedOrder = { ...existingOrder };
+
             // Check if status changed (e.g., from TRADING to COMPLETED)
             if (existingOrder.orderStatus !== o.orderStatus) {
-              const updatedOrder = { ...existingOrder, orderStatus: o.orderStatus };
+              updatedOrder.orderStatus = o.orderStatus;
+              isUpdated = true;
+            }
+
+            // Auto-asignar a ciclo activo si estaba huerfana
+            if (!updatedOrder.cycleId && activeCycle) {
+              updatedOrder.cycleId = activeCycle.id;
+              isUpdated = true;
+            }
+
+            if (isUpdated) {
               await saveOrder(updatedOrder);
               requiresRecalc = true;
               addedCount++; // Forces the refresh block below
@@ -60,10 +72,9 @@ export const Topbar: React.FC = () => {
           }
 
           let autoAssignedCycleId = null;
-          const orderTime = new Date(o.createTime).getTime();
 
-          // Auto-assign: If cycle is active and order occurred at or after cycle was opened
-          if (activeCycle && cycleOpenedAt && orderTime >= cycleOpenedAt) {
+          // Auto-assign: Si hay un ciclo activo, le asignamos cualquier orden nueva detectada
+          if (activeCycle) {
             autoAssignedCycleId = activeCycle.id;
             requiresRecalc = true;
           }
