@@ -59,68 +59,73 @@ export const Topbar: React.FC = () => {
         const cycleOpenedAt = activeCycle ? new Date(activeCycle.openedAt).getTime() : null;
 
         for (const o of uniqueBinanceOrders) {
-          const existingOrder = existingOrders.find(ex => ex.orderNumber === o.orderNumber);
+          try {
+            const existingOrder = existingOrders.find(ex => ex.orderNumber === o.orderNumber);
 
-          if (existingOrder) {
-            let isUpdated = false;
-            let updatedOrder = { ...existingOrder };
+            if (existingOrder) {
+              let isUpdated = false;
+              let updatedOrder = { ...existingOrder };
 
-            // Check if status changed (e.g., from TRADING to COMPLETED)
-            if (existingOrder.orderStatus !== o.orderStatus) {
-              updatedOrder.orderStatus = o.orderStatus;
-              isUpdated = true;
-            }
-
-            // Retroactive assignment: Si la orden existe, pero estaba huérfana, y ocurrió después de abrir el ciclo actual, la anexamos.
-            if (!updatedOrder.cycleId && activeCycle && cycleOpenedAt) {
-              const orderTime = new Date(o.createTime).getTime();
-              if (orderTime >= cycleOpenedAt) {
-                updatedOrder.cycleId = activeCycle.id;
+              // Check if status changed (e.g., from TRADING to COMPLETED)
+              if (existingOrder.orderStatus !== o.orderStatus) {
+                updatedOrder.orderStatus = o.orderStatus;
                 isUpdated = true;
               }
+
+              // Retroactive assignment: Si la orden existe, pero estaba huérfana, y ocurrió después de abrir el ciclo actual, la anexamos.
+              if (!updatedOrder.cycleId && activeCycle && cycleOpenedAt) {
+                const orderTime = new Date(o.createTime).getTime();
+                if (orderTime >= cycleOpenedAt) {
+                  updatedOrder.cycleId = activeCycle.id;
+                  isUpdated = true;
+                }
+              }
+
+              if (isUpdated) {
+                await saveOrder(updatedOrder);
+                requiresRecalc = true;
+                addedCount++;
+              }
+              continue;
             }
 
-            if (isUpdated) {
-              await saveOrder(updatedOrder);
+            // Also update the existingOrders array locally so subsequent duplicates (if any bypassed map) are caught
+            existingOrders.push({ ...o, id: generateUUID() } as any);
+
+            let autoAssignedCycleId = null;
+            const orderTime = new Date(o.createTime).getTime();
+
+            // Auto-assign: If cycle is active and order occurred at or after cycle was opened
+            if (activeCycle && cycleOpenedAt && orderTime >= cycleOpenedAt) {
+              autoAssignedCycleId = activeCycle.id;
               requiresRecalc = true;
-              addedCount++;
             }
-            continue;
+
+            const importedOrder: Order = {
+              id: generateUUID(),
+              orderNumber: String(o.orderNumber || ''),
+              tradeType: String(o.tradeType || '') as 'BUY' | 'SELL',
+              asset: String(o.asset || ''),
+              fiat: String(o.fiat || ''),
+              totalPrice: parseFloat(o.totalPrice) || 0,
+              unitPrice: parseFloat(o.unitPrice) || 0,
+              amount: parseFloat(o.amount) || 0,
+              commission: parseFloat(o.commission) || 0,
+              commissionAsset: String(o.commissionAsset || o.asset || ''),
+              counterPartNickName: String(o.counterPartNickName || 'Desconocido'),
+              orderStatus: String(o.orderStatus || ''),
+              createTime_utc: new Date(o.createTime).toISOString(),
+              createTime_local: new Date(o.createTime).toLocaleString(),
+              cycleId: autoAssignedCycleId,
+              importedAt: new Date().toISOString(),
+              userId: user.id
+            };
+            await saveOrder(importedOrder);
+            addedCount++;
+          } catch (rowError: any) {
+             console.error('Error insertando orden:', o.orderNumber, rowError);
+             throw new Error(`Error en orden ${o.orderNumber}: ${rowError.message}`);
           }
-
-          // Also update the existingOrders array locally so subsequent duplicates (if any bypassed map) are caught
-          existingOrders.push({ ...o, id: generateUUID() } as any);
-
-          let autoAssignedCycleId = null;
-          const orderTime = new Date(o.createTime).getTime();
-
-          // Auto-assign: If cycle is active and order occurred at or after cycle was opened
-          if (activeCycle && cycleOpenedAt && orderTime >= cycleOpenedAt) {
-            autoAssignedCycleId = activeCycle.id;
-            requiresRecalc = true;
-          }
-
-          const importedOrder: Order = {
-            id: generateUUID(),
-            orderNumber: o.orderNumber,
-            tradeType: o.tradeType,
-            asset: o.asset,
-            fiat: o.fiat,
-            totalPrice: parseFloat(o.totalPrice),
-            unitPrice: parseFloat(o.unitPrice),
-            amount: parseFloat(o.amount),
-            commission: parseFloat(o.commission),
-            commissionAsset: o.asset,
-            counterPartNickName: o.counterPartNickName,
-            orderStatus: o.orderStatus,
-            createTime_utc: new Date(o.createTime).toISOString(),
-            createTime_local: new Date(o.createTime).toLocaleString(),
-            cycleId: autoAssignedCycleId,
-            importedAt: new Date().toISOString(),
-            userId: user.id
-          };
-          await saveOrder(importedOrder);
-          addedCount++;
         }
 
         if (addedCount > 0) {
@@ -148,14 +153,14 @@ export const Topbar: React.FC = () => {
       if (isManual && allBinanceOrders.length > 0) {
         toast.success(`Sincronización exitosa. Se actualizaron las órdenes.`);
       } else if (isManual) {
-        toast.success('Sincronización exitosa. No hay órdenes nuevas.');
+        toast.success(`Sincronización exitosa. Cero órdenes retornadas usando tus llaves API: revisa si están activas o si tienen permisos.`);
       }
     } catch (e: any) {
-      console.error(e);
+      console.error('Excepción global en Sync:', e);
       setSyncStatus('error');
       setIsSyncing(false);
       if (isManual) {
-        toast.error(`Error de conexión con Binance Proxy o base de datos.`);
+        toast.error(`ERROR CRÍTICO: ${e.message}`, { duration: 6000 });
       }
       setTimeout(() => setSyncStatus('idle'), 3000);
     }
