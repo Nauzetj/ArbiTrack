@@ -241,31 +241,61 @@ export const TransactionsTable: React.FC = () => {
           </div>
 
           <div className="flex items-center bg-[var(--bg-surface-2)] border border-[var(--border)] rounded-[8px] overflow-hidden focus-within:border-[var(--accent)] transition-all shadow-inner">
-             <div className="pl-[12px] pr-[6px] flex items-center text-[var(--text-tertiary)]">
+             <div className="pl-[12px] pr-[6px] flex items-center text-[var(--text-tertiary)] pointer-events-none">
                 <Calendar size={14} />
              </div>
-             <input type="date" value={dateFrom} onChange={e => setDateFrom(e.target.value)} className="bg-transparent border-none text-[13px] px-[8px] py-[9px] text-[var(--text-secondary)] outline-none [color-scheme:dark] cursor-pointer hover:text-[var(--text-primary)] min-w-[120px]" />
+             <input 
+               type="date" 
+               value={dateFrom} 
+               onChange={e => setDateFrom(e.target.value)} 
+               onClick={e => { try { (e.target as HTMLInputElement).showPicker() } catch(e){} }}
+               className="bg-transparent border-none text-[13px] px-[8px] py-[9px] text-[var(--text-secondary)] outline-none cursor-pointer hover:text-[var(--text-primary)] min-w-[120px] transition-colors" 
+             />
              <div className="px-[8px] text-[var(--text-tertiary)] text-[10px] font-bold uppercase border-l border-r border-[var(--border)] flex items-center bg-[var(--bg-surface-3)]">A</div>
-             <input type="date" value={dateTo} onChange={e => setDateTo(e.target.value)} className="bg-transparent border-none text-[13px] px-[8px] py-[9px] text-[var(--text-secondary)] outline-none [color-scheme:dark] cursor-pointer hover:text-[var(--text-primary)] min-w-[120px]" />
+             <input 
+               type="date" 
+               value={dateTo} 
+               onChange={e => setDateTo(e.target.value)} 
+               onClick={e => { try { (e.target as HTMLInputElement).showPicker() } catch(e){} }}
+               className="bg-transparent border-none text-[13px] px-[8px] py-[9px] text-[var(--text-secondary)] outline-none cursor-pointer hover:text-[var(--text-primary)] min-w-[120px] transition-colors" 
+             />
           </div>
 
-          <div className="flex gap-[12px]">
-            <div className="relative border border-[var(--border)] rounded-[8px] bg-[var(--bg-surface-2)] hover:border-[var(--accent-muted)] transition-colors group shadow-inner">
-              <select value={typeFilter} onChange={e => setTypeFilter(e.target.value as any)} className="w-full h-full bg-transparent text-[13px] text-[var(--text-primary)] pl-[14px] pr-[36px] py-[9px] outline-none border-none cursor-pointer appearance-none font-medium relative z-10 min-w-[140px]">
-                <option value="ALL" className="bg-[var(--bg-surface-2)]">Tipos: Todos</option>
-                <option value="BUY" className="bg-[var(--bg-surface-2)] text-[var(--profit)]">Compras (BUY)</option>
-                <option value="SELL" className="bg-[var(--bg-surface-2)] text-[var(--loss)]">Ventas (SELL)</option>
-              </select>
-              <ChevronDown size={14} className="absolute right-[12px] top-1/2 -translate-y-1/2 text-[var(--text-tertiary)] group-hover:text-[var(--accent)] pointer-events-none" />
+          <div className="flex flex-col sm:flex-row gap-[12px]">
+            {/* Type Pills */}
+            <div className="flex bg-[var(--bg-surface-2)] p-[4px] rounded-[10px] border border-[var(--border)] shadow-inner">
+              {(['ALL', 'BUY', 'SELL'] as const).map(t => (
+                <button
+                  key={t}
+                  onClick={() => setTypeFilter(t)}
+                  className={`text-[12px] font-medium px-[14px] py-[6px] rounded-[6px] transition-all
+                    ${typeFilter === t 
+                      ? 'bg-[var(--bg-surface-1)] shadow-sm text-[var(--accent)] ' 
+                      : 'text-[var(--text-tertiary)] hover:text-[var(--text-primary)]'
+                    }
+                  `}
+                >
+                  {t === 'ALL' ? 'Todos' : t === 'BUY' ? 'Compras' : 'Ventas'}
+                </button>
+              ))}
             </div>
 
-            <div className="relative border border-[var(--border)] rounded-[8px] bg-[var(--bg-surface-2)] hover:border-[var(--accent-muted)] transition-colors group shadow-inner">
-              <select value={statusFilter} onChange={e => setStatusFilter(e.target.value as any)} className="w-full h-full bg-transparent text-[13px] text-[var(--text-primary)] pl-[14px] pr-[36px] py-[9px] outline-none border-none cursor-pointer appearance-none font-medium relative z-10 min-w-[160px]">
-                <option value="ALL" className="bg-[var(--bg-surface-2)]">Estado: Todos</option>
-                <option value="ASSIGNED" className="bg-[var(--bg-surface-2)] text-[var(--accent)]">Asignado a Ciclo</option>
-                <option value="UNASSIGNED" className="bg-[var(--bg-surface-2)] text-[var(--warning)]">Sin Asignar</option>
-              </select>
-              <ChevronDown size={14} className="absolute right-[12px] top-1/2 -translate-y-1/2 text-[var(--text-tertiary)] group-hover:text-[var(--accent)] pointer-events-none" />
+            {/* Status Pills */}
+            <div className="flex bg-[var(--bg-surface-2)] p-[4px] rounded-[10px] border border-[var(--border)] shadow-inner">
+              {(['ALL', 'ASSIGNED', 'UNASSIGNED'] as const).map(s => (
+                <button
+                  key={s}
+                  onClick={() => setStatusFilter(s)}
+                  className={`text-[12px] font-medium px-[14px] py-[6px] rounded-[6px] transition-all
+                    ${statusFilter === s 
+                      ? 'bg-[var(--bg-surface-1)] shadow-sm text-[var(--accent)] ' 
+                      : 'text-[var(--text-tertiary)] hover:text-[var(--text-primary)]'
+                    }
+                  `}
+                >
+                  {s === 'ALL' ? 'Todos' : s === 'ASSIGNED' ? 'Asignados' : 'Sin asignar'}
+                </button>
+              ))}
             </div>
           </div>
         </div>

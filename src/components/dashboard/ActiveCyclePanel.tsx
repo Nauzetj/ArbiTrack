@@ -59,12 +59,19 @@ export const ActiveCyclePanel: React.FC = () => {
         notas: '',
         userId: currentUser.id
       };
-      await saveCycle(newCycle);
+      const savePromise = saveCycle(newCycle);
+      
+      toast.promise(savePromise, {
+        loading: 'Abriendo nuevo ciclo...',
+        success: '¡Ciclo iniciado exitosamente!',
+        error: (err) => `Error: ${err.message || 'No se pudo abrir el ciclo'}`
+      });
+
+      await savePromise;
       setActiveCycle(newCycle);
       setCycles([newCycle, ...cycles]);
     } catch (err: any) {
       console.error('Error opening cycle:', err);
-      toast.error('Error al abrir ciclo: ' + err.message);
     }
   };
 
