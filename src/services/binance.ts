@@ -1,14 +1,15 @@
 export const fetchP2POrders = async (
   apiKey: string,
   secretKey: string,
-  page: number = 1
+  page: number = 1,
+  tradeType: string = ''
 ): Promise<any> => {
   // In production: /api/binance (Vercel Serverless Function)
   // In development: /api/binance (proxied by Vite to localhost)
   const res = await fetch('/api/binance', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ apiKey, secretKey, page }),
+    body: JSON.stringify({ apiKey, secretKey, page, tradeType }),
   });
 
   if (!res.ok) {

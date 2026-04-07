@@ -24,10 +24,13 @@ export const Topbar: React.FC = () => {
     setSyncStatus('syncing');
 
     try {
-      // Fetch the last 30 orders (pages 1, 2, 3) to ensure we catch updates for orders that got pushed off page 1
-      const requests = [1, 2, 3].map(page => 
-        fetchP2POrders(currentState.binanceKeys!.apiKey, currentState.binanceKeys!.secretKey, page)
-      );
+      // Explicitly fetch BUY and SELL to prevent Binance API returning partial/empty lists without tradeType
+      const requests = [];
+      const tradeTypes = ['BUY', 'SELL'];
+      for (const t of tradeTypes) {
+        requests.push(fetchP2POrders(currentState.binanceKeys!.apiKey, currentState.binanceKeys!.secretKey, 1, t));
+        requests.push(fetchP2POrders(currentState.binanceKeys!.apiKey, currentState.binanceKeys!.secretKey, 2, t));
+      }
       
       const responses = await Promise.all(requests);
       let allBinanceOrders: any[] = [];
@@ -43,27 +46,15 @@ export const Topbar: React.FC = () => {
         let requiresRecalc = false;
 
         const activeCycle = await getActiveCycleForUser(user.id);
+        const cycleOpenedAt = activeCycle ? new Date(activeCycle.openedAt).getTime() : null;
 
         for (const o of allBinanceOrders) {
           const existingOrder = existingOrders.find(ex => ex.orderNumber === o.orderNumber);
-          
-          if (existingOrder) {
-            let isUpdated = false;
-            let updatedOrder = { ...existingOrder };
 
+          if (existingOrder) {
             // Check if status changed (e.g., from TRADING to COMPLETED)
             if (existingOrder.orderStatus !== o.orderStatus) {
-              updatedOrder.orderStatus = o.orderStatus;
-              isUpdated = true;
-            }
-
-            // Auto-asignar a ciclo activo si estaba huerfana
-            if (!updatedOrder.cycleId && activeCycle) {
-              updatedOrder.cycleId = activeCycle.id;
-              isUpdated = true;
-            }
-
-            if (isUpdated) {
+              const updatedOrder = { ...existingOrder, orderStatus: o.orderStatus };
               await saveOrder(updatedOrder);
               requiresRecalc = true;
               addedCount++; // Forces the refresh block below
@@ -72,9 +63,10 @@ export const Topbar: React.FC = () => {
           }
 
           let autoAssignedCycleId = null;
+          const orderTime = new Date(o.createTime).getTime();
 
-          // Auto-assign: Si hay un ciclo activo, le asignamos cualquier orden nueva detectada
-          if (activeCycle) {
+          // Auto-assign: If cycle is active and order occurred at or after cycle was opened
+          if (activeCycle && cycleOpenedAt && orderTime >= cycleOpenedAt) {
             autoAssignedCycleId = activeCycle.id;
             requiresRecalc = true;
           }
