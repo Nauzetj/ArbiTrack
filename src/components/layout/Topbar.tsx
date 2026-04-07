@@ -52,9 +52,25 @@ export const Topbar: React.FC = () => {
           const existingOrder = existingOrders.find(ex => ex.orderNumber === o.orderNumber);
 
           if (existingOrder) {
+            let isUpdated = false;
+            let updatedOrder = { ...existingOrder };
+
             // Check if status changed (e.g., from TRADING to COMPLETED)
             if (existingOrder.orderStatus !== o.orderStatus) {
-              const updatedOrder = { ...existingOrder, orderStatus: o.orderStatus };
+              updatedOrder.orderStatus = o.orderStatus;
+              isUpdated = true;
+            }
+
+            // Retroactive assignment: Si la orden existe, pero estaba huérfana, y ocurrió después de abrir el ciclo actual, la anexamos.
+            if (!updatedOrder.cycleId && activeCycle && cycleOpenedAt) {
+              const orderTime = new Date(o.createTime).getTime();
+              if (orderTime >= cycleOpenedAt) {
+                updatedOrder.cycleId = activeCycle.id;
+                isUpdated = true;
+              }
+            }
+
+            if (isUpdated) {
               await saveOrder(updatedOrder);
               requiresRecalc = true;
               addedCount++; // Forces the refresh block below
