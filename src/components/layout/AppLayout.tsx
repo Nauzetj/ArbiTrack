@@ -1,6 +1,7 @@
 import React, { useEffect, useRef } from 'react';
-import { Outlet, useNavigate } from 'react-router-dom';
+import { Outlet, useNavigate, useLocation } from 'react-router-dom';
 import toast from 'react-hot-toast';
+import { gsap } from 'gsap';
 import { Sidebar } from './Sidebar';
 import { Topbar } from './Topbar';
 import { BottomNav } from './BottomNav';
@@ -82,7 +83,19 @@ const ExpiredWall: React.FC<{ role: string; planExpiresAt: string | null; onLogo
 export const AppLayout: React.FC = () => {
   const { currentUser, setOrders, setCycles, setActiveCycle, setBcvRate, logout } = useAppStore();
   const navigate = useNavigate();
+  const location = useLocation();
   const hasHydrated = useRef(false);
+  const pageRef = useRef<HTMLDivElement>(null);
+
+  // ── Page transition on every route change ──────────────────────────────────
+  useEffect(() => {
+    if (!pageRef.current) return;
+    gsap.fromTo(
+      pageRef.current,
+      { opacity: 0, y: 18 },
+      { opacity: 1, y: 0, duration: 0.42, ease: 'power3.out', clearProps: 'all' }
+    );
+  }, [location.pathname]);
 
   useEffect(() => {
     // Solo redirigir si no hay usuario autenticado
@@ -159,7 +172,7 @@ export const AppLayout: React.FC = () => {
             paddingBottom: 'calc(64px + env(safe-area-inset-bottom, 8px))',
           }}
         >
-          <div className="p-[14px] md:p-[32px] md:pt-[16px] animate-page-enter">
+          <div ref={pageRef} className="p-[14px] md:p-[32px] md:pt-[16px]">
             <Outlet />
           </div>
         </main>

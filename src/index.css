@@ -178,6 +178,37 @@ a {
 .animate-bot-bounce   { animation: botBounce 2.5s ease-in-out infinite; }
 .animate-page-enter   { animation: pageEnter 0.5s cubic-bezier(0.22,1,0.36,1) both; }
 
+/* ── Premium Table Row Glassmorphism Hover ───────────────────── */
+/* Apply .table-glass-row to <tr> elements for the premium lift effect */
+.table-glass-row {
+  transition:
+    background 0.22s ease,
+    transform 0.22s cubic-bezier(0.22,1,0.36,1),
+    box-shadow 0.22s ease;
+  position: relative;
+  cursor: default;
+}
+.table-glass-row:hover {
+  background: var(--bg-surface-3) !important;
+  transform: translateY(-2px);
+  box-shadow:
+    0 4px 18px rgba(37,99,235,0.07),
+    inset 0 0 0 1px rgba(37,99,235,0.08);
+  z-index: 1;
+}
+[data-theme='dark'] .table-glass-row:hover {
+  background: rgba(18,34,56,0.92) !important;
+  box-shadow:
+    0 4px 20px rgba(37,99,235,0.12),
+    inset 0 0 0 1px rgba(37,99,235,0.15);
+}
+
+/* Highlight left border on row hover */
+.table-glass-row:hover td:first-child {
+  border-left: 2px solid var(--accent);
+  padding-left: calc(14px - 2px);
+}
+
 .animate-shimmer {
   position: absolute;
   inset: 0;

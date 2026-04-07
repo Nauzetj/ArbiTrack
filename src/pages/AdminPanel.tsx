@@ -175,7 +175,7 @@ export const AdminPanel: React.FC = () => {
               ) : users.map(u => {
                 const isExpired = u.planExpiresAt && new Date(u.planExpiresAt) < new Date();
                 return (
-                  <tr key={u.id} className="border-b border-[var(--border)] hover:bg-[var(--bg-surface-3)] transition-colors">
+                  <tr key={u.id} className="table-glass-row border-b border-[var(--border)]">
                     <td className="py-[14px] px-[20px] font-mono text-[13px] font-semibold text-[var(--text-primary)]">@{u.username}</td>
                     <td className="py-[14px] px-[20px] text-[13px] text-[var(--text-secondary)]">{u.fullName}</td>
                     <td className="py-[14px] px-[20px]">
@@ -266,7 +266,7 @@ export const AdminPanel: React.FC = () => {
                 ) : codes.map(c => {
                   const s = codeStatus(c);
                   return (
-                    <tr key={c.id} className={`border-b border-[var(--border)] transition-colors ${c.usedAt || new Date(c.expiresAt) < new Date() ? 'opacity-50' : 'hover:bg-[var(--bg-surface-3)]'}`}>
+                    <tr key={c.id} className={`table-glass-row border-b border-[var(--border)] ${c.usedAt || new Date(c.expiresAt) < new Date() ? 'opacity-50' : ''}`}>
                       <td className="py-[14px] px-[20px]"><span className="font-mono text-[15px] font-bold tracking-[2px] text-[var(--text-primary)]">{c.code}</span></td>
                       <td className="py-[14px] px-[20px]">
                         <Badge variant={c.plan === 'vip_annual' ? 'profit' : 'accent'}>

@@ -61,7 +61,7 @@ export const RecentCyclesTable: React.FC = () => {
             {recent.map((c) => (
               <tr
                 key={c.id}
-                className="recent-row hover:bg-[var(--bg-surface-4)] transition-colors border-b border-[var(--border)] last:border-none opacity-0"
+                className="recent-row table-glass-row border-b border-[var(--border)] last:border-none opacity-0"
               >
                 <td className="p-[14px] mono text-[13px] text-[var(--text-primary)] font-medium">
                   {c.cycleNumber.toString().slice(-4)}

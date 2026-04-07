@@ -322,7 +322,7 @@ export const TransactionsTable: React.FC = () => {
                 const isAssigned = o.cycleId !== null;
                 
                 return (
-                  <tr key={o.id} className="hover:bg-[var(--bg-surface-3)]/50 transition-colors group">
+                  <tr key={o.id} className="table-glass-row group">
                     <td className="py-[10px] px-[16px] whitespace-nowrap text-[12px] text-[var(--text-secondary)]">
                       {new Date(o.createTime_utc).toLocaleString([], { dateStyle: 'short', timeStyle: 'short' })}
                     </td>

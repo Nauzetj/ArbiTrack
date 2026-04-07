@@ -157,7 +157,7 @@ export const Cycles: React.FC = () => {
                   <React.Fragment key={c.id}>
                     <tr
                       onClick={() => setExpandedId(isExpanded ? null : c.id)}
-                      className="hover:bg-[var(--bg-surface-4)] transition-colors border-b border-[var(--border)] group cursor-pointer"
+                      className="table-glass-row border-b border-[var(--border)] group cursor-pointer"
                     >
                       <td className="p-[16px] mono text-[13px] font-medium text-[var(--accent)]">
                         {c.cycleNumber.toString().slice(-4)}
