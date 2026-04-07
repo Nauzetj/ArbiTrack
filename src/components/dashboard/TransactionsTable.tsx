@@ -1,7 +1,7 @@
 import React, { useState, useMemo } from 'react';
 import { useAppStore } from '../../store/useAppStore';
 import type { Order } from '../../types';
-import { Search, X, ChevronUp, ChevronDown, ListFilter, Download, ChevronLeft, ChevronRight } from 'lucide-react';
+import { Search, X, ChevronUp, ChevronDown, ListFilter, Download, ChevronLeft, ChevronRight, Calendar } from 'lucide-react';
 import { Badge } from '../ui/Badge';
 import { saveOrder, recalculateCycleMetrics, getCyclesForUser, getOrdersForUser } from '../../services/dbOperations';
 import jsPDF from 'jspdf';
@@ -227,39 +227,46 @@ export const TransactionsTable: React.FC = () => {
           </div>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-5 gap-[12px]">
+        <div className="flex flex-col xl:flex-row gap-[12px] bg-[var(--bg-surface-1)] p-[12px] rounded-[12px] border border-[var(--border-strong)]">
           {/* Search */}
-          <div className="relative col-span-1 md:col-span-1 border-[0.5px] border-[var(--border)] rounded-[8px] bg-[var(--bg-surface-3)] focus-within:border-[var(--accent)] transition-colors">
-            <Search size={14} className="absolute left-[10px] top-[10px] text-[var(--text-tertiary)]" />
+          <div className="flex-1 relative border border-[var(--border)] rounded-[8px] bg-[var(--bg-surface-2)] focus-within:border-[var(--accent)] focus-within:ring-1 focus-within:ring-[var(--accent)]/20 transition-all shadow-inner">
+            <Search size={14} className="absolute left-[12px] top-1/2 -translate-y-1/2 text-[var(--text-tertiary)]" />
             <input 
               type="text" 
               placeholder="Buscar contraparte..." 
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              className="w-full bg-transparent border-none text-[13px] text-[var(--text-primary)] py-[8px] pl-[32px] pr-[12px] outline-none placeholder:text-[var(--text-tertiary)]"
+              className="w-full bg-transparent border-none text-[13px] text-[var(--text-primary)] py-[9px] pl-[36px] pr-[12px] outline-none placeholder:text-[var(--text-tertiary)]"
             />
           </div>
 
-          <div className="col-span-1 md:col-span-2 flex items-center gap-[8px]">
-             <input type="date" value={dateFrom} onChange={e => setDateFrom(e.target.value)} className="flex-1 bg-[var(--bg-surface-3)] border-[0.5px] border-[var(--border)] rounded-[8px] text-[13px] px-[12px] py-[8px] text-[var(--text-secondary)] outline-none focus:border-[var(--accent)] transition-colors" />
-             <span className="text-[var(--text-tertiary)] text-[11px] font-medium uppercase">HASTA</span>
-             <input type="date" value={dateTo} onChange={e => setDateTo(e.target.value)} className="flex-1 bg-[var(--bg-surface-3)] border-[0.5px] border-[var(--border)] rounded-[8px] text-[13px] px-[12px] py-[8px] text-[var(--text-secondary)] outline-none focus:border-[var(--accent)] transition-colors" />
+          <div className="flex items-center bg-[var(--bg-surface-2)] border border-[var(--border)] rounded-[8px] overflow-hidden focus-within:border-[var(--accent)] transition-all shadow-inner">
+             <div className="pl-[12px] pr-[6px] flex items-center text-[var(--text-tertiary)]">
+                <Calendar size={14} />
+             </div>
+             <input type="date" value={dateFrom} onChange={e => setDateFrom(e.target.value)} className="bg-transparent border-none text-[13px] px-[8px] py-[9px] text-[var(--text-secondary)] outline-none [color-scheme:dark] cursor-pointer hover:text-[var(--text-primary)] min-w-[120px]" />
+             <div className="px-[8px] text-[var(--text-tertiary)] text-[10px] font-bold uppercase border-l border-r border-[var(--border)] flex items-center bg-[var(--bg-surface-3)]">A</div>
+             <input type="date" value={dateTo} onChange={e => setDateTo(e.target.value)} className="bg-transparent border-none text-[13px] px-[8px] py-[9px] text-[var(--text-secondary)] outline-none [color-scheme:dark] cursor-pointer hover:text-[var(--text-primary)] min-w-[120px]" />
           </div>
 
-          <div className="col-span-1 border-[0.5px] border-[var(--border)] rounded-[8px] overflow-hidden">
-            <select value={typeFilter} onChange={e => setTypeFilter(e.target.value as any)} className="w-full h-full bg-[var(--bg-surface-3)] text-[13px] text-[var(--text-secondary)] px-[12px] py-[8px] outline-none border-none cursor-pointer">
-              <option value="ALL">Tipos: Todos</option>
-              <option value="BUY">Compras (BUY)</option>
-              <option value="SELL">Ventas (SELL)</option>
-            </select>
-          </div>
+          <div className="flex gap-[12px]">
+            <div className="relative border border-[var(--border)] rounded-[8px] bg-[var(--bg-surface-2)] hover:border-[var(--accent-muted)] transition-colors group shadow-inner">
+              <select value={typeFilter} onChange={e => setTypeFilter(e.target.value as any)} className="w-full h-full bg-transparent text-[13px] text-[var(--text-primary)] pl-[14px] pr-[36px] py-[9px] outline-none border-none cursor-pointer appearance-none font-medium relative z-10 min-w-[140px]">
+                <option value="ALL" className="bg-[var(--bg-surface-2)]">Tipos: Todos</option>
+                <option value="BUY" className="bg-[var(--bg-surface-2)] text-[var(--profit)]">Compras (BUY)</option>
+                <option value="SELL" className="bg-[var(--bg-surface-2)] text-[var(--loss)]">Ventas (SELL)</option>
+              </select>
+              <ChevronDown size={14} className="absolute right-[12px] top-1/2 -translate-y-1/2 text-[var(--text-tertiary)] group-hover:text-[var(--accent)] pointer-events-none" />
+            </div>
 
-          <div className="col-span-1 border-[0.5px] border-[var(--border)] rounded-[8px] overflow-hidden">
-            <select value={statusFilter} onChange={e => setStatusFilter(e.target.value as any)} className="w-full h-full bg-[var(--bg-surface-3)] text-[13px] text-[var(--text-secondary)] px-[12px] py-[8px] outline-none border-none cursor-pointer">
-              <option value="ALL">Estado: Todos</option>
-              <option value="ASSIGNED">Asignado a Ciclo</option>
-              <option value="UNASSIGNED">Sin Asignar</option>
-            </select>
+            <div className="relative border border-[var(--border)] rounded-[8px] bg-[var(--bg-surface-2)] hover:border-[var(--accent-muted)] transition-colors group shadow-inner">
+              <select value={statusFilter} onChange={e => setStatusFilter(e.target.value as any)} className="w-full h-full bg-transparent text-[13px] text-[var(--text-primary)] pl-[14px] pr-[36px] py-[9px] outline-none border-none cursor-pointer appearance-none font-medium relative z-10 min-w-[160px]">
+                <option value="ALL" className="bg-[var(--bg-surface-2)]">Estado: Todos</option>
+                <option value="ASSIGNED" className="bg-[var(--bg-surface-2)] text-[var(--accent)]">Asignado a Ciclo</option>
+                <option value="UNASSIGNED" className="bg-[var(--bg-surface-2)] text-[var(--warning)]">Sin Asignar</option>
+              </select>
+              <ChevronDown size={14} className="absolute right-[12px] top-1/2 -translate-y-1/2 text-[var(--text-tertiary)] group-hover:text-[var(--accent)] pointer-events-none" />
+            </div>
           </div>
         </div>
       </div>
