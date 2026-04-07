@@ -123,10 +123,10 @@ export const Topbar: React.FC = () => {
   useEffect(() => {
     if (!currentUser || !binanceKeys) return;
 
-    // Auto-sync en background cada 30s (suf. para capturar cambios sin riesgo de ban IP)
+    // Auto-sync en background cada 10s
     const interval = setInterval(() => {
       handleSync(false);
-    }, 30_000);
+    }, 10_000);
 
     return () => clearInterval(interval);
   }, [currentUser, binanceKeys]);
