@@ -3,18 +3,19 @@ import { RefreshCw, User, CheckCircle2 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { useAppStore } from '../../store/useAppStore';
 import { fetchP2POrders } from '../../services/binance';
-import { saveOrder, getOrdersForUser, getActiveCycleForUser, recalculateCycleMetrics } from '../../services/dbOperations';
+import { saveOrder, getOrdersForUser, getCyclesForUser, getActiveCycleForUser, recalculateCycleMetrics } from '../../services/dbOperations';
 import { generateUUID } from '../../crypto/auth';
 import type { Order } from '../../types';
 
 export const Topbar: React.FC = () => {
-  const { bcvRate, isSyncing, setIsSyncing, setLastSyncTime, binanceKeys, currentUser, setOrders, setActiveCycle } = useAppStore();
+  const { bcvRate, isSyncing, setIsSyncing, setLastSyncTime, binanceKeys, currentUser, setOrders, setActiveCycle, setCycles } = useAppStore();
   const [syncStatus, setSyncStatus] = useState<'idle' | 'syncing' | 'success' | 'error'>('idle');
 
   const handleSync = async (isManual: boolean = false) => {
     const currentState = useAppStore.getState();
     const user = currentState.currentUser;
     if (!currentState.binanceKeys || !user) {
+      if (isManual) toast.error('Sesión de Binance expirada. Por favor cierra sesión y vuelve a entrar.');
       return;
     }
 
@@ -40,7 +41,16 @@ export const Topbar: React.FC = () => {
          }
       });
       
-      if (allBinanceOrders.length > 0) {
+      // Deduplicate orders to prevent UNIQUE constraint violations if Binance pagination overlaps
+      const uniqueOrdersMap = new Map();
+      allBinanceOrders.forEach(o => {
+        if (!uniqueOrdersMap.has(o.orderNumber)) {
+          uniqueOrdersMap.set(o.orderNumber, o);
+        }
+      });
+      const uniqueBinanceOrders = Array.from(uniqueOrdersMap.values());
+      
+      if (uniqueBinanceOrders.length > 0) {
         const existingOrders = await getOrdersForUser(user.id);
         let addedCount = 0;
         let requiresRecalc = false;
@@ -48,7 +58,7 @@ export const Topbar: React.FC = () => {
         const activeCycle = await getActiveCycleForUser(user.id);
         const cycleOpenedAt = activeCycle ? new Date(activeCycle.openedAt).getTime() : null;
 
-        for (const o of allBinanceOrders) {
+        for (const o of uniqueBinanceOrders) {
           const existingOrder = existingOrders.find(ex => ex.orderNumber === o.orderNumber);
 
           if (existingOrder) {
@@ -73,10 +83,13 @@ export const Topbar: React.FC = () => {
             if (isUpdated) {
               await saveOrder(updatedOrder);
               requiresRecalc = true;
-              addedCount++; // Forces the refresh block below
+              addedCount++;
             }
             continue;
           }
+
+          // Also update the existingOrders array locally so subsequent duplicates (if any bypassed map) are caught
+          existingOrders.push({ ...o, id: generateUUID() } as any);
 
           let autoAssignedCycleId = null;
           const orderTime = new Date(o.createTime).getTime();
@@ -113,9 +126,18 @@ export const Topbar: React.FC = () => {
         if (addedCount > 0) {
           if (requiresRecalc && activeCycle) {
             await recalculateCycleMetrics(activeCycle.id, user.id);
-            setActiveCycle(await getActiveCycleForUser(user.id));
+            // Refresh both activeCycle AND the full cycles array so all views stay in sync
+            const [freshActiveCycle, freshCycles, freshOrders] = await Promise.all([
+              getActiveCycleForUser(user.id),
+              getCyclesForUser(user.id),
+              getOrdersForUser(user.id),
+            ]);
+            setActiveCycle(freshActiveCycle);
+            setCycles(freshCycles);
+            setOrders(freshOrders);
+          } else {
+            setOrders(await getOrdersForUser(user.id));
           }
-          setOrders(await getOrdersForUser(user.id));
         }
       }
 
@@ -142,13 +164,16 @@ export const Topbar: React.FC = () => {
   useEffect(() => {
     if (!currentUser || !binanceKeys) return;
 
+    // Sync inmediato al montar para no esperar 10 segundos
+    handleSync(false);
+
     // Auto-sync en background cada 10s
     const interval = setInterval(() => {
       handleSync(false);
     }, 10_000);
 
     return () => clearInterval(interval);
-  }, [currentUser, binanceKeys]);
+  }, [currentUser?.id, binanceKeys?.apiKey]);
 
   return (
     <header className="h-[56px] md:h-[64px] fixed top-0 right-0 left-0 md:left-[220px] bg-[var(--bg-surface-1)] border-b border-[var(--border)] z-40 flex items-center justify-between px-[16px] md:px-[32px]"

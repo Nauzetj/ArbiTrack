@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import { persist } from 'zustand/middleware';
+import { persist, createJSONStorage } from 'zustand/middleware';
 import { supabase } from '../lib/supabase';
 import type { User, Order, Cycle, BCVRate } from '../types';
 import type { Session } from '@supabase/supabase-js';
@@ -98,8 +98,9 @@ export const useAppStore = create<AppState>()(
     }),
     {
       name: 'arbitrack-session',
+      storage: createJSONStorage(() => sessionStorage),
       partialize: (state) => ({
-        // Only persist binance keys and theme across refreshes
+        // Only persist binance keys and theme across refreshes WITHIN SAME TAB
         // session is managed by Supabase Auth automatically
         binanceKeys: state.binanceKeys,
         theme: state.theme,

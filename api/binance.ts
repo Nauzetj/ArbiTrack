@@ -19,7 +19,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     }
 
     const timestamp = Date.now();
-    const rows = 10;
+    const rows = 100;
 
     let queryString = `timestamp=${timestamp}&page=${page}&rows=${rows}`;
     if (tradeType) queryString += `&tradeType=${tradeType}`;

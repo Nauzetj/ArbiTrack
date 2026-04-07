@@ -3,12 +3,36 @@ import { useAppStore } from '../store/useAppStore';
 import { Button } from '../components/ui/Button';
 import { Modal } from '../components/ui/Modal';
 import { supabase } from '../lib/supabase';
+import { KeyRound, CheckCircle2, AlertTriangle } from 'lucide-react';
+import toast from 'react-hot-toast';
 
 
 export const Settings: React.FC = () => {
-  const { currentUser, logout, orders, cycles } = useAppStore();
+  const { currentUser, logout, orders, cycles, binanceKeys, login } = useAppStore();
   const [showClearModal, setShowClearModal] = useState(false);
   const [isClearing, setIsClearing] = useState(false);
+
+  // Binance keys state
+  const [apiKey, setApiKey] = useState('');
+  const [secretKey, setSecretKey] = useState('');
+  const [isSavingKeys, setIsSavingKeys] = useState(false);
+
+  const handleSaveKeys = () => {
+    if (!apiKey.trim() || !secretKey.trim()) {
+      toast.error('Debes ingresar ambas claves (API Key y Secret Key).');
+      return;
+    }
+    if (!currentUser) return;
+    setIsSavingKeys(true);
+    // Re-use the login action just to update the binanceKeys in the store
+    const { session } = useAppStore.getState();
+    if (!session) { toast.error('Sesión no encontrada. Inicia sesión de nuevo.'); setIsSavingKeys(false); return; }
+    login(currentUser, session, apiKey.trim(), secretKey.trim());
+    setApiKey('');
+    setSecretKey('');
+    toast.success('¡Claves de Binance actualizadas! La sincronización comenzará en breve.');
+    setIsSavingKeys(false);
+  };
 
   const handleExportData = () => {
     if (!currentUser) return;
@@ -62,6 +86,57 @@ export const Settings: React.FC = () => {
       <div>
         <h1 className="text-[24px] font-bold">Configuración</h1>
         <p className="text-[14px] text-[var(--text-secondary)] mt-[4px]">Administra tu perfil y los datos de tu cuenta en la nube.</p>
+      </div>
+
+      {/* ── Binance API Keys ── */}
+      <div className="bg-[var(--bg-surface-2)] rounded-[16px] border border-[var(--border)] p-[24px]">
+        <div className="flex items-center gap-[10px] mb-[4px]">
+          <KeyRound size={16} className="text-[var(--accent)]" />
+          <h2 className="text-[16px] font-semibold">Claves de Binance API</h2>
+        </div>
+        <p className="text-[13px] text-[var(--text-tertiary)] mb-[20px]">
+          Las claves solo se guardan en memoria durante la sesión. Si la app fue limpiada o recargada, actualízalas aquí sin cerrar sesión.
+        </p>
+
+        {/* Status pill */}
+        <div className={`flex items-center gap-[8px] px-[14px] py-[10px] rounded-[10px] border mb-[20px] text-[13px] font-medium ${
+          binanceKeys
+            ? 'bg-[var(--profit-bg)] border-[rgba(0,229,195,0.25)] text-[var(--profit)]'
+            : 'bg-[var(--warning-bg)] border-[rgba(255,183,77,0.25)] text-[var(--warning)]'
+        }`}>
+          {binanceKeys
+            ? <><CheckCircle2 size={15} /> Claves activas — sincronización habilitada</>
+            : <><AlertTriangle size={15} /> Sin claves — sincronización con Binance desactivada</>
+          }
+        </div>
+
+        <div className="flex flex-col gap-[12px]">
+          <div className="flex flex-col gap-[6px]">
+            <label className="text-[11px] font-semibold text-[var(--text-secondary)] uppercase tracking-[0.5px]">Nueva API Key</label>
+            <input
+              type="password"
+              value={apiKey}
+              onChange={e => setApiKey(e.target.value)}
+              placeholder="Clave pública de Binance"
+              autoComplete="off"
+              className="bg-[var(--bg-surface-3)] border border-[var(--border-strong)] rounded-[10px] px-[14px] py-[11px] text-[13px] font-mono text-[var(--text-primary)] outline-none focus:border-[var(--accent)] transition-all"
+            />
+          </div>
+          <div className="flex flex-col gap-[6px]">
+            <label className="text-[11px] font-semibold text-[var(--text-secondary)] uppercase tracking-[0.5px]">Nueva Secret Key</label>
+            <input
+              type="password"
+              value={secretKey}
+              onChange={e => setSecretKey(e.target.value)}
+              placeholder="Clave secreta de Binance"
+              autoComplete="off"
+              className="bg-[var(--bg-surface-3)] border border-[var(--border-strong)] rounded-[10px] px-[14px] py-[11px] text-[13px] font-mono text-[var(--text-primary)] outline-none focus:border-[var(--accent)] transition-all"
+            />
+          </div>
+          <Button onClick={handleSaveKeys} disabled={isSavingKeys || !apiKey.trim() || !secretKey.trim()} className="self-start mt-[4px]">
+            {isSavingKeys ? 'Guardando...' : 'Actualizar Claves'}
+          </Button>
+        </div>
       </div>
 
       {/* Account Info */}
