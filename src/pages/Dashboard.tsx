@@ -1,4 +1,4 @@
-import React, { useEffect, useRef } from 'react';
+import React, { useRef } from 'react';
 import { useGSAP } from '@gsap/react';
 import { gsap } from 'gsap';
 import { AreaChart, Layers, DollarSign, Clock } from 'lucide-react';
@@ -7,10 +7,9 @@ import { MetricCard } from '../components/ui/MetricCard';
 import { ActiveCyclePanel } from '../components/dashboard/ActiveCyclePanel';
 import { MiniChart } from '../components/dashboard/MiniChart';
 import { RecentCyclesTable } from '../components/dashboard/RecentCyclesTable';
-import { getCyclesForUser, recalculateCycleMetrics } from '../services/dbOperations';
 
 export const Dashboard: React.FC = () => {
-  const { currentUser, orders, setCycles, setActiveCycle, cycles, activeCycle } = useAppStore();
+  const { orders, cycles } = useAppStore();
   const containerRef = useRef<HTMLDivElement>(null);
 
   useGSAP(() => {
