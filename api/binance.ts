@@ -18,10 +18,19 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       return res.status(401).json({ error: 'API Key and Secret Key required' });
     }
 
+    // Validar parámetros
+    const pageNum = parseInt(String(page), 10);
+    if (isNaN(pageNum) || pageNum < 1 || pageNum > 500) {
+      return res.status(400).json({ error: 'Parámetro "page" inválido.' });
+    }
+    if (tradeType && !['SELL', 'BUY', ''].includes(tradeType)) {
+      return res.status(400).json({ error: 'Parámetro "tradeType" inválido.' });
+    }
+
     const timestamp = Date.now();
     const rows = 100;
 
-    let queryString = `timestamp=${timestamp}&page=${page}&rows=${rows}`;
+    let queryString = `timestamp=${timestamp}&page=${pageNum}&rows=${rows}`;
     if (tradeType) queryString += `&tradeType=${tradeType}`;
 
     const signature = crypto
