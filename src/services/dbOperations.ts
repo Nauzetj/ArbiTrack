@@ -253,6 +253,11 @@ export const saveCycle = async (cycle: Cycle) => {
   if (error) throw error;
 };
 
+export const deleteCycle = async (cycleId: string, userId: string): Promise<void> => {
+  const { error } = await supabase.from('cycles').delete().eq('id', cycleId).eq('user_id', userId);
+  if (error) throw error;
+};
+
 export const recalculateCycleMetrics = async (cycleId: string, userId: string): Promise<void> => {
   // Get cycle
   const { data: cycleRows } = await supabase.from('cycles').select('*').eq('id', cycleId).eq('user_id', userId).limit(1);

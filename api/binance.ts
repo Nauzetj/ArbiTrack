@@ -37,6 +37,12 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     });
 
     const data = await binanceRes.json();
+    
+    console.log(`[BINANCE PROXY] Status: ${binanceRes.status}`);
+    console.log(`[BINANCE PROXY] Payload length: ${data?.data?.length || 0}, Error Code: ${data?.code || 'none'}`);
+    if (data?.data && data.data.length > 0) {
+      console.log(`[BINANCE PROXY] First Order sample:`, JSON.stringify(data.data[0]).substring(0, 300));
+    }
 
     if (!binanceRes.ok) {
       return res.status(binanceRes.status).json(data);

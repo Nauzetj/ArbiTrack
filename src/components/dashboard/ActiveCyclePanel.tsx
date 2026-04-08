@@ -2,11 +2,11 @@ import React, { useRef } from 'react';
 import { useGSAP } from '@gsap/react';
 import { gsap } from 'gsap';
 import { useAppStore } from '../../store/useAppStore';
-import { Button } from '../ui/Button';
-import { Badge } from '../ui/Badge';
-import { saveCycle } from '../../services/dbOperations';
-import { generateUUID } from '../../crypto/auth';
+import { saveCycle, deleteCycle } from '../../services/dbOperations';
 import toast from 'react-hot-toast';
+import { Badge } from '../ui/Badge';
+import { Button } from '../ui/Button';
+import { generateUUID } from '../../crypto/auth';
 import type { Cycle } from '../../types';
 
 export const ActiveCyclePanel: React.FC = () => {
@@ -91,6 +91,20 @@ export const ActiveCyclePanel: React.FC = () => {
     } catch (err: any) {
       console.error('Error closing cycle:', err);
       toast.error('Error al cerrar ciclo: ' + err.message);
+    }
+  };
+
+  const handleDeleteCycle = async () => {
+    if (!activeCycle || !currentUser) return;
+    if (!confirm('¿Estás seguro de que quieres eliminar este ciclo? Esta acción no se puede deshacer.')) return;
+    try {
+      await deleteCycle(activeCycle.id, currentUser.id);
+      setActiveCycle(null);
+      setCycles(cycles.filter(c => c.id !== activeCycle.id));
+      toast.success('Ciclo eliminado');
+    } catch (err: any) {
+      console.error('Error deleting cycle:', err);
+      toast.error('Error al eliminar ciclo: ' + err.message);
     }
   };
 
@@ -180,6 +194,9 @@ export const ActiveCyclePanel: React.FC = () => {
           Abierto el {new Date(activeCycle.openedAt).toLocaleDateString()} a las {new Date(activeCycle.openedAt).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}
         </span>
         <div className="flex gap-[12px]">
+          <Button variant="danger" onClick={handleDeleteCycle}>
+            Eliminar Ciclo
+          </Button>
           <Button variant="danger" onClick={handleCloseCycle} disabled={activeCycle.usdt_vendido === 0 || activeCycle.usdt_recomprado === 0}>
             Cerrar Ciclo
           </Button>

@@ -234,7 +234,6 @@ export const Login: React.FC = () => {
         id: data.user.id,
         username: profile.username || data.user.email?.split('@')[0] || 'Usuario',
         fullName: profile.full_name ?? '',
-        passwordHash: '',
         createdAt: profile.created_at,
         role: profile.role ?? 'free',
         planExpiresAt: profile.plan_expires_at ?? null,
