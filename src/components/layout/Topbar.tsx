@@ -28,9 +28,11 @@ export const Topbar: React.FC = () => {
       // Explicitly fetch BUY and SELL to prevent Binance API returning partial/empty lists without tradeType
       const requests = [];
       const tradeTypes = ['BUY', 'SELL'];
+      const maxPages = 10; // Aumentado para traer más órdenes
       for (const t of tradeTypes) {
-        requests.push(fetchP2POrders(currentState.binanceKeys!.apiKey, currentState.binanceKeys!.secretKey, 1, t));
-        requests.push(fetchP2POrders(currentState.binanceKeys!.apiKey, currentState.binanceKeys!.secretKey, 2, t));
+        for (let page = 1; page <= maxPages; page++) {
+          requests.push(fetchP2POrders(currentState.binanceKeys!.apiKey, currentState.binanceKeys!.secretKey, page, t));
+        }
       }
       
       const responses = await Promise.all(requests);
@@ -41,7 +43,7 @@ export const Topbar: React.FC = () => {
          }
       });
       
-      // Deduplicate orders to prevent UNIQUE constraint violations if Binance pagination overlaps
+      // Deduplicate orders
       const uniqueOrdersMap = new Map();
       allBinanceOrders.forEach(o => {
         if (!uniqueOrdersMap.has(o.orderNumber)) {
@@ -49,6 +51,9 @@ export const Topbar: React.FC = () => {
         }
       });
       const uniqueBinanceOrders = Array.from(uniqueOrdersMap.values());
+      
+      console.log('[SYNC] Total órdenes de Binance:', allBinanceOrders.length);
+      console.log('[SYNC] Órdenes únicas después deduplicar:', uniqueBinanceOrders.length);
       
       if (uniqueBinanceOrders.length > 0) {
         const existingOrders = await getOrdersForUser(user.id);
@@ -150,8 +155,14 @@ export const Topbar: React.FC = () => {
       setLastSyncTime(new Date());
       setIsSyncing(false);
       setTimeout(() => setSyncStatus('idle'), 3000);
-      if (isManual && allBinanceOrders.length > 0) {
-        toast.success(`Sincronización exitosa. Se actualizaron las órdenes.`);
+      
+      console.log('[SYNC] Resumen:', {
+        totalBinance: allBinanceOrders.length,
+        unique: uniqueBinanceOrders.length,
+      });
+      
+      if (isManual && uniqueBinanceOrders.length > 0) {
+        toast.success(`Sincronización exitosa. Órdenes sincronizadas.`);
       } else if (isManual) {
         toast.success(`Sincronización exitosa. Cero órdenes retornadas usando tus llaves API: revisa si están activas o si tienen permisos.`);
       }
