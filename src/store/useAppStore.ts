@@ -8,8 +8,8 @@ interface AppState {
   // Auth State (from Supabase)
   session: Session | null;
   currentUser: User | null;
-  // NOTA DE SEGURIDAD: las API Keys de Binance se guardan en sessionStorage
-  // (scope de pestaña, se borran al cerrar). NO se persisten en localStorage.
+  // NOTA DE SEGURIDAD: las API Keys de Binance se guardan en localStorage
+  // y persisten al cerrar la pestaña. Se borran al hacer logout.
   // El riesgo residual es XSS — mitigar con una CSP estricta.
   binanceKeys: { apiKey: string; secretKey: string } | null;
 
@@ -101,11 +101,11 @@ export const useAppStore = create<AppState>()(
     }),
     {
       name: 'arbitrack-session',
-      storage: createJSONStorage(() => sessionStorage),
+      storage: createJSONStorage(() => localStorage),
       partialize: (state) => ({
-        // Solo persistimos las API keys y el tema dentro de la misma pestaña.
-        // La sesión de Supabase Auth se auto-gestiona (no la persistimos aquí).
-        // CORRECCIÓN: currentUser ya no incluye passwordHash (eliminado del tipo).
+        // Las API keys de Binance se guardan en localStorage y persisten al cerrar la pestaña.
+        // Se borran automáticamente al hacer logout (ver función logout más abajo).
+        // El tema también persiste.
         binanceKeys: state.binanceKeys,
         theme: state.theme,
       }),
