@@ -39,11 +39,22 @@ function buildFallbackProfile(session: Session) {
       session.user.user_metadata?.full_name ||
       session.user.user_metadata?.name ||
       '',
-    passwordHash: '',
+    // CORRECCIÓN: eliminado passwordHash del tipo User (siempre era '')
     createdAt: new Date().toISOString(),
     role: 'free' as const,
     planExpiresAt: null,
   };
+}
+
+// ── CORRECCIÓN: Guard de ruta para admin ─────────────────────────────────────
+// Antes el panel de admin era accesible por URL directa a cualquier usuario
+// autenticado — el componente AdminPanel solo protegía visualmente.
+// Ahora la ruta rechaza en el router antes de cargar el componente.
+function AdminRoute({ children }: { children: React.ReactNode }) {
+  const { currentUser } = useAppStore();
+  if (!currentUser) return <Navigate to="/login" replace />;
+  if (currentUser.role !== 'admin') return <Navigate to="/" replace />;
+  return <>{children}</>;
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -195,7 +206,16 @@ function App() {
           <Route path="/ordenes"       element={<Suspense fallback={<PageLoader />}><Orders /></Suspense>} />
           <Route path="/reportes"      element={<Suspense fallback={<PageLoader />}><Reports /></Suspense>} />
           <Route path="/configuracion" element={<Suspense fallback={<PageLoader />}><Settings /></Suspense>} />
-          <Route path="/admin"         element={<Suspense fallback={<PageLoader />}><AdminPanel /></Suspense>} />
+          {/* CORRECCIÓN: ruta /admin protegida por AdminRoute — antes era accesible
+              para cualquier usuario autenticado por URL directa */}
+          <Route
+            path="/admin"
+            element={
+              <AdminRoute>
+                <Suspense fallback={<PageLoader />}><AdminPanel /></Suspense>
+              </AdminRoute>
+            }
+          />
         </Route>
 
         <Route path="*" element={<Navigate to="/" replace />} />

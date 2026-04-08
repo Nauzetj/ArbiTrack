@@ -4,13 +4,14 @@ export type CycleStatus = "En curso" | "Completado" | "Con pérdida" | "Neutral"
 export type UserRole = 'admin' | 'vip_annual' | 'vip_semiannual' | 'vip_monthly' | 'vip_promo' | 'free';
 
 export interface User {
-  id: string; // uuid
-  username: string; // unique
+  id: string;           // uuid — Supabase Auth UID
+  username: string;     // único, visible en app
   fullName: string;
-  passwordHash: string; // bcrypt
-  createdAt: string; // ISO string
+  // CORRECCIÓN: se eliminó passwordHash. Supabase Auth gestiona credenciales;
+  // nunca debemos almacenar ni transportar hashes de contraseña en el cliente.
+  createdAt: string;    // ISO string
   role: UserRole;
-  planExpiresAt: string | null; // ISO string, null = never expires (admin/free)
+  planExpiresAt: string | null; // null = nunca expira (admin/free)
 }
 
 export interface PromoCode {

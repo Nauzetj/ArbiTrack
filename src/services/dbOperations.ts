@@ -6,9 +6,10 @@ import type { User, Order, Cycle, PromoCode, PaymentRequest } from '../types';
 function mapProfile(row: any): User {
   return {
     id: row.id,
-    username: row.username,
+    username: row.username ?? row.email?.split('@')[0] ?? 'Usuario',
     fullName: row.full_name ?? '',
-    passwordHash: '', // not stored — Supabase Auth handles it
+    // CORRECCIÓN: passwordHash eliminado del tipo User.
+    // Supabase Auth gestiona credenciales; nunca las exponemos en el cliente.
     createdAt: row.created_at,
     role: row.role ?? 'free',
     planExpiresAt: row.plan_expires_at ?? null,
@@ -159,7 +160,8 @@ export const redeemPromoCode = async (codeStr: string, userId: string): Promise<
   const { error } = await supabase
     .from('promo_codes')
     .update({ used_at: now, used_by: userId })
-    .eq('code', codeStr.trim().toUpperCase());
+    .eq('code', codeStr.trim().toUpperCase())
+    .is('used_at', null);  // CORRECCIÓN: solo redimir si aún no fue usado (evita race condition)
   if (error) throw error;
 };
 
@@ -264,7 +266,9 @@ export const recalculateCycleMetrics = async (cycleId: string, userId: string): 
   let usdt_vendido = 0, usdt_recomprado = 0, ves_recibido = 0, ves_pagado = 0, comision_total = 0;
 
   orders.forEach(o => {
-    if (o.orderStatus !== 'COMPLETED') return;
+    // CORRECCIÓN: el estado de Binance viene como 'COMPLETED' (uppercase) desde la API.
+    // Se normaliza para comparar de forma robusta.
+    if (o.orderStatus?.toUpperCase() !== 'COMPLETED') return;
     comision_total += o.commission;
     if (o.tradeType === 'SELL') { usdt_vendido += o.amount; ves_recibido += o.totalPrice; }
     else if (o.tradeType === 'BUY') { usdt_recomprado += o.amount; ves_pagado += o.totalPrice; }
