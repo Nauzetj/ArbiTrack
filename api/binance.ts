@@ -12,11 +12,19 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
 
   try {
-    const { apiKey, secretKey, page = 1, tradeType = '' } = req.body;
+    let { apiKey, secretKey, page = 1, tradeType = '' } = req.body;
+    
+    // Sanitize keys - remove any whitespace that may cause signature errors
+    if (typeof apiKey === 'string') apiKey = apiKey.trim();
+    if (typeof secretKey === 'string') secretKey = secretKey.trim();
 
     if (!apiKey || !secretKey) {
       return res.status(401).json({ error: 'API Key and Secret Key required' });
     }
+
+    console.log('[BINANCE PROXY] API Key长度:', apiKey.length);
+    console.log('[BINANCE PROXY] Secret Key长度:', secretKey.length);
+    console.log('[BINANCE PROXY] Page:', page, 'TradeType:', tradeType);
 
     // Validar parámetros
     const pageNum = parseInt(String(page), 10);
@@ -33,10 +41,14 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     let queryString = `timestamp=${timestamp}&page=${pageNum}&rows=${rows}`;
     if (tradeType) queryString += `&tradeType=${tradeType}`;
 
+    console.log('[BINANCE PROXY] QueryString:', queryString);
+
     const signature = crypto
       .createHmac('sha256', secretKey)
       .update(queryString)
       .digest('hex');
+
+    console.log('[BINANCE PROXY] Signature长度:', signature.length);
 
     const fetchUrl = `https://api.binance.com/sapi/v1/c2c/orderMatch/listUserOrderHistory?${queryString}&signature=${signature}`;
 
