@@ -9,11 +9,12 @@ interface CycleCalendarProps {
   selectedDate: string | null;
 }
 
-// Returns "YYYY-MM-DD" from an ISO string local time adjustment
-const toDateKey = (iso: string | null): string | null => {
-  if (!iso) return null;
-  // Fallback direct string slice. For better accuracy we should use the local date but UTC is mostly fine
-  return iso.slice(0, 10);
+// Returns "YYYY-MM-DD" adjusted to the user's local time zone
+const toDateKey = (val: string | number | null | Date): string | null => {
+  if (!val) return null;
+  const d = new Date(val);
+  if (isNaN(d.getTime())) return null;
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
 };
 
 const MONTH_NAMES = [
