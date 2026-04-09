@@ -52,6 +52,11 @@ export const Topbar: React.FC = () => {
       });
       const uniqueBinanceOrders = Array.from(uniqueOrdersMap.values());
       
+      // Debug: contar tipos de órdenes
+      const sellCount = uniqueBinanceOrders.filter(o => o.tradeType === 'SELL').length;
+      const buyCount = uniqueBinanceOrders.filter(o => o.tradeType === 'BUY').length;
+      console.log('[SYNC] SELL:', sellCount, 'BUY:', buyCount);
+      
       console.log('[SYNC] Total órdenes de Binance:', allBinanceOrders.length);
       console.log('[SYNC] Órdenes únicas después deduplicar:', uniqueBinanceOrders.length);
       
