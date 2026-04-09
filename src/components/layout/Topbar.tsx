@@ -146,12 +146,14 @@ export const Topbar: React.FC = () => {
         if (addedCount > 0) {
           if (requiresRecalc && activeCycle) {
             await recalculateCycleMetrics(activeCycle.id, user.id);
+            console.log('[SYNC] Recálculo completado, obteniendo datos frescos...');
             // Refresh both activeCycle AND the full cycles array so all views stay in sync
             const [freshActiveCycle, freshCycles, freshOrders] = await Promise.all([
               getActiveCycleForUser(user.id),
               getCyclesForUser(user.id),
               getOrdersForUser(user.id),
             ]);
+            console.log('[SYNC] freshActiveCycle:', freshActiveCycle);
             setActiveCycle(freshActiveCycle);
             setCycles(freshCycles);
             setOrders(freshOrders);

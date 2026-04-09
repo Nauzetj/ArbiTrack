@@ -268,13 +268,11 @@ export const recalculateCycleMetrics = async (cycleId: string, userId: string): 
   const { data: orderRows } = await supabase.from('orders').select('*').eq('cycle_id', cycleId).eq('user_id', userId);
   const orders = (orderRows ?? []).map(mapOrder);
   
-  console.log('[RECALC] Órdenes del ciclo:', orders.length);
   const sellOrders = orders.filter(o => o.tradeType === 'SELL');
   const buyOrders = orders.filter(o => o.tradeType === 'BUY');
   const completedSell = sellOrders.filter(o => o.orderStatus?.toUpperCase() === 'COMPLETED');
   const completedBuy = buyOrders.filter(o => o.orderStatus?.toUpperCase() === 'COMPLETED');
-  console.log('[RECALC] SELL total:', sellOrders.length, 'COMPLETED:', completedSell.length);
-  console.log('[RECALC] BUY total:', buyOrders.length, 'COMPLETED:', completedBuy.length);
+  console.log('[RECALC] Orders:', orders.length, 'SELL:', completedSell.length, 'BUY:', completedBuy.length);
   
   let usdt_vendido = 0, usdt_recomprado = 0, ves_recibido = 0, ves_pagado = 0, comision_total = 0;
 
