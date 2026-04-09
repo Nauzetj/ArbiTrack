@@ -267,6 +267,9 @@ export const recalculateCycleMetrics = async (cycleId: string, userId: string): 
   // Get orders for this cycle
   const { data: orderRows } = await supabase.from('orders').select('*').eq('cycle_id', cycleId).eq('user_id', userId);
   const orders = (orderRows ?? []).map(mapOrder);
+  
+  console.log('[RECALC] Órdenes del ciclo:', orders.length);
+  orders.forEach(o => console.log('[RECALC] Order:', o.orderNumber, 'status:', o.orderStatus, 'type:', o.tradeType, 'amount:', o.amount));
 
   let usdt_vendido = 0, usdt_recomprado = 0, ves_recibido = 0, ves_pagado = 0, comision_total = 0;
 
