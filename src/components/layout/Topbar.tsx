@@ -66,7 +66,6 @@ export const Topbar: React.FC = () => {
         const cycleOpenedAt = activeCycle ? new Date(activeCycle.openedAt).getTime() : null;
         
         let addedCount = 0;
-        let requiresRecalc = false;
         
         console.log('[SYNC] existingOrders:', existingOrders.length);
         console.log('[SYNC] uniqueBinanceOrders:', uniqueBinanceOrders.length);
@@ -98,7 +97,6 @@ export const Topbar: React.FC = () => {
 
               if (isUpdated) {
                 await saveOrder(updatedOrder);
-                requiresRecalc = true;
                 addedCount++;
               }
               continue;
@@ -113,7 +111,6 @@ export const Topbar: React.FC = () => {
             // Auto-assign: If cycle is active and order occurred at or after cycle was opened
             if (activeCycle && cycleOpenedAt && orderTime >= cycleOpenedAt) {
               autoAssignedCycleId = activeCycle.id;
-              requiresRecalc = true;
             }
 
             const importedOrder: Order = {
