@@ -65,15 +65,15 @@ export const Reports: React.FC = () => {
         const hasChildren = node.children && Object.keys(node.children).length > 0;
 
         return (
-          <div key={id} className="flex flex-col ml-[16px] border-l border-white/5 pl-[8px] animate-fade-in-up">
+          <div key={id} className="flex flex-col ml-[16px] border-l border-[var(--border-strong)] pl-[8px] animate-fade-in-up">
             <div 
               className={`flex items-center gap-[8px] py-[6px] px-[12px] rounded-[8px] cursor-pointer transition-all ${
-                isSelected ? 'bg-[var(--accent-muted)] border border-[var(--accent-border)]' : 'hover:bg-white/5 border border-transparent'
+                isSelected ? 'bg-[var(--accent-muted)] border border-[var(--accent-border)]' : 'hover:bg-[var(--bg-surface-3)] border border-transparent'
               }`}
               onClick={(e) => handleSelect(node, e)}
             >
               {hasChildren ? (
-                <div onClick={(e) => toggleNode(id, e)} className="p-[2px] bg-white/5 rounded-[4px] hover:bg-white/10 text-[var(--text-secondary)] transition-colors">
+                <div onClick={(e) => toggleNode(id, e)} className="p-[2px] bg-[var(--bg-surface-3)] rounded-[4px] hover:bg-[var(--bg-surface-4)] text-[var(--text-secondary)] transition-colors">
                   {isExpanded ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
                 </div>
               ) : (
@@ -86,10 +86,10 @@ export const Reports: React.FC = () => {
                 <FileCheck size={18} className="text-[#00e5c3]" />
               )}
               
-              <span className={`text-[14px] ${isSelected ? 'text-white font-medium' : 'text-[var(--text-secondary)]'}`}>
+              <span className={`text-[14px] ${isSelected ? 'text-[var(--text-primary)] font-medium' : 'text-[var(--text-secondary)]'}`}>
                 {node.label}
               </span>
-              <span className="ml-auto text-[11px] bg-white/10 px-[6px] py-[2px] rounded-[4px] text-[var(--text-tertiary)] mono">
+              <span className="ml-auto text-[11px] bg-[var(--bg-surface-3)] px-[6px] py-[2px] rounded-[4px] text-[var(--text-tertiary)] mono">
                 {node.cycles.length} op.
               </span>
             </div>
@@ -171,7 +171,7 @@ export const Reports: React.FC = () => {
         
         {/* Explorador de Archivos (Izquierda) */}
         <div className="w-full lg:w-[350px] bg-[var(--bg-surface-2)] border border-[var(--border)] rounded-[16px] flex flex-col overflow-hidden h-fit max-h-[70vh]">
-          <div className="px-[20px] py-[16px] border-b border-[var(--border)] bg-black/20">
+          <div className="px-[20px] py-[16px] border-b border-[var(--border)] bg-[var(--bg-surface-3)]">
             <h2 className="text-[14px] font-medium text-[var(--text-secondary)] tracking-wide uppercase">Tus Archivos</h2>
           </div>
           <div className="p-[12px] overflow-y-auto">
@@ -194,13 +194,13 @@ export const Reports: React.FC = () => {
             <div className="flex flex-col h-full animate-fade-in-up">
               <div className="flex items-center gap-[12px] mb-[24px]">
                 {selectedNode.type !== 'DAY' ? <FolderOpen className="text-[var(--accent)]" size={24} /> : <FileCheck className="text-[var(--accent)]" size={24} />}
-                <h2 className="text-[20px] font-bold text-white">{selectedNode.title}</h2>
+                <h2 className="text-[20px] font-bold text-[var(--text-primary)]">{selectedNode.title}</h2>
                 <span className="ml-auto bg-[var(--accent-muted)] border border-[var(--accent-border)] px-[12px] py-[4px] rounded-full text-[12px] text-[var(--accent)] font-medium">
                   {selectedNode.type === 'YEAR' ? 'Reporte Anual' : selectedNode.type === 'MONTH' ? 'Reporte Mensual' : 'Cierre Diario'}
                 </span>
               </div>
 
-              <div className="bg-black/30 border border-white/5 rounded-[12px] p-[20px] grid grid-cols-1 md:grid-cols-2 gap-[20px]">
+              <div className="bg-[var(--bg-surface-3)] border border-[var(--border-strong)] rounded-[12px] p-[20px] grid grid-cols-1 md:grid-cols-2 gap-[20px]">
                 <div className="flex flex-col">
                   <span className="text-[12px] text-[var(--text-secondary)] uppercase">Operaciones Cubiertas</span>
                   <span className="text-[20px] font-medium mt-[4px]">{selectedNode.cycles.length} Ciclos</span>
@@ -225,8 +225,8 @@ export const Reports: React.FC = () => {
                 </div>
               </div>
 
-              <div className="mt-auto pt-[32px] flex justify-end border-t border-white/5">
-                <Button onClick={generatePDF} className="px-[32px] py-[16px] text-[15px] shadow-[0_0_20px_rgba(0,229,195,0.15)]">
+              <div className="mt-auto pt-[32px] flex justify-end border-t border-[var(--border-strong)]">
+                <Button onClick={generatePDF} className="px-[32px] py-[16px] text-[15px] shadow-[0_0_20px_rgba(37,99,235,0.15)] btn-primary">
                   <Download size={20} />
                   Descargar Modelo PDF
                 </Button>
