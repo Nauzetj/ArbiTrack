@@ -57,11 +57,16 @@ export const Topbar: React.FC = () => {
       
       if (uniqueBinanceOrders.length > 0) {
         const existingOrders = await getOrdersForUser(user.id);
-        let addedCount = 0;
-        let requiresRecalc = false;
-
         const activeCycle = await getActiveCycleForUser(user.id);
         const cycleOpenedAt = activeCycle ? new Date(activeCycle.openedAt).getTime() : null;
+        
+        let addedCount = 0;
+        let requiresRecalc = false;
+        
+        console.log('[SYNC] existingOrders:', existingOrders.length);
+        console.log('[SYNC] uniqueBinanceOrders:', uniqueBinanceOrders.length);
+        console.log('[SYNC] activeCycle:', activeCycle ? activeCycle.id : 'null');
+        console.log('[SYNC] cycleOpenedAt:', cycleOpenedAt);
 
         for (const o of uniqueBinanceOrders) {
           try {
