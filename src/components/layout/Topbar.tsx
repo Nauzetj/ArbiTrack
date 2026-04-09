@@ -143,8 +143,8 @@ export const Topbar: React.FC = () => {
           }
         }
 
-        if (addedCount > 0) {
-          if (requiresRecalc && activeCycle) {
+        if (addedCount > 0 || (activeCycle && existingOrders.some(o => o.cycleId === activeCycle.id))) {
+          if (activeCycle) {
             await recalculateCycleMetrics(activeCycle.id, user.id);
             console.log('[SYNC] Recálculo completado, obteniendo datos frescos...');
             // Refresh both activeCycle AND the full cycles array so all views stay in sync
@@ -153,7 +153,7 @@ export const Topbar: React.FC = () => {
               getCyclesForUser(user.id),
               getOrdersForUser(user.id),
             ]);
-            console.log('[SYNC] freshActiveCycle:', freshActiveCycle);
+            console.log('[SYNC] freshActiveCycle:', freshActiveCycle ? `usdt_vendido=${freshActiveCycle.usdt_vendido}, usdt_recomprado=${freshActiveCycle.usdt_recomprado}` : 'null');
             setActiveCycle(freshActiveCycle);
             setCycles(freshCycles);
             setOrders(freshOrders);
