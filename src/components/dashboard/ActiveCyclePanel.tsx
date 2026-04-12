@@ -660,7 +660,7 @@ const CycleSummary: React.FC<{
                   </td>
                   <td className="px-[12px] py-[9px] text-[var(--text-secondary)]">{o.exchange || '—'}</td>
                   <td className="px-[12px] py-[9px] font-mono">{o.unitPrice > 0 ? fmt(o.unitPrice) : '—'}</td>
-                  <td className="px-[12px] py-[9px] font-mono">{fmt(o.amount, 4)}</td>
+                  <td className="px-[12px] py-[9px] font-mono">$ {fmt(o.amount, 4)}</td>
                   <td className="px-[12px] py-[9px] font-mono font-medium">Bs. {fmt(o.totalPrice)}</td>
                   <td className="px-[12px] py-[9px] text-[var(--text-secondary)] max-w-[120px] truncate">{o.counterPartNickName || '—'}</td>
                   <td className="px-[12px] py-[9px] font-mono text-[10px] text-[var(--text-secondary)]">{o.orderNumber}</td>
@@ -668,11 +668,11 @@ const CycleSummary: React.FC<{
                   <td className="px-[12px] py-[9px] text-[var(--text-secondary)] whitespace-nowrap">{fmtDate(o.createTime_utc)}</td>
                   <td className="px-[12px] py-[9px]">
                     <span className={`inline-flex items-center gap-[3px] text-[9px] font-bold px-[6px] py-[2px] rounded-full border uppercase ${
-                      o.originMode === 'auto' || !o.originMode && o.orderNumber.startsWith('BIN')
+                      (o.originMode === 'auto' || (!o.originMode && !o.orderNumber.startsWith('MAN-')))
                         ? 'bg-[var(--accent-muted)] text-[var(--accent)] border-[var(--accent-border)]'
                         : 'bg-[rgba(124,58,237,0.1)] text-[#a78bfa] border-[rgba(124,58,237,0.2)]'
                     }`}>
-                      {o.originMode === 'auto' ? <><Zap size={7}/> Exchange</> : <><PenLine size={7}/> Manual</>}
+                      {(o.originMode === 'auto' || (!o.originMode && !o.orderNumber.startsWith('MAN-'))) ? <><Zap size={7}/> Exchange</> : <><PenLine size={7}/> Manual</>}
                     </span>
                   </td>
                 </tr>
