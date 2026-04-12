@@ -1,90 +1,205 @@
-import React, { useRef, useState } from 'react';
+import React, { useRef, useState, useCallback, useMemo } from 'react';
 import { useGSAP } from '@gsap/react';
 import { gsap } from 'gsap';
 import { useAppStore } from '../../store/useAppStore';
-import { saveCycle, deleteCycle, saveOrder, getOrdersForUser, getCyclesForUser, getActiveCycleForUser, recalculateCycleMetrics } from '../../services/dbOperations';
+import {
+  saveCycle, deleteCycle, saveOrder, deleteOrder,
+  getOrdersForUser, getCyclesForUser, getActiveCycleForUser,
+  recalculateCycleMetrics,
+} from '../../services/dbOperations';
 import toast from 'react-hot-toast';
 import { Badge } from '../ui/Badge';
 import { Button } from '../ui/Button';
 import { Modal } from '../ui/Modal';
 import { CycleTypeModal } from './CycleTypeModal';
 import { generateUUID } from '../../crypto/auth';
-import { PenLine, Zap, Plus, ArrowUpRight, ArrowDownLeft } from 'lucide-react';
-import type { Cycle, Order } from '../../types';
+import {
+  PenLine, Zap, Plus, Trash2, Edit3, X,
+  Copy, RotateCcw, TrendingUp, TrendingDown, Minus,
+  ArrowUpRight, ArrowDownLeft, RefreshCw, Banknote, CreditCard,
+  Bolt, CheckCircle2, Clock,
+} from 'lucide-react';
+import type { Cycle, Order, OperationType, CommissionType, OriginMode } from '../../types';
+
+// ─── Constants ────────────────────────────────────────────────────────────────
 
 const MAKER_FEES = {
-  standard: 0.0025, // 0.25%
-  bronze: 0.0020,   // 0.20%
-  silver: 0.00175,  // 0.175%
-  gold: 0.00125,    // 0.125%
-  zero: 0.0000,     // 0% Promo
-  manual: 'manual'  // Ingreso manual
+  standard: 0.0025,
+  bronze:   0.0020,
+  silver:   0.00175,
+  gold:     0.00125,
+  zero:     0.0000,
 };
 
-const ManualOrderForm: React.FC<{
+const OP_TYPES: { value: OperationType; label: string; icon: React.ReactNode; color: string }[] = [
+  { value: 'VENTA_USDT',    label: 'Venta USDT',    icon: <ArrowUpRight size={12}/>,  color: 'var(--loss)' },
+  { value: 'COMPRA_USDT',   label: 'Compra USDT',   icon: <ArrowDownLeft size={12}/>, color: 'var(--profit)' },
+  { value: 'RECOMPRA',      label: 'Recompra',       icon: <RefreshCw size={12}/>,     color: 'var(--accent)' },
+  { value: 'COMPRA_USD',    label: 'Compra USD',     icon: <Banknote size={12}/>,      color: '#f59e0b' },
+  { value: 'TRANSFERENCIA', label: 'Transferencia',  icon: <CreditCard size={12}/>,    color: '#a78bfa' },
+];
+
+function getOpMeta(t?: OperationType) {
+  return OP_TYPES.find(o => o.value === t) ?? OP_TYPES[0];
+}
+
+// ─── Format helpers ───────────────────────────────────────────────────────────
+
+function fmt(n: number, digits = 2) {
+  return n.toLocaleString('es-VE', { minimumFractionDigits: digits, maximumFractionDigits: digits });
+}
+
+function fmtDate(iso: string) {
+  try { return new Date(iso).toLocaleString('es-VE', { dateStyle: 'short', timeStyle: 'short' }); }
+  catch { return iso; }
+}
+
+// ─── Inline Unified Form ──────────────────────────────────────────────────────
+
+interface FormData {
+  mode: OriginMode;
+  opType: OperationType;
+  exchange: string;
+  rate: string;
+  amount: string;
+  totalPrice: string;
+  orderRef: string;
+  counterpart: string;
+  commission: string;
+  commissionType: CommissionType;
+  commissionCalc: string;
+  datetime: string;
+  notas: string;
+}
+
+const defaultForm = (opSeq: number): FormData => ({
+  mode: 'manual',
+  opType: 'VENTA_USDT',
+  exchange: '',
+  rate: '',
+  amount: '',
+  totalPrice: '',
+  orderRef: `MAN-${opSeq.toString().padStart(4, '0')}`,
+  counterpart: '',
+  commission: '',
+  commissionType: 'fixed',
+  commissionCalc: '',
+  datetime: new Date().toISOString().slice(0, 16),
+  notas: '',
+});
+
+interface UnifiedFormProps {
   cycleId: string;
   userId: string;
-  onOrderSaved: () => void;
-}> = ({ cycleId, userId, onOrderSaved }) => {
-  const [tradeType, setTradeType] = useState<'SELL' | 'BUY'>('SELL');
-  const [amount, setAmount] = useState('');
-  const [unitPrice, setUnitPrice] = useState('');
-  
-  // Comisión state
-  const [tier, setTier] = useState<number | 'manual'>(MAKER_FEES.standard);
-  const [commission, setCommission] = useState('');
-  const [isCommissionManuallyEdited, setIsCommissionManuallyEdited] = useState(false);
-  
-  const [notes, setNotes] = useState('');
+  opSeq: number;
+  editingOrder?: Order | null;
+  onSaved: () => void;
+  onCancel: () => void;
+  compact?: boolean; // true = modal de venta rápida
+}
+
+const UnifiedForm: React.FC<UnifiedFormProps> = ({
+  cycleId, userId, opSeq, editingOrder, onSaved, onCancel, compact = false,
+}) => {
+  const [form, setForm] = useState<FormData>(() => {
+    if (editingOrder) {
+      const commCalc = editingOrder.commissionType === 'percent'
+        ? ((parseFloat('0') || 0) * ((parseFloat(editingOrder.commission.toString()) || 0) / 100)).toFixed(4)
+        : editingOrder.commission.toFixed(4);
+      return {
+        mode: editingOrder.originMode ?? 'manual',
+        opType: editingOrder.operationType ?? 'VENTA_USDT',
+        exchange: editingOrder.exchange ?? '',
+        rate: editingOrder.unitPrice.toString(),
+        amount: editingOrder.amount.toString(),
+        totalPrice: editingOrder.totalPrice.toString(),
+        orderRef: editingOrder.orderNumber,
+        counterpart: editingOrder.counterPartNickName,
+        commission: editingOrder.commission.toString(),
+        commissionType: editingOrder.commissionType ?? 'fixed',
+        commissionCalc: commCalc,
+        datetime: editingOrder.createTime_utc.slice(0, 16),
+        notas: editingOrder.notas ?? '',
+      };
+    }
+    return defaultForm(opSeq);
+  });
+
   const [saving, setSaving] = useState(false);
+  const [totalEdited, setTotalEdited] = useState(false);
+  const [commEdited, setCommEdited] = useState(false);
 
-  const totalPrice = (parseFloat(amount) || 0) * (parseFloat(unitPrice) || 0);
+  const set = (k: keyof FormData, v: string) =>
+    setForm(prev => ({ ...prev, [k]: v }));
 
-  // Auto-calcular comisión cuando cambia monto o nivel, a menos que el usuario lo haya editado a mano
+  // Auto-calc total
+  const rate = parseFloat(form.rate) || 0;
+  const amount = parseFloat(form.amount) || 0;
+  const autoTotal = rate * amount;
+
   React.useEffect(() => {
-    if (tier !== 'manual' && !isCommissionManuallyEdited) {
-      const amt = parseFloat(amount) || 0;
-      if (amt > 0) {
-        // Redondear a 4 decimales
-        const calc = amt * (tier as number);
-        setCommission(calc.toFixed(4).replace(/\.?0+$/, '')); // trim zeros
-      } else {
-        setCommission('');
+    if (!totalEdited && rate > 0 && amount > 0) {
+      setForm(prev => ({ ...prev, totalPrice: autoTotal.toFixed(2) }));
+    }
+  }, [rate, amount, totalEdited]);
+
+  // Auto-calc commission
+  const commissionRate = parseFloat(form.commission) || 0;
+  React.useEffect(() => {
+    if (!commEdited) {
+      if (form.commissionType === 'percent' && amount > 0 && commissionRate > 0) {
+        const calc = (amount * (commissionRate / 100)).toFixed(4);
+        setForm(prev => ({ ...prev, commissionCalc: calc }));
+      } else if (form.commissionType === 'fixed') {
+        setForm(prev => ({ ...prev, commissionCalc: form.commission }));
       }
     }
-  }, [amount, tier, isCommissionManuallyEdited]);
+  }, [form.commission, form.commissionType, amount, commEdited]);
+
+  const opMeta = getOpMeta(form.opType);
 
   const handleSave = async () => {
-    const amountN = parseFloat(amount);
-    const priceN = parseFloat(unitPrice);
-    if (!amountN || amountN <= 0) { toast.error('Ingresa una cantidad válida de USDT.'); return; }
-    if (!priceN || priceN <= 0) { toast.error('Ingresa un precio (tasa) válido.'); return; }
+    const amountN = parseFloat(form.amount);
+    const totalN = parseFloat(form.totalPrice);
+
+    if (!amountN || amountN <= 0) { toast.error('Ingresa una cantidad válida.'); return; }
+    if (form.opType !== 'TRANSFERENCIA' && (!totalN || totalN <= 0)) {
+      toast.error('Ingresa el valor total.'); return;
+    }
+
+    const commFinal = parseFloat(form.commissionCalc || form.commission) || 0;
+    // Map operationType to legacy tradeType for compatibility
+    const legacyTradeType = ['VENTA_USDT'].includes(form.opType) ? 'SELL' : 'BUY';
+
+    const order: Order = {
+      id: editingOrder?.id ?? generateUUID(),
+      orderNumber: form.orderRef.trim() || `MAN-${Date.now()}`,
+      tradeType: legacyTradeType,
+      operationType: form.opType,
+      commissionType: form.commissionType,
+      originMode: form.mode,
+      exchange: form.exchange.trim() || undefined,
+      asset: 'USDT',
+      fiat: 'VES',
+      totalPrice: totalN || 0,
+      unitPrice: parseFloat(form.rate) || 0,
+      amount: amountN,
+      commission: commFinal,
+      commissionAsset: form.commissionType === 'percent' ? '%' : 'USDT',
+      counterPartNickName: form.counterpart.trim() || opMeta.label,
+      orderStatus: 'COMPLETED',
+      createTime_utc: new Date(form.datetime).toISOString(),
+      createTime_local: new Date(form.datetime).toLocaleString(),
+      cycleId,
+      importedAt: new Date().toISOString(),
+      userId,
+      notas: form.notas.trim() || undefined,
+    };
 
     setSaving(true);
     try {
-      const order: Order = {
-        id: generateUUID(),
-        orderNumber: `MAN-${Date.now()}`,
-        tradeType,
-        asset: 'USDT',
-        fiat: 'VES',
-        totalPrice,
-        unitPrice: priceN,
-        amount: amountN,
-        commission: parseFloat(commission) || 0,
-        commissionAsset: 'USDT',
-        counterPartNickName: notes.trim() || (tradeType === 'SELL' ? 'Venta manual' : 'Compra manual'),
-        orderStatus: 'COMPLETED',
-        createTime_utc: new Date().toISOString(),
-        createTime_local: new Date().toLocaleString(),
-        cycleId,
-        importedAt: new Date().toISOString(),
-        userId,
-      };
       await saveOrder(order);
       await recalculateCycleMetrics(cycleId, userId);
-
-      // Refresh store
       const { setOrders, setActiveCycle, setCycles } = useAppStore.getState();
       const [freshOrders, freshActiveCycle, freshCycles] = await Promise.all([
         getOrdersForUser(userId),
@@ -94,212 +209,711 @@ const ManualOrderForm: React.FC<{
       setOrders(freshOrders);
       setActiveCycle(freshActiveCycle);
       setCycles(freshCycles);
-
-      toast.success(`Orden de ${tradeType === 'SELL' ? 'venta' : 'compra'} registrada.`);
-      setAmount('');
-      setUnitPrice('');
-      setCommission('');
-      setIsCommissionManuallyEdited(false);
-      setNotes('');
-      onOrderSaved();
+      toast.success(editingOrder ? 'Operación actualizada.' : `${opMeta.label} registrada.`);
+      onSaved();
     } catch (err: any) {
-      toast.error(`Error al guardar: ${err.message}`);
+      toast.error(`Error: ${err.message}`);
     } finally {
       setSaving(false);
     }
   };
 
+  const inputCls = `w-full bg-[var(--bg-surface-2)] border border-[var(--border-strong)] rounded-[8px]
+    px-[10px] py-[7px] text-[12px] font-mono text-[var(--text-primary)] outline-none
+    focus:border-[var(--accent)] transition-colors placeholder-[var(--text-tertiary)]`;
+  const labelCls = `text-[9px] font-bold text-[var(--text-tertiary)] uppercase tracking-wider mb-[3px] block`;
+
   return (
-    <div className="bg-[var(--bg-surface-3)] border border-[rgba(124,58,237,0.25)] rounded-[10px] p-[16px] flex flex-col gap-[12px] shadow-sm">
-      {/* Header compact */}
-      <div className="flex items-center gap-[8px] mb-[4px]">
-        <PenLine size={12} className="text-[#a78bfa]" />
-        <span className="text-[11px] font-bold text-[#a78bfa] uppercase tracking-wider">Registrar Orden Manual</span>
-      </div>
+    <div className={`flex flex-col gap-[14px] ${compact ? '' : 'bg-[var(--bg-surface-3)] border border-[var(--border-strong)] rounded-[12px] p-[18px]'}`}>
 
-      {/* Trade type toggle (Compacto) */}
-      <div className="flex bg-[var(--bg-surface-2)] p-[3px] rounded-[8px] border border-[var(--border-strong)] gap-[2px] max-w-[280px]">
-        <button
-          onClick={() => setTradeType('SELL')}
-          className={`flex-1 flex items-center justify-center gap-[4px] py-[6px] rounded-[6px] text-[12px] font-bold transition-all ${
-            tradeType === 'SELL'
-              ? 'bg-[var(--loss-bg)] text-[var(--loss)] shadow-sm'
-              : 'text-[var(--text-tertiary)] hover:text-[var(--text-secondary)]'
-          }`}
-        >
-          <ArrowUpRight size={13} />
-          Venta
-        </button>
-        <button
-          onClick={() => setTradeType('BUY')}
-          className={`flex-1 flex items-center justify-center gap-[4px] py-[6px] rounded-[6px] text-[12px] font-bold transition-all ${
-            tradeType === 'BUY'
-              ? 'bg-[var(--profit-bg)] text-[var(--profit)] shadow-sm'
-              : 'text-[var(--text-tertiary)] hover:text-[var(--text-secondary)]'
-          }`}
-        >
-          <ArrowDownLeft size={13} />
-          Compra
-        </button>
-      </div>
-
-      {/* Fields */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-[10px] mt-[4px]">
-        
-        {/* Monto */}
-        <div className="flex flex-col gap-[4px]">
-          <label className="text-[9px] font-bold text-[var(--text-tertiary)] uppercase tracking-wider">
-            Cant. USDT *
-          </label>
-          <input
-            type="number"
-            min="0"
-            step="any"
-            placeholder="Ej: 150"
-            value={amount}
-            onChange={e => setAmount(e.target.value)}
-            className="w-full bg-[var(--bg-surface-2)] border border-[var(--border-strong)] rounded-[8px] px-[10px] py-[7px] text-[12px] font-mono text-[var(--text-primary)] outline-none focus:border-[#7c3aed] transition-colors"
-          />
+      {/* ── Row 0: Header + Mode toggle ── */}
+      <div className="flex items-center justify-between flex-wrap gap-[10px]">
+        <div className="flex items-center gap-[8px]">
+          {compact ? <Bolt size={14} className="text-[var(--warning)]"/> : <PenLine size={13} className="text-[var(--accent)]"/>}
+          <span className="text-[12px] font-bold text-[var(--text-primary)]">
+            {editingOrder ? 'Editar Operación' : compact ? 'Venta Rápida' : 'Registrar Operación'}
+          </span>
         </div>
 
-        {/* Precio */}
-        <div className="flex flex-col gap-[4px]">
-          <label className="text-[9px] font-bold text-[var(--text-tertiary)] uppercase tracking-wider">
-            Precio (Bs) *
-          </label>
-          <input
-            type="number"
-            min="0"
-            step="any"
-            placeholder="Ej: 65.50"
-            value={unitPrice}
-            onChange={e => setUnitPrice(e.target.value)}
-            className="w-full bg-[var(--bg-surface-2)] border border-[var(--border-strong)] rounded-[8px] px-[10px] py-[7px] text-[12px] font-mono text-[var(--text-primary)] outline-none focus:border-[#7c3aed] transition-colors"
-          />
-        </div>
-
-        {/* Comisión auto/manual */}
-        <div className="flex flex-col gap-[4px]">
-          <div className="flex items-center justify-between">
-            <label className="text-[9px] font-bold text-[var(--text-tertiary)] uppercase tracking-wider">
-              Comisión (USDT)
-            </label>
-          </div>
-          <div className="relative">
-            <input
-              type="number"
-              min="0"
-              step="any"
-              placeholder="Ej: 0.50"
-              value={commission}
-              onChange={e => {
-                setCommission(e.target.value);
-                setIsCommissionManuallyEdited(true);
-                setTier('manual');
-              }}
-              className="w-full bg-[var(--bg-surface-2)] border border-[var(--border-strong)] rounded-[8px] px-[10px] py-[7px] pb-[16px] text-[12px] font-mono text-[var(--text-primary)] outline-none focus:border-[#7c3aed] transition-colors"
-            />
-            {/* Tiny selector inside input area for tier */}
-            <select 
-              className="absolute bottom-[2px] left-0 w-full px-[8px] bg-transparent text-[8.5px] font-bold text-[#a78bfa] outline-none cursor-pointer text-ellipsis overflow-hidden"
-              value={tier}
-              onChange={(e) => {
-                const val = e.target.value;
-                setTier(val === 'manual' ? 'manual' : parseFloat(val));
-                if (val !== 'manual') setIsCommissionManuallyEdited(false);
-              }}
+        {/* Mode selector */}
+        <div className="flex bg-[var(--bg-surface-2)] p-[3px] rounded-[8px] border border-[var(--border-strong)] gap-[2px]">
+          {(['auto', 'manual'] as OriginMode[]).map(m => (
+            <button
+              key={m}
+              onClick={() => set('mode', m)}
+              className={`flex items-center gap-[5px] px-[10px] py-[5px] rounded-[6px] text-[11px] font-bold transition-all ${
+                form.mode === m
+                  ? m === 'auto'
+                    ? 'bg-[var(--accent)] text-white shadow-sm'
+                    : 'bg-[rgba(124,58,237,0.2)] text-[#a78bfa] shadow-sm'
+                  : 'text-[var(--text-tertiary)] hover:text-[var(--text-secondary)]'
+              }`}
             >
-              <option value={MAKER_FEES.standard} className="bg-[var(--bg-surface-2)]">Binance Normal (0.25%)</option>
-              <option value={MAKER_FEES.bronze} className="bg-[var(--bg-surface-2)]">🛡️ Bronce (0.20%)</option>
-              <option value={MAKER_FEES.silver} className="bg-[var(--bg-surface-2)]">⚔️ Plata (0.175%)</option>
-              <option value={MAKER_FEES.gold} className="bg-[var(--bg-surface-2)]">👑 Oro (0.125%)</option>
-              <option value={MAKER_FEES.zero} className="bg-[var(--bg-surface-2)]">🎉 Promo (0%)</option>
-              <option value="manual" className="bg-[var(--bg-surface-2)]">✍️ Ingreso Manual</option>
-            </select>
-          </div>
+              {m === 'auto' ? <Zap size={10}/> : <PenLine size={10}/>}
+              {m === 'auto' ? 'Automático' : 'Manual'}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {/* Mode hint */}
+      <div className={`flex items-center gap-[6px] px-[10px] py-[6px] rounded-[8px] text-[11px] ${
+        form.mode === 'auto'
+          ? 'bg-[var(--accent-muted)] text-[var(--accent)] border border-[var(--accent-border)]'
+          : 'bg-[rgba(124,58,237,0.08)] text-[#a78bfa] border border-[rgba(124,58,237,0.2)]'
+      }`}>
+        {form.mode === 'auto'
+          ? <><Zap size={10}/> Los campos reflejan los datos de la orden en el exchange. Edita si necesitas corregir.</>
+          : <><PenLine size={10}/> N° operación y fecha asignados automáticamente. Ingresa los datos de tu operación.</>
+        }
+      </div>
+
+      {/* ── Row 1: Op type + Exchange + Order ref ── */}
+      <div className="grid grid-cols-2 md:grid-cols-3 gap-[10px]">
+        {/* Tipo de operación */}
+        <div className="flex flex-col">
+          <label className={labelCls}>Tipo de operación *</label>
+          <select
+            value={form.opType}
+            onChange={e => set('opType', e.target.value as OperationType)}
+            className={inputCls}
+            style={{ color: opMeta.color }}
+          >
+            {OP_TYPES.map(t => (
+              <option key={t.value} value={t.value} className="bg-[var(--bg-surface-2)] text-[var(--text-primary)]">
+                {t.label}
+              </option>
+            ))}
+          </select>
         </div>
 
-        {/* Notas */}
-        <div className="flex flex-col gap-[4px]">
-          <label className="text-[9px] font-bold text-[var(--text-tertiary)] uppercase tracking-wider">
-            Exchange
-          </label>
+        {/* Exchange */}
+        <div className="flex flex-col">
+          <label className={labelCls}>Exchange / Plataforma</label>
           <input
             type="text"
-            placeholder="Ej: Bybit / OKX"
-            value={notes}
-            onChange={e => setNotes(e.target.value)}
-            className="w-full bg-[var(--bg-surface-2)] border border-[var(--border-strong)] rounded-[8px] px-[10px] py-[7px] text-[12px] text-[var(--text-primary)] outline-none focus:border-[#7c3aed] transition-colors"
+            placeholder={form.mode === 'auto' ? 'Ej: Binance P2P' : 'Ej: Bybit, OKX…'}
+            value={form.exchange}
+            onChange={e => set('exchange', e.target.value)}
+            className={inputCls}
           />
         </div>
 
+        {/* N° Orden */}
+        <div className="flex flex-col">
+          <label className={labelCls}>N° Orden / Referencia</label>
+          <input
+            type="text"
+            placeholder={form.mode === 'auto' ? 'Desde el exchange' : form.orderRef}
+            value={form.orderRef}
+            onChange={e => set('orderRef', e.target.value)}
+            className={inputCls}
+          />
+        </div>
       </div>
 
-      {/* Footer Row: Total + Button */}
-      <div className="flex items-center justify-between mt-[6px] gap-[16px] pt-[8px] border-t border-[var(--border)]">
+      {/* ── Row 2: Rate + Amount + Total ── */}
+      <div className="grid grid-cols-2 md:grid-cols-3 gap-[10px]">
+        {/* Tasa */}
         <div className="flex flex-col">
-          <span className="text-[10px] text-[var(--text-secondary)] font-medium">Total a operar:</span>
-          {totalPrice > 0 ? (
-            <span className="font-mono font-bold text-[13px] text-[var(--text-primary)]">
-              Bs. {totalPrice.toFixed(2)}
-            </span>
-          ) : (
-             <span className="text-[13px] text-[var(--text-tertiary)]">-</span>
+          <label className={labelCls}>Tasa de cambio</label>
+          <input
+            type="number" min="0" step="any"
+            placeholder="Ej: 38.50"
+            value={form.rate}
+            onChange={e => set('rate', e.target.value)}
+            className={inputCls}
+          />
+        </div>
+
+        {/* Cantidad */}
+        <div className="flex flex-col">
+          <label className={labelCls}>
+            Cantidad {form.opType === 'COMPRA_USD' ? '(USD)' : '(USDT)'} *
+          </label>
+          <input
+            type="number" min="0" step="any"
+            placeholder="Ej: 200"
+            value={form.amount}
+            onChange={e => set('amount', e.target.value)}
+            className={inputCls}
+          />
+        </div>
+
+        {/* Valor total — calculado, editable */}
+        <div className="flex flex-col">
+          <label className={labelCls}>
+            Valor total {form.opType === 'COMPRA_USD' ? '(VES)' : '(Bs.)'}
+            <span className="ml-[4px] text-[var(--accent)] normal-case tracking-normal font-normal">auto</span>
+          </label>
+          <input
+            type="number" min="0" step="any"
+            placeholder="Calculado auto"
+            value={form.totalPrice}
+            onChange={e => { setTotalEdited(true); set('totalPrice', e.target.value); }}
+            onFocus={() => setTotalEdited(true)}
+            className={`${inputCls} ${!totalEdited && autoTotal > 0 ? 'text-[var(--accent)]' : ''}`}
+          />
+        </div>
+      </div>
+
+      {/* ── Row 3: Counterpart + Datetime ── */}
+      <div className="grid grid-cols-2 gap-[10px]">
+        <div className="flex flex-col">
+          <label className={labelCls}>Usuario / Contraparte</label>
+          <input
+            type="text"
+            placeholder={form.mode === 'auto' ? 'Nickname del exchange' : 'Opcional'}
+            value={form.counterpart}
+            onChange={e => set('counterpart', e.target.value)}
+            className={inputCls}
+          />
+        </div>
+        <div className="flex flex-col">
+          <label className={labelCls}>
+            Fecha y hora
+            {form.mode === 'manual' && (
+              <span className="ml-[4px] text-[#a78bfa] normal-case tracking-normal font-normal">· fecha auto</span>
+            )}
+          </label>
+          <input
+            type="datetime-local"
+            value={form.datetime}
+            onChange={e => set('datetime', e.target.value)}
+            className={inputCls}
+          />
+        </div>
+      </div>
+
+      {/* ── Row 4: Commission ── */}
+      <div className="grid grid-cols-2 md:grid-cols-3 gap-[10px]">
+        {/* Tipo comisión */}
+        <div className="flex flex-col">
+          <label className={labelCls}>Tipo de comisión</label>
+          <div className="flex bg-[var(--bg-surface-2)] p-[3px] rounded-[8px] border border-[var(--border-strong)] gap-[2px]">
+            {(['fixed', 'percent'] as CommissionType[]).map(ct => (
+              <button
+                key={ct}
+                onClick={() => { set('commissionType', ct); setCommEdited(false); }}
+                className={`flex-1 py-[5px] rounded-[6px] text-[10px] font-bold transition-all ${
+                  form.commissionType === ct
+                    ? 'bg-[var(--bg-surface-4)] text-[var(--text-primary)] shadow-sm'
+                    : 'text-[var(--text-tertiary)]'
+                }`}
+              >
+                {ct === 'fixed' ? 'Fija' : 'Porcentual'}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        {/* Comisión valor */}
+        <div className="flex flex-col">
+          <label className={labelCls}>
+            Comisión {form.commissionType === 'percent' ? '(%)' : '(USDT)'}
+          </label>
+          <div className="relative">
+            <input
+              type="number" min="0" step="any"
+              placeholder={form.commissionType === 'percent' ? 'Ej: 0.25' : 'Ej: 0.50'}
+              value={form.commission}
+              onChange={e => { set('commission', e.target.value); setCommEdited(false); }}
+              className={`${inputCls} pr-[60px]`}
+            />
+            {form.commissionType === 'fixed' && (
+              <select
+                className="absolute right-[2px] top-[2px] bottom-[2px] bg-[var(--bg-surface-3)] text-[9px] font-bold text-[#a78bfa] rounded-[6px] px-[4px] outline-none cursor-pointer border-l border-[var(--border)]"
+                onChange={e => {
+                  const v = parseFloat(e.target.value);
+                  if (!isNaN(v)) {
+                    const calc = (amount * v).toFixed(4);
+                    set('commission', calc);
+                    setCommEdited(false);
+                  }
+                }}
+                defaultValue=""
+              >
+                <option value="" disabled>Nivel</option>
+                <option value={MAKER_FEES.standard}>Normal 0.25%</option>
+                <option value={MAKER_FEES.bronze}>🛡 Bronce 0.20%</option>
+                <option value={MAKER_FEES.silver}>⚔ Plata 0.175%</option>
+                <option value={MAKER_FEES.gold}>👑 Oro 0.125%</option>
+                <option value={MAKER_FEES.zero}>🎉 Promo 0%</option>
+              </select>
+            )}
+          </div>
+        </div>
+
+        {/* Comisión calculada — editable */}
+        <div className="flex flex-col">
+          <label className={labelCls}>
+            Comisión calculada
+            <span className="ml-[4px] text-[var(--warning)] normal-case tracking-normal font-normal">auto</span>
+          </label>
+          <input
+            type="number" min="0" step="any"
+            placeholder="0.0000"
+            value={form.commissionCalc}
+            onChange={e => { setCommEdited(true); set('commissionCalc', e.target.value); }}
+            className={`${inputCls} text-[var(--warning)]`}
+          />
+        </div>
+      </div>
+
+      {/* ── Row 5: Notes ── */}
+      {!compact && (
+        <div className="flex flex-col">
+          <label className={labelCls}>Notas</label>
+          <input
+            type="text"
+            placeholder="Observaciones opcionales…"
+            value={form.notas}
+            onChange={e => set('notas', e.target.value)}
+            className={inputCls}
+          />
+        </div>
+      )}
+
+      {/* ── Footer: Preview + Actions ── */}
+      <div className="flex items-center justify-between pt-[10px] border-t border-[var(--border)] gap-[12px] flex-wrap">
+        {/* Preview */}
+        <div className="flex items-center gap-[16px]">
+          {/* Origin badge */}
+          <span className={`inline-flex items-center gap-[4px] text-[9px] font-bold px-[8px] py-[3px] rounded-full border uppercase tracking-wider ${
+            form.mode === 'auto'
+              ? 'bg-[var(--accent-muted)] text-[var(--accent)] border-[var(--accent-border)]'
+              : 'bg-[rgba(124,58,237,0.1)] text-[#a78bfa] border-[rgba(124,58,237,0.3)]'
+          }`}>
+            {form.mode === 'auto' ? <Zap size={8}/> : <PenLine size={8}/>}
+            {form.mode === 'auto' ? 'Exchange' : 'Manual'}
+          </span>
+
+          {parseFloat(form.totalPrice) > 0 && (
+            <div className="flex flex-col leading-tight">
+              <span className="text-[9px] text-[var(--text-secondary)]">Total</span>
+              <span className="font-mono font-bold text-[13px] text-[var(--text-primary)]">
+                Bs. {fmt(parseFloat(form.totalPrice))}
+              </span>
+            </div>
+          )}
+          {parseFloat(form.commissionCalc || form.commission) > 0 && (
+            <div className="flex flex-col leading-tight">
+              <span className="text-[9px] text-[var(--text-secondary)]">Comisión</span>
+              <span className="font-mono font-bold text-[13px] text-[var(--warning)]">
+                {fmt(parseFloat(form.commissionCalc || form.commission), 4)}
+              </span>
+            </div>
           )}
         </div>
 
-        <button
-          onClick={handleSave}
-          disabled={saving}
-          className="flex items-center justify-center gap-[6px] px-[24px] py-[8px] rounded-[8px] bg-[#7c3aed] hover:bg-[#6d28d9] text-white font-bold text-[12px] transition-all disabled:opacity-60 shadow-[0_2px_10px_rgba(124,58,237,0.2)]"
-        >
-          {saving ? (
-            <span className="animate-spin w-[13px] h-[13px] border-[1.5px] border-white border-t-transparent rounded-full inline-block" />
-          ) : (
-            <Plus size={13} />
-          )}
-          {saving ? 'Guardando' : `Registrar ${tradeType === 'SELL' ? 'Venta' : 'Compra'}`}
-        </button>
+        {/* Buttons */}
+        <div className="flex items-center gap-[8px]">
+          <button
+            onClick={onCancel}
+            className="flex items-center gap-[5px] px-[14px] py-[7px] rounded-[8px] border border-[var(--border-strong)] text-[var(--text-secondary)] text-[12px] font-medium hover:bg-[var(--bg-surface-2)] transition-all"
+          >
+            <X size={12}/> Cancelar
+          </button>
+          <button
+            onClick={handleSave}
+            disabled={saving}
+            className="flex items-center gap-[6px] px-[20px] py-[7px] rounded-[8px] bg-[var(--accent)] hover:brightness-110 text-white font-bold text-[12px] transition-all disabled:opacity-60 shadow-[0_2px_10px_rgba(37,99,235,0.25)]"
+          >
+            {saving
+              ? <span className="w-[12px] h-[12px] border-[1.5px] border-white border-t-transparent rounded-full animate-spin"/>
+              : <CheckCircle2 size={13}/>}
+            {saving ? 'Guardando…' : editingOrder ? 'Guardar cambios' : 'Registrar'}
+          </button>
+        </div>
       </div>
     </div>
   );
 };
 
-// ─────────────────────────────────────────────────────────────────────────────
+// ─── Cycle Summary Panel ──────────────────────────────────────────────────────
+
+const CycleSummary: React.FC<{
+  cycle: Cycle;
+  orders: Order[];
+  onReopen: () => void;
+  onCopy: () => void;
+}> = ({ cycle, orders, onReopen, onCopy }) => {
+  const sortedOrders = [...orders].sort(
+    (a, b) => new Date(a.createTime_utc).getTime() - new Date(b.createTime_utc).getTime()
+  );
+
+  // Compute totals
+  let totalInvertido = 0, totalRecuperado = 0, totalComisiones = 0;
+  sortedOrders.forEach(o => {
+    const opType = o.operationType ?? (o.tradeType === 'SELL' ? 'VENTA_USDT' : 'COMPRA_USDT');
+    totalComisiones += o.commission ?? 0;
+    if (opType === 'COMPRA_USDT' || opType === 'COMPRA_USD') totalInvertido += o.totalPrice;
+    if (opType === 'VENTA_USDT' || opType === 'RECOMPRA') totalRecuperado += o.totalPrice;
+  });
+  const gananciaBruta = totalRecuperado - totalInvertido;
+  const gananciaNeta = gananciaBruta - totalComisiones;
+  const isPositive = gananciaNeta > 0;
+  const isNeutral = Math.abs(gananciaNeta) < 0.01;
+
+  return (
+    <div className="flex flex-col gap-[20px] animate-fade-in-up">
+      {/* Header */}
+      <div className="flex items-center justify-between flex-wrap gap-[8px]">
+        <div className="flex items-center gap-[10px]">
+          <h3 className="font-bold text-[16px]">
+            Resumen — Ciclo #{cycle.cycleNumber.toString().slice(-4)}
+          </h3>
+          {isNeutral ? (
+            <span className="inline-flex items-center gap-[4px] text-[10px] font-bold px-[8px] py-[3px] rounded-full bg-[var(--bg-surface-4)] text-[var(--text-secondary)] uppercase">
+              <Minus size={9}/> Neutro
+            </span>
+          ) : isPositive ? (
+            <span className="inline-flex items-center gap-[4px] text-[10px] font-bold px-[8px] py-[3px] rounded-full bg-[var(--profit-bg)] text-[var(--profit)] border border-[var(--profit)]/30 uppercase">
+              <TrendingUp size={9}/> Positivo
+            </span>
+          ) : (
+            <span className="inline-flex items-center gap-[4px] text-[10px] font-bold px-[8px] py-[3px] rounded-full bg-[var(--loss-bg)] text-[var(--loss)] border border-[var(--loss)]/30 uppercase">
+              <TrendingDown size={9}/> Negativo
+            </span>
+          )}
+        </div>
+        <div className="flex items-center gap-[8px]">
+          <button
+            onClick={onCopy}
+            className="flex items-center gap-[6px] px-[12px] py-[6px] rounded-[8px] border border-[var(--border-strong)] text-[var(--text-secondary)] text-[12px] font-medium hover:bg-[var(--bg-surface-2)] transition-all"
+          >
+            <Copy size={12}/> Copiar resumen
+          </button>
+          <button
+            onClick={onReopen}
+            className="flex items-center gap-[6px] px-[12px] py-[6px] rounded-[8px] border border-[var(--accent-border)] text-[var(--accent)] text-[12px] font-medium hover:bg-[var(--accent-muted)] transition-all"
+          >
+            <RotateCcw size={12}/> Reabrir ciclo
+          </button>
+        </div>
+      </div>
+
+      {/* Dates */}
+      <div className="flex items-center gap-[16px] text-[12px] text-[var(--text-secondary)]">
+        <span><span className="text-[var(--text-tertiary)]">Apertura:</span> {fmtDate(cycle.openedAt)}</span>
+        {cycle.closedAt && (
+          <span><span className="text-[var(--text-tertiary)]">Cierre:</span> {fmtDate(cycle.closedAt)}</span>
+        )}
+      </div>
+
+      {/* Financial summary cards */}
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-[10px]">
+        {[
+          { label: 'Total invertido', val: totalInvertido, color: 'text-[var(--text-primary)]' },
+          { label: 'Total recuperado', val: totalRecuperado, color: 'text-[var(--profit)]' },
+          { label: 'Total comisiones', val: totalComisiones, color: 'text-[var(--warning)]' },
+          { label: 'Ganancia neta', val: gananciaNeta, color: isNeutral ? 'text-[var(--text-secondary)]' : isPositive ? 'text-[var(--profit)]' : 'text-[var(--loss)]' },
+        ].map(({ label, val, color }) => (
+          <div key={label} className="bg-[var(--bg-surface-3)] border border-[var(--border)] rounded-[10px] p-[12px] flex flex-col gap-[3px]">
+            <span className="text-[10px] text-[var(--text-tertiary)] uppercase tracking-wider">{label}</span>
+            <span className={`font-mono font-bold text-[15px] ${color}`}>
+              {val >= 0 ? '' : '-'}Bs. {fmt(Math.abs(val))}
+            </span>
+          </div>
+        ))}
+      </div>
+
+      {/* Orders table */}
+      <div className="overflow-x-auto custom-scrollbar rounded-[10px] border border-[var(--border)]">
+        <table className="w-full min-w-[900px] text-left border-collapse text-[12px]">
+          <thead>
+            <tr className="bg-[var(--bg-surface-3)] text-[9px] uppercase font-bold text-[var(--text-tertiary)] tracking-[1px]">
+              {['#','Tipo','Exchange','Tasa','Cantidad','Valor Total','Contraparte','Ref. Orden','Comisión','Fecha','Origen'].map(h => (
+                <th key={h} className="px-[12px] py-[10px] border-b border-[var(--border-strong)] whitespace-nowrap">{h}</th>
+              ))}
+            </tr>
+          </thead>
+          <tbody>
+            {sortedOrders.map((o, i) => {
+              const opMeta = getOpMeta(o.operationType ?? (o.tradeType === 'SELL' ? 'VENTA_USDT' : 'COMPRA_USDT'));
+              return (
+                <tr key={o.id} className="border-b border-[var(--border)] hover:bg-[var(--bg-surface-2)] transition-colors">
+                  <td className="px-[12px] py-[9px] font-mono text-[var(--text-tertiary)]">{i + 1}</td>
+                  <td className="px-[12px] py-[9px]">
+                    <span className="inline-flex items-center gap-[4px] font-bold text-[10px] whitespace-nowrap" style={{ color: opMeta.color }}>
+                      {opMeta.icon} {opMeta.label}
+                    </span>
+                  </td>
+                  <td className="px-[12px] py-[9px] text-[var(--text-secondary)]">{o.exchange || '—'}</td>
+                  <td className="px-[12px] py-[9px] font-mono">{o.unitPrice > 0 ? fmt(o.unitPrice) : '—'}</td>
+                  <td className="px-[12px] py-[9px] font-mono">{fmt(o.amount, 4)}</td>
+                  <td className="px-[12px] py-[9px] font-mono font-medium">Bs. {fmt(o.totalPrice)}</td>
+                  <td className="px-[12px] py-[9px] text-[var(--text-secondary)] max-w-[120px] truncate">{o.counterPartNickName || '—'}</td>
+                  <td className="px-[12px] py-[9px] font-mono text-[10px] text-[var(--text-secondary)]">{o.orderNumber}</td>
+                  <td className="px-[12px] py-[9px] font-mono text-[var(--warning)]">{fmt(o.commission, 4)}</td>
+                  <td className="px-[12px] py-[9px] text-[var(--text-secondary)] whitespace-nowrap">{fmtDate(o.createTime_utc)}</td>
+                  <td className="px-[12px] py-[9px]">
+                    <span className={`inline-flex items-center gap-[3px] text-[9px] font-bold px-[6px] py-[2px] rounded-full border uppercase ${
+                      o.originMode === 'auto' || !o.originMode && o.orderNumber.startsWith('BIN')
+                        ? 'bg-[var(--accent-muted)] text-[var(--accent)] border-[var(--accent-border)]'
+                        : 'bg-[rgba(124,58,237,0.1)] text-[#a78bfa] border-[rgba(124,58,237,0.2)]'
+                    }`}>
+                      {o.originMode === 'auto' ? <><Zap size={7}/> Exchange</> : <><PenLine size={7}/> Manual</>}
+                    </span>
+                  </td>
+                </tr>
+              );
+            })}
+            {sortedOrders.length === 0 && (
+              <tr>
+                <td colSpan={11} className="px-[12px] py-[24px] text-center text-[var(--text-tertiary)]">
+                  No hay operaciones registradas en este ciclo.
+                </td>
+              </tr>
+            )}
+          </tbody>
+        </table>
+      </div>
+
+      {/* Subtotals by type */}
+      <div className="flex flex-col gap-[8px]">
+        <span className="text-[10px] font-bold text-[var(--text-tertiary)] uppercase tracking-[1px]">Desglose por tipo</span>
+        <div className="flex flex-wrap gap-[8px]">
+          {OP_TYPES.map(ot => {
+            const ops = sortedOrders.filter(o =>
+              (o.operationType ?? (o.tradeType === 'SELL' ? 'VENTA_USDT' : 'COMPRA_USDT')) === ot.value
+            );
+            if (!ops.length) return null;
+            const subTotal = ops.reduce((s, o) => s + o.totalPrice, 0);
+            const subComm = ops.reduce((s, o) => s + (o.commission ?? 0), 0);
+            return (
+              <div key={ot.value} className="bg-[var(--bg-surface-3)] border border-[var(--border)] rounded-[8px] px-[12px] py-[8px] flex items-center gap-[10px]">
+                <span className="text-[10px] font-bold" style={{ color: ot.color }}>
+                  {ot.icon} {ot.label}
+                </span>
+                <span className="text-[10px] text-[var(--text-tertiary)]">×{ops.length}</span>
+                <span className="font-mono text-[11px] font-medium">Bs. {fmt(subTotal)}</span>
+                {subComm > 0 && (
+                  <span className="font-mono text-[10px] text-[var(--warning)]">com:{fmt(subComm, 4)}</span>
+                )}
+              </div>
+            );
+          })}
+        </div>
+      </div>
+    </div>
+  );
+};
+
+// ─── Operations Table ─────────────────────────────────────────────────────────
+
+const OpsTable: React.FC<{
+  orders: Order[];
+  cycleId: string;
+  userId: string;
+  onEdit: (order: Order) => void;
+  onDeleted: () => void;
+}> = ({ orders, cycleId: _cId, userId: _uId, onEdit, onDeleted }) => {
+  const [deletingId, setDeletingId] = useState<string | null>(null);
+
+  const sorted = useMemo(() =>
+    [...orders].sort((a, b) => new Date(a.createTime_utc).getTime() - new Date(b.createTime_utc).getTime()),
+    [orders]
+  );
+
+  const handleDelete = async (order: Order) => {
+    if (deletingId) return;
+    setDeletingId(order.id);
+    try {
+      await deleteOrder(order.id, order.userId);
+      await recalculateCycleMetrics(order.cycleId!, order.userId);
+      const { setOrders, setActiveCycle, setCycles } = useAppStore.getState();
+      const [freshOrders, freshActiveCycle, freshCycles] = await Promise.all([
+        getOrdersForUser(order.userId),
+        getActiveCycleForUser(order.userId),
+        getCyclesForUser(order.userId),
+      ]);
+      setOrders(freshOrders);
+      setActiveCycle(freshActiveCycle);
+      setCycles(freshCycles);
+      toast.success('Operación eliminada.');
+      onDeleted();
+    } catch (err: any) {
+      toast.error(`Error: ${err.message}`);
+    } finally {
+      setDeletingId(null);
+    }
+  };
+
+  if (!sorted.length) {
+    return (
+      <div className="flex flex-col items-center justify-center py-[24px] gap-[8px] text-center">
+        <Clock size={24} className="text-[var(--text-tertiary)]"/>
+        <p className="text-[13px] text-[var(--text-secondary)]">Aún no hay operaciones en este ciclo.</p>
+        <p className="text-[11px] text-[var(--text-tertiary)]">Registra la primera usando el formulario de abajo.</p>
+      </div>
+    );
+  }
+
+  return (
+    <div className="overflow-x-auto custom-scrollbar rounded-[10px] border border-[var(--border)]">
+      <table className="w-full min-w-[800px] text-left border-collapse text-[12px]">
+        <thead>
+          <tr className="bg-[var(--bg-surface-3)] text-[9px] uppercase font-bold text-[var(--text-tertiary)] tracking-[1px]">
+            <th className="px-[12px] py-[10px] border-b border-[var(--border-strong)]">#</th>
+            <th className="px-[12px] py-[10px] border-b border-[var(--border-strong)]">Tipo</th>
+            <th className="px-[12px] py-[10px] border-b border-[var(--border-strong)]">Exchange</th>
+            <th className="px-[12px] py-[10px] border-b border-[var(--border-strong)]">Tasa</th>
+            <th className="px-[12px] py-[10px] border-b border-[var(--border-strong)]">Cantidad</th>
+            <th className="px-[12px] py-[10px] border-b border-[var(--border-strong)]">Valor</th>
+            <th className="px-[12px] py-[10px] border-b border-[var(--border-strong)]">Contraparte</th>
+            <th className="px-[12px] py-[10px] border-b border-[var(--border-strong)]">Comisión</th>
+            <th className="px-[12px] py-[10px] border-b border-[var(--border-strong)]">Fecha</th>
+            <th className="px-[12px] py-[10px] border-b border-[var(--border-strong)]">Origen</th>
+            <th className="px-[12px] py-[10px] border-b border-[var(--border-strong)]">Acciones</th>
+          </tr>
+        </thead>
+        <tbody>
+          {sorted.map((o, i) => {
+            const opMeta = getOpMeta(o.operationType ?? (o.tradeType === 'SELL' ? 'VENTA_USDT' : 'COMPRA_USDT'));
+            const isDeleting = deletingId === o.id;
+            return (
+              <tr key={o.id} className={`border-b border-[var(--border)] transition-colors ${isDeleting ? 'opacity-40' : 'hover:bg-[var(--bg-surface-2)]'}`}>
+                <td className="px-[12px] py-[9px] font-mono text-[10px] text-[var(--text-tertiary)]">{i + 1}</td>
+                <td className="px-[12px] py-[9px]">
+                  <span className="inline-flex items-center gap-[4px] font-bold text-[10px] whitespace-nowrap" style={{ color: opMeta.color }}>
+                    {opMeta.icon} {opMeta.label}
+                  </span>
+                </td>
+                <td className="px-[12px] py-[9px] text-[var(--text-secondary)]">{o.exchange || '—'}</td>
+                <td className="px-[12px] py-[9px] font-mono">{o.unitPrice > 0 ? fmt(o.unitPrice) : '—'}</td>
+                <td className="px-[12px] py-[9px] font-mono">{fmt(o.amount, 4)}</td>
+                <td className="px-[12px] py-[9px] font-mono font-medium">Bs. {fmt(o.totalPrice)}</td>
+                <td className="px-[12px] py-[9px] text-[var(--text-secondary)] max-w-[100px] truncate">{o.counterPartNickName || '—'}</td>
+                <td className="px-[12px] py-[9px] font-mono text-[var(--warning)] text-[10px]">{fmt(o.commission, 4)}</td>
+                <td className="px-[12px] py-[9px] text-[var(--text-secondary)] whitespace-nowrap text-[10px]">{fmtDate(o.createTime_utc)}</td>
+                <td className="px-[12px] py-[9px]">
+                  <span className={`inline-flex items-center gap-[3px] text-[9px] font-bold px-[6px] py-[2px] rounded-full uppercase ${
+                    o.originMode === 'auto'
+                      ? 'bg-[var(--accent-muted)] text-[var(--accent)]'
+                      : 'bg-[rgba(124,58,237,0.1)] text-[#a78bfa]'
+                  }`}>
+                    {o.originMode === 'auto' ? <><Zap size={7}/> Exchange</> : <><PenLine size={7}/> Manual</>}
+                  </span>
+                </td>
+                <td className="px-[12px] py-[9px]">
+                  <div className="flex items-center gap-[4px]">
+                    <button
+                      onClick={() => onEdit(o)}
+                      className="p-[5px] rounded-[6px] hover:bg-[var(--accent-muted)] text-[var(--text-tertiary)] hover:text-[var(--accent)] transition-all"
+                      title="Editar"
+                    >
+                      <Edit3 size={12}/>
+                    </button>
+                    <button
+                      onClick={() => handleDelete(o)}
+                      disabled={isDeleting}
+                      className="p-[5px] rounded-[6px] hover:bg-[var(--loss-bg)] text-[var(--text-tertiary)] hover:text-[var(--loss)] transition-all disabled:opacity-40"
+                      title="Eliminar"
+                    >
+                      {isDeleting
+                        ? <span className="w-[12px] h-[12px] border border-[var(--loss)] border-t-transparent rounded-full animate-spin block"/>
+                        : <Trash2 size={12}/>}
+                    </button>
+                  </div>
+                </td>
+              </tr>
+            );
+          })}
+        </tbody>
+      </table>
+    </div>
+  );
+};
+
+// ─── Metrics Bar ──────────────────────────────────────────────────────────────
+
+const MetricsBar: React.FC<{ orders: Order[] }> = ({ orders }) => {
+  const completed = orders.filter(o => o.orderStatus?.toUpperCase() === 'COMPLETED');
+  let totalInvertido = 0, totalRecuperado = 0, totalComisiones = 0;
+
+  completed.forEach(o => {
+    const opType = o.operationType ?? (o.tradeType === 'SELL' ? 'VENTA_USDT' : 'COMPRA_USDT');
+    totalComisiones += o.commission ?? 0;
+    if (opType === 'COMPRA_USDT' || opType === 'COMPRA_USD') totalInvertido += o.totalPrice;
+    if (opType === 'VENTA_USDT' || opType === 'RECOMPRA') totalRecuperado += o.totalPrice;
+  });
+
+  const gananciaNeta = totalRecuperado - totalInvertido - totalComisiones;
+  const isPos = gananciaNeta > 0;
+  const isNeutral = Math.abs(gananciaNeta) < 0.01;
+
+  return (
+    <div className="grid grid-cols-2 md:grid-cols-4 gap-[10px]">
+      {[
+        { label: 'Total Invertido', val: totalInvertido, color: 'text-[var(--text-primary)]', prefix: 'Bs.' },
+        { label: 'Total Recuperado', val: totalRecuperado, color: 'text-[var(--profit)]', prefix: 'Bs.' },
+        { label: 'Total Comisiones', val: totalComisiones, color: 'text-[var(--warning)]', prefix: '' },
+        {
+          label: 'Ganancia Neta',
+          val: gananciaNeta,
+          color: isNeutral ? 'text-[var(--text-secondary)]' : isPos ? 'text-[var(--profit)]' : 'text-[var(--loss)]',
+          prefix: 'Bs.',
+        },
+      ].map(({ label, val, color, prefix }) => (
+        <div key={label} className="cycle-stat-group bg-[var(--bg-surface-3)] border border-[var(--border)] rounded-[10px] p-[12px] flex flex-col gap-[3px]">
+          <span className="text-[9px] font-bold text-[var(--text-tertiary)] uppercase tracking-[1px]">{label}</span>
+          <span className={`font-mono font-bold text-[14px] ${color}`}>
+            {prefix && `${prefix} `}{fmt(Math.abs(val))}
+            {!isNeutral && label === 'Ganancia Neta' && (
+              <span className="text-[10px] ml-[4px]">{isPos ? '▲' : '▼'}</span>
+            )}
+          </span>
+        </div>
+      ))}
+    </div>
+  );
+};
+
+// ─── Main Component ───────────────────────────────────────────────────────────
 
 export const ActiveCyclePanel: React.FC = () => {
-  const { activeCycle, setActiveCycle, currentUser, bcvRate, cycles, setCycles } = useAppStore();
+  const { activeCycle, setActiveCycle, currentUser, bcvRate, cycles, setCycles, orders } = useAppStore();
   const panelRef = useRef<HTMLDivElement>(null);
 
-  // Modal state
-  const [showDeleteModal, setShowDeleteModal] = useState(false);
-  const [showCloseModal, setShowCloseModal] = useState(false);
-  const [showTypeModal, setShowTypeModal] = useState(false);
-  const [isProcessing, setIsProcessing] = useState(false);
-  const [showManualForm, setShowManualForm] = useState(false);
+  // UI state
+  const [showDeleteModal, setShowDeleteModal]   = useState(false);
+  const [showCloseModal, setShowCloseModal]     = useState(false);
+  const [showTypeModal, setShowTypeModal]       = useState(false);
+  const [showForm, setShowForm]                 = useState(false);
+  const [showQuickSale, setShowQuickSale]       = useState(false); // emergent modal
+  const [showSummary, setShowSummary]           = useState(false);
+  const [editingOrder, setEditingOrder]         = useState<Order | null>(null);
+  const [isProcessing, setIsProcessing]         = useState(false);
+  const [closedCycleOrders, setClosedCycleOrders] = useState<Order[]>([]);
+
+  // Orders for active cycle
+  const cycleOrders = useMemo(
+    () => orders.filter(o => o.cycleId === activeCycle?.id),
+    [orders, activeCycle?.id]
+  );
+
+  // Next operation sequence number
+  const opSeq = cycleOrders.length + 1;
 
   useGSAP(() => {
     if (!activeCycle) {
       gsap.to('.pulse-icon', {
-        scale: 1.05,
-        boxShadow: '0 0 20px rgba(0, 229, 195, 0.4)',
-        y: -5,
-        duration: 1.5,
-        repeat: -1,
-        yoyo: true,
-        ease: "sine.inOut"
+        scale: 1.05, boxShadow: '0 0 20px rgba(37,99,235,0.4)', y: -5,
+        duration: 1.5, repeat: -1, yoyo: true, ease: 'sine.inOut',
       });
     } else {
       gsap.fromTo('.cycle-stat-group',
         { y: 15, opacity: 0 },
-        { y: 0, opacity: 1, duration: 0.6, stagger: 0.1, ease: 'power3.out', clearProps: 'all' }
+        { y: 0, opacity: 1, duration: 0.6, stagger: 0.08, ease: 'power3.out', clearProps: 'all' }
       );
     }
   }, { dependencies: [activeCycle?.id], scope: panelRef });
 
+  // ── Handlers ────────────────────────────────────────────────────────────────
+
   const handleOpenCycle = async (cycleType: 'p2p' | 'manual') => {
     if (!currentUser) return;
-
     const safeCycleNumber = Number(Date.now().toString().slice(-9));
     const newCycle: Cycle = {
       id: generateUUID(),
@@ -308,32 +922,22 @@ export const ActiveCyclePanel: React.FC = () => {
       closedAt: null,
       status: 'En curso',
       cycleType,
-      usdt_vendido: 0,
-      usdt_recomprado: 0,
-      ves_recibido: 0,
-      ves_pagado: 0,
+      usdt_vendido: 0, usdt_recomprado: 0,
+      ves_recibido: 0, ves_pagado: 0,
       comision_total: 0,
-      ganancia_usdt: 0,
-      ganancia_ves: 0,
-      tasa_venta_prom: 0,
-      tasa_compra_prom: 0,
-      diferencial_tasa: 0,
-      roi_percent: 0,
-      tasa_bcv_dia: bcvRate ? bcvRate.tasa_bcv : 0,
+      ganancia_usdt: 0, ganancia_ves: 0,
+      tasa_venta_prom: 0, tasa_compra_prom: 0,
+      diferencial_tasa: 0, roi_percent: 0,
+      tasa_bcv_dia: bcvRate?.tasa_bcv ?? 0,
       notas: '',
       userId: currentUser.id,
     };
-
     setShowTypeModal(false);
     setActiveCycle(newCycle);
     setCycles([newCycle, ...cycles]);
-
-    const label = cycleType === 'p2p' ? 'P2P automático' : 'Multi-Exchange manual';
-    toast.success(`¡Ciclo ${label} iniciado!`);
-
-    saveCycle(newCycle).catch((err: any) => {
-      console.error('Error saving cycle:', err);
-      toast.error(`Error al guardar el ciclo: ${err.message || 'Inténtalo de nuevo'}`);
+    toast.success(`Ciclo ${cycleType === 'p2p' ? 'P2P' : 'Multi-Exchange'} iniciado.`);
+    saveCycle(newCycle).catch(err => {
+      toast.error(`Error al guardar: ${err.message}`);
       setActiveCycle(null);
       setCycles(cycles);
     });
@@ -343,20 +947,22 @@ export const ActiveCyclePanel: React.FC = () => {
     if (!activeCycle || !currentUser) return;
     setIsProcessing(true);
     try {
-      const closedCycle = {
+      const closed: Cycle = {
         ...activeCycle,
-        status: 'Completado' as const,
+        status: activeCycle.ganancia_ves < 0 ? 'Con pérdida' : 'Completado',
         closedAt: new Date().toISOString(),
-        tasa_bcv_dia: bcvRate ? bcvRate.tasa_bcv : activeCycle.tasa_bcv_dia
+        tasa_bcv_dia: bcvRate?.tasa_bcv ?? activeCycle.tasa_bcv_dia,
       };
-      await saveCycle(closedCycle);
+      await saveCycle(closed);
+      setClosedCycleOrders(cycleOrders);
       setActiveCycle(null);
-      setCycles(cycles.map(c => c.id === closedCycle.id ? closedCycle : c));
+      setCycles(cycles.map(c => c.id === closed.id ? closed : c));
       setShowCloseModal(false);
-      toast.success('Ciclo cerrado correctamente.');
+      setShowSummary(true);
+      setShowForm(false);
+      toast.success('Ciclo cerrado. Revisa el resumen abajo.');
     } catch (err: any) {
-      console.error('Error closing cycle:', err);
-      toast.error('Error al cerrar ciclo: ' + err.message);
+      toast.error('Error al cerrar: ' + err.message);
     } finally {
       setIsProcessing(false);
     }
@@ -370,34 +976,102 @@ export const ActiveCyclePanel: React.FC = () => {
       setActiveCycle(null);
       setCycles(cycles.filter(c => c.id !== activeCycle.id));
       setShowDeleteModal(false);
-      toast.success('Ciclo eliminado');
+      toast.success('Ciclo eliminado.');
     } catch (err: any) {
-      console.error('Error deleting cycle:', err);
-      toast.error('Error al eliminar ciclo: ' + err.message);
+      toast.error('Error: ' + err.message);
     } finally {
       setIsProcessing(false);
     }
   };
 
-  // ── Empty state ─────────────────────────────────────────────────────────────
+  const handleReopenCycle = async () => {
+    const lastClosed = cycles.find(c => c.closedAt && cycleOrders.length > 0) ??
+      cycles.find(c => closedCycleOrders.some(o => o.cycleId === c.id));
+    if (!lastClosed || !currentUser) {
+      toast.error('No se encontró el ciclo para reabrir.');
+      return;
+    }
+    const reopened: Cycle = { ...lastClosed, status: 'En curso', closedAt: null };
+    try {
+      await saveCycle(reopened);
+      setActiveCycle(reopened);
+      setCycles(cycles.map(c => c.id === reopened.id ? reopened : c));
+      setShowSummary(false);
+      toast.success('Ciclo reabierto.');
+    } catch (err: any) {
+      toast.error('Error al reabrir: ' + err.message);
+    }
+  };
+
+  const handleCopySummary = useCallback(() => {
+    const cycle = cycles.find(c => closedCycleOrders.some(o => o.cycleId === c.id)) ?? activeCycle;
+    if (!cycle) return;
+    const lines: string[] = [
+      `===== CICLO #${cycle.cycleNumber.toString().slice(-4)} =====`,
+      `Apertura: ${fmtDate(cycle.openedAt)}`,
+      cycle.closedAt ? `Cierre:   ${fmtDate(cycle.closedAt)}` : '',
+      '',
+      'OPERACIONES:',
+      ...closedCycleOrders.map((o, i) => {
+        const opMeta = getOpMeta(o.operationType ?? (o.tradeType === 'SELL' ? 'VENTA_USDT' : 'COMPRA_USDT'));
+        return `  ${i + 1}. ${opMeta.label.padEnd(16)} | ${fmt(o.amount, 4)} | Bs.${fmt(o.totalPrice)} | com:${fmt(o.commission, 4)} | ${fmtDate(o.createTime_utc)}`;
+      }),
+      '',
+      `Total invertido:   Bs. ${fmt(cycleOrders.reduce((s, o) => { const t = o.operationType ?? (o.tradeType === 'SELL' ? 'VENTA_USDT' : 'COMPRA_USDT'); return s + (['COMPRA_USDT','COMPRA_USD'].includes(t) ? o.totalPrice : 0); }, 0))}`,
+      `Total recuperado:  Bs. ${fmt(cycleOrders.reduce((s, o) => { const t = o.operationType ?? (o.tradeType === 'SELL' ? 'VENTA_USDT' : 'COMPRA_USDT'); return s + (['VENTA_USDT','RECOMPRA'].includes(t) ? o.totalPrice : 0); }, 0))}`,
+      `Total comisiones:  ${fmt(cycleOrders.reduce((s, o) => s + (o.commission ?? 0), 0), 4)}`,
+      `Ganancia neta:     Bs. ${fmt(cycle.ganancia_ves)}`,
+    ].filter(Boolean);
+    navigator.clipboard.writeText(lines.join('\n'))
+      .then(() => toast.success('Resumen copiado al portapapeles.'))
+      .catch(() => toast.error('No se pudo copiar.'));
+  }, [cycles, closedCycleOrders, cycleOrders, activeCycle]);
+
+  const handleFormSaved = () => {
+    setShowForm(false);
+    setEditingOrder(null);
+    setShowQuickSale(false);
+  };
+
+  // ── Empty state ──────────────────────────────────────────────────────────────
   if (!activeCycle) {
     return (
       <>
-        <div ref={panelRef} className="bg-[var(--bg-surface-2)] rounded-[16px] border border-[var(--border)] p-[32px] flex flex-col items-center justify-center gap-[20px] h-full shadow-sm relative overflow-hidden transition-all hover:border-[var(--accent-muted)]">
-          <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[150px] h-[150px] bg-[var(--accent)]/5 rounded-full blur-3xl pointer-events-none" />
-          <div className="pulse-icon w-[64px] h-[64px] rounded-full border border-[var(--border-strong)] flex items-center justify-center text-[var(--accent)] bg-[var(--accent-muted)] relative z-10 transition-colors hover:bg-[var(--accent)] hover:text-[#020B16]">
-            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h7"/><line x1="16" y1="5" x2="22" y2="5"/><line x1="19" y1="2" x2="19" y2="8"/></svg>
+        <div ref={panelRef} className="flex flex-col gap-[20px]">
+          {/* Summary panel after close */}
+          {showSummary && closedCycleOrders.length >= 0 && (() => {
+            const closedCycle = cycles.find(c => closedCycleOrders.some(o => o.cycleId === c.id));
+            if (!closedCycle) return null;
+            return (
+              <div className="bg-[var(--bg-surface-2)] rounded-[16px] border border-[var(--border)] p-[24px]">
+                <CycleSummary
+                  cycle={closedCycle}
+                  orders={closedCycleOrders}
+                  onReopen={handleReopenCycle}
+                  onCopy={handleCopySummary}
+                />
+              </div>
+            );
+          })()}
+
+          {/* Empty / new cycle CTA */}
+          <div className="bg-[var(--bg-surface-2)] rounded-[16px] border border-[var(--border)] p-[32px] flex flex-col items-center justify-center gap-[20px] shadow-sm relative overflow-hidden hover:border-[var(--accent-border)] transition-all">
+            <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[150px] h-[150px] bg-[var(--accent)]/5 rounded-full blur-3xl pointer-events-none"/>
+            <div className="pulse-icon w-[64px] h-[64px] rounded-full border border-[var(--border-strong)] flex items-center justify-center text-[var(--accent)] bg-[var(--accent-muted)] relative z-10 hover:bg-[var(--accent)] hover:text-white transition-colors">
+              <Plus size={28}/>
+            </div>
+            <div className="text-center">
+              <h3 className="font-bold text-[16px] mb-[4px]">No hay ciclos en curso</h3>
+              <p className="text-[var(--text-secondary)] text-[13px] max-w-[280px]">
+                Inicia un nuevo ciclo para comenzar a registrar tus operaciones de trading.
+              </p>
+            </div>
+            <Button onClick={() => setShowTypeModal(true)} className="mt-[8px] text-[15px] px-[24px] py-[12px]">
+              + Abrir nuevo ciclo
+            </Button>
           </div>
-          <div className="text-center">
-            <h3 className="font-semibold text-[16px] mb-[4px] text-[var(--text-primary)]">No hay ciclos en curso</h3>
-            <p className="text-[var(--text-secondary)] text-[13px] max-w-[280px]">Inicia un nuevo ciclo para comenzar a agrupar tus órdenes de venta y recompra.</p>
-          </div>
-          <Button onClick={() => setShowTypeModal(true)} className="mt-[8px] text-[15px] px-[24px] py-[12px]">
-            + Abrir nuevo ciclo
-          </Button>
         </div>
 
-        {/* Modal: Selección de tipo de ciclo */}
         <CycleTypeModal
           isOpen={showTypeModal}
           onClose={() => setShowTypeModal(false)}
@@ -408,125 +1082,150 @@ export const ActiveCyclePanel: React.FC = () => {
     );
   }
 
-  // ── Active cycle ────────────────────────────────────────────────────────────
-  const resParcial = activeCycle.ganancia_usdt;
-  const isLoss = resParcial < 0;
-  const liquidezVES = activeCycle.ves_recibido - activeCycle.ves_pagado;
-  const percentComplete = activeCycle.usdt_vendido > 0
-    ? Math.min((activeCycle.usdt_recomprado / activeCycle.usdt_vendido) * 100, 100)
-    : 0;
-
   const isManual = activeCycle.cycleType === 'manual';
-  const cycleTypeLabel = isManual ? 'Multi-Exchange' : 'P2P Auto';
-  const cycleTypeBg = isManual ? 'bg-[rgba(124,58,237,0.15)] text-[#a78bfa] border-[rgba(124,58,237,0.3)]' : 'bg-[var(--accent-muted)] text-[var(--accent)] border-[var(--accent-border)]';
+  const cycleTypeBg = isManual
+    ? 'bg-[rgba(124,58,237,0.15)] text-[#a78bfa] border-[rgba(124,58,237,0.3)]'
+    : 'bg-[var(--accent-muted)] text-[var(--accent)] border-[var(--accent-border)]';
+  const hasOps = cycleOrders.length > 0;
 
   return (
     <>
-      <div ref={panelRef} className="bg-[var(--bg-surface-2)] rounded-[16px] border-t-2 border-[var(--accent)] border-x border-b border-x-[var(--border)] border-b-[var(--border)] p-[24px] flex flex-col gap-[20px] h-full shadow-[0_0_20px_rgba(0,229,195,0.06)] relative overflow-hidden transition-colors hover:border-[var(--accent-border)]">
-        <div className="absolute top-0 right-0 w-[200px] h-[200px] bg-[var(--accent)]/5 rounded-full blur-[80px] pointer-events-none" />
+      <div ref={panelRef} className="flex flex-col gap-[16px]">
 
-        {/* Header */}
-        <div className="flex items-center justify-between relative z-10 flex-wrap gap-[8px]">
-          <div className="flex items-center gap-[10px]">
-            <h2 className="font-bold text-[18px]">Ciclo #{activeCycle.cycleNumber.toString().slice(-4)}</h2>
-            <Badge variant="accent">EN CURSO</Badge>
-            {/* Cycle type badge */}
-            <span className={`inline-flex items-center gap-[4px] text-[10px] font-bold px-[8px] py-[3px] rounded-full border uppercase tracking-wider ${cycleTypeBg}`}>
-              {isManual ? <PenLine size={9} /> : <Zap size={9} />}
-              {cycleTypeLabel}
-            </span>
-          </div>
-        </div>
+        {/* ── Header ── */}
+        <div className="bg-[var(--bg-surface-2)] rounded-[16px] border-t-2 border-[var(--accent)] border-x border-b border-x-[var(--border)] border-b-[var(--border)] p-[20px] flex flex-col gap-[16px] shadow-[0_0_20px_rgba(37,99,235,0.06)] relative overflow-hidden">
+          <div className="absolute top-0 right-0 w-[180px] h-[180px] bg-[var(--accent)]/5 rounded-full blur-[80px] pointer-events-none"/>
 
-        {/* Stats Grid */}
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-[16px] gap-y-[24px] relative z-10">
-          <div className="flex flex-col cycle-stat-group">
-            <span className="text-[10px] text-[var(--text-tertiary)] uppercase font-semibold tracking-[1.2px] mb-[4px]">USDT Vendido</span>
-            <span className="mono text-[18px] font-medium">{activeCycle.usdt_vendido.toFixed(2)}</span>
-          </div>
-          <div className="flex flex-col cycle-stat-group">
-            <span className="text-[10px] text-[var(--text-tertiary)] uppercase font-semibold tracking-[1.2px] mb-[4px]">USDT Recomprado</span>
-            <span className="mono text-[18px] font-medium">{activeCycle.usdt_recomprado.toFixed(2)}</span>
-          </div>
-          <div className="flex flex-col cycle-stat-group">
-            <span className="text-[10px] text-[var(--text-tertiary)] uppercase font-semibold tracking-[1.2px] mb-[4px]">Liquidez Neta</span>
-            <span className={`mono text-[18px] font-medium ${liquidezVES < 0 ? 'text-loss' : 'text-[var(--text-primary)]'}`}>
-              {liquidezVES.toFixed(2)}
-            </span>
-            <span className="text-[10px] text-[var(--text-tertiary)] mt-[2px]">Bolívares (VES)</span>
-          </div>
-          <div className="flex flex-col cycle-stat-group">
-            <span className="text-[10px] text-[var(--text-tertiary)] uppercase font-semibold tracking-[1.2px] mb-[4px]">Resultado Parcial</span>
-            <span className={`mono text-[18px] font-medium ${isLoss ? 'text-loss' : 'text-profit'}`}>
-              {resParcial > 0 ? '+' : ''}<span>{resParcial.toFixed(2)}</span> USDT
-            </span>
-          </div>
-        </div>
-
-        {/* Progress bar */}
-        <div className="flex flex-col gap-[8px]">
-          <div className="flex items-center justify-between text-[12px]">
-            <span className="text-[var(--text-secondary)]">Progreso estimado de recompra</span>
-            <span className="mono">{percentComplete.toFixed(0)}%</span>
-          </div>
-          <div className="w-full h-[6px] bg-[var(--bg-surface-4)] rounded-full relative overflow-hidden">
-            <div
-              className="absolute top-0 left-0 h-full bg-gradient-to-r from-[var(--accent-muted)] to-[var(--accent)] transition-all duration-500 rounded-full"
-              style={{ width: `${percentComplete}%` }}
-            />
-            {percentComplete > 0 && percentComplete < 100 && (
-              <div className="animate-shimmer" />
-            )}
-          </div>
-          <div className="text-[11px] text-[var(--text-secondary)]">
-            {percentComplete < 100
-              ? `Faltan ~${Math.max(0, activeCycle.usdt_vendido - activeCycle.usdt_recomprado).toFixed(2)} USDT por recomprar para cerrar neutro.`
-              : 'Recompra cubierta. Verifica los diferenciales.'}
-          </div>
-        </div>
-
-        {/* Manual form — only for 'manual' cycle type */}
-        {isManual && (
-          <div className="relative z-10">
-            {showManualForm ? (
-              <ManualOrderForm
-                cycleId={activeCycle.id}
-                userId={currentUser!.id}
-                onOrderSaved={() => setShowManualForm(false)}
-              />
-            ) : (
+          {/* Top row */}
+          <div className="flex items-center justify-between flex-wrap gap-[8px] relative z-10">
+            <div className="flex items-center gap-[10px]">
+              <h2 className="font-bold text-[18px]">Ciclo #{activeCycle.cycleNumber.toString().slice(-4)}</h2>
+              <Badge variant="accent">EN CURSO</Badge>
+              <span className={`inline-flex items-center gap-[4px] text-[10px] font-bold px-[8px] py-[3px] rounded-full border uppercase tracking-wider ${cycleTypeBg}`}>
+                {isManual ? <PenLine size={9}/> : <Zap size={9}/>}
+                {isManual ? 'Multi-Exchange' : 'P2P Auto'}
+              </span>
+            </div>
+            <div className="flex items-center gap-[8px]">
+              {/* Quick sale button — emergency modal */}
               <button
-                onClick={() => setShowManualForm(true)}
-                className="w-full flex items-center justify-center gap-[8px] py-[10px] rounded-[12px] border-2 border-dashed border-[rgba(124,58,237,0.4)] text-[#a78bfa] text-[13px] font-semibold hover:border-[#7c3aed] hover:bg-[rgba(124,58,237,0.06)] transition-all"
+                onClick={() => { setShowQuickSale(true); setShowForm(false); setEditingOrder(null); }}
+                className="flex items-center gap-[5px] px-[12px] py-[7px] rounded-[8px] bg-[var(--warning-bg)] border border-[var(--warning)]/30 text-[var(--warning)] text-[12px] font-bold hover:brightness-110 transition-all"
+                title="Venta rápida de emergencia"
               >
-                <Plus size={15} />
-                Registrar orden manualmente
+                <Bolt size={12}/> Venta rápida
+              </button>
+              <Button variant="danger" onClick={() => setShowDeleteModal(true)}>
+                Eliminar
+              </Button>
+              <Button
+                variant="danger"
+                onClick={() => setShowCloseModal(true)}
+                disabled={!hasOps}
+              >
+                Cerrar ciclo
+              </Button>
+            </div>
+          </div>
+
+          {/* Metrics */}
+          <div className="relative z-10">
+            <MetricsBar orders={cycleOrders}/>
+          </div>
+
+          {/* Opened at */}
+          <div className="flex items-center gap-[6px] text-[11px] text-[var(--text-secondary)] border-t border-[var(--border)] pt-[10px] relative z-10">
+            <Clock size={11}/>
+            Abierto el {fmtDate(activeCycle.openedAt)}
+          </div>
+        </div>
+
+        {/* ── Operations table ── */}
+        <div className="bg-[var(--bg-surface-2)] rounded-[14px] border border-[var(--border)] p-[16px] flex flex-col gap-[12px]">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-[8px]">
+              <span className="text-[12px] font-bold text-[var(--text-primary)]">Operaciones</span>
+              {cycleOrders.length > 0 && (
+                <span className="text-[10px] font-bold px-[8px] py-[2px] bg-[var(--bg-surface-3)] text-[var(--text-secondary)] rounded-full border border-[var(--border)]">
+                  {cycleOrders.length}
+                </span>
+              )}
+            </div>
+            {/* Add / toggle form */}
+            {!showForm && (
+              <button
+                onClick={() => { setShowForm(true); setEditingOrder(null); }}
+                className="flex items-center gap-[6px] px-[14px] py-[7px] rounded-[8px] bg-[var(--accent)] hover:brightness-110 text-white font-bold text-[12px] transition-all shadow-[0_2px_8px_rgba(37,99,235,0.2)]"
+              >
+                <Plus size={13}/> Registrar operación
               </button>
             )}
           </div>
+
+          <OpsTable
+            orders={cycleOrders}
+            cycleId={activeCycle.id}
+            userId={currentUser!.id}
+            onEdit={(order) => { setEditingOrder(order); setShowForm(true); setShowQuickSale(false); }}
+            onDeleted={() => {}}
+          />
+        </div>
+
+        {/* ── Inline form ── */}
+        {showForm && (
+          <div className="bg-[var(--bg-surface-2)] rounded-[14px] border border-[var(--border)] border-l-2 border-l-[var(--accent)] p-[18px] animate-fade-in-up">
+            <UnifiedForm
+              cycleId={activeCycle.id}
+              userId={currentUser!.id}
+              opSeq={opSeq}
+              editingOrder={editingOrder}
+              onSaved={handleFormSaved}
+              onCancel={() => { setShowForm(false); setEditingOrder(null); }}
+            />
+          </div>
         )}
 
-        {/* Footer actions */}
-        <div className="mt-auto flex items-center justify-between pt-[16px] border-t border-[var(--border-strong)]">
-          <span className="text-[12px] text-[var(--text-secondary)]">
-            Abierto el {new Date(activeCycle.openedAt).toLocaleDateString()} a las {new Date(activeCycle.openedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-          </span>
-          <div className="flex gap-[12px]">
-            <Button variant="danger" onClick={() => setShowDeleteModal(true)}>
-              Eliminar Ciclo
-            </Button>
-            <Button
-              variant="danger"
-              onClick={() => setShowCloseModal(true)}
-              disabled={activeCycle.usdt_vendido === 0 || activeCycle.usdt_recomprado === 0}
-            >
-              Cerrar Ciclo
-            </Button>
-          </div>
-        </div>
+        {/* Quick-add row when no ops and form hidden */}
+        {!showForm && !hasOps && (
+          <button
+            onClick={() => setShowForm(true)}
+            className="w-full flex items-center justify-center gap-[8px] py-[12px] rounded-[12px] border-2 border-dashed border-[var(--border-strong)] text-[var(--text-tertiary)] text-[13px] font-semibold hover:border-[var(--accent)] hover:text-[var(--accent)] hover:bg-[var(--accent-muted)] transition-all"
+          >
+            <Plus size={15}/> Registrar primera operación
+          </button>
+        )}
       </div>
 
-      {/* Modal: Eliminar Ciclo */}
+      {/* ── Emergency Quick-Sale Modal ── */}
+      <Modal
+        isOpen={showQuickSale}
+        onClose={() => setShowQuickSale(false)}
+        title=""
+        confirmText=""
+        cancelText=""
+        onConfirm={() => {}}
+        icon="info"
+      >
+        <div className="flex flex-col gap-[12px]">
+          <div className="flex items-center gap-[8px] mb-[4px]">
+            <Bolt size={16} className="text-[var(--warning)]"/>
+            <span className="text-[14px] font-bold text-[var(--text-primary)]">Venta Rápida de Emergencia</span>
+          </div>
+          <p className="text-[12px] text-[var(--text-secondary)]">
+            Registra una operación urgente. Puedes editarla después con todos los detalles.
+          </p>
+          <UnifiedForm
+            cycleId={activeCycle.id}
+            userId={currentUser!.id}
+            opSeq={opSeq}
+            onSaved={handleFormSaved}
+            onCancel={() => setShowQuickSale(false)}
+            compact
+          />
+        </div>
+      </Modal>
+
+      {/* ── Confirm Delete Modal ── */}
       <Modal
         isOpen={showDeleteModal}
         onClose={() => !isProcessing && setShowDeleteModal(false)}
@@ -543,14 +1242,14 @@ export const ActiveCyclePanel: React.FC = () => {
           <strong className="text-[var(--text-primary)]">
             Ciclo #{activeCycle.cycleNumber.toString().slice(-4)}
           </strong>{' '}
-          y todas las métricas asociadas a él.
+          y todas sus operaciones.
         </p>
-        <p className="mt-[8px] text-[#ff4e4e]/80 text-[12.5px] font-medium">
+        <p className="mt-[8px] text-[var(--loss)]/80 text-[12.5px] font-medium">
           ⚠️ Esta acción no se puede deshacer.
         </p>
       </Modal>
 
-      {/* Modal: Cerrar Ciclo */}
+      {/* ── Confirm Close Modal ── */}
       <Modal
         isOpen={showCloseModal}
         onClose={() => !isProcessing && setShowCloseModal(false)}
@@ -563,23 +1262,30 @@ export const ActiveCyclePanel: React.FC = () => {
         loading={isProcessing}
       >
         <p>
-          El ciclo se marcará como <strong className="text-[var(--text-primary)]">Completado</strong> y ya no podrás agregar más órdenes a él.
+          El ciclo se marcará como <strong className="text-[var(--text-primary)]">Completado</strong> y
+          se generará el resumen financiero completo.
         </p>
         <div className="mt-[12px] grid grid-cols-2 gap-[8px]">
           <div className="bg-[var(--bg-surface-3)] border border-[var(--border)] rounded-[10px] p-[10px]">
-            <span className="text-[10px] text-[var(--text-tertiary)] uppercase tracking-wider">Resultado</span>
-            <p className={`mono text-[15px] font-bold mt-[2px] ${isLoss ? 'text-[#ff4e4e]' : 'text-[var(--accent)]'}`}>
-              {resParcial >= 0 ? '+' : ''}{resParcial.toFixed(2)} USDT
-            </p>
+            <span className="text-[10px] text-[var(--text-tertiary)] uppercase tracking-wider">Operaciones</span>
+            <p className="mono text-[15px] font-bold mt-[2px]">{cycleOrders.length}</p>
           </div>
           <div className="bg-[var(--bg-surface-3)] border border-[var(--border)] rounded-[10px] p-[10px]">
-            <span className="text-[10px] text-[var(--text-tertiary)] uppercase tracking-wider">Progreso</span>
-            <p className="mono text-[15px] font-bold mt-[2px] text-[var(--text-primary)]">
-              {percentComplete.toFixed(0)}%
+            <span className="text-[10px] text-[var(--text-tertiary)] uppercase tracking-wider">Resultado</span>
+            <p className={`mono text-[15px] font-bold mt-[2px] ${activeCycle.ganancia_ves >= 0 ? 'text-[var(--profit)]' : 'text-[var(--loss)]'}`}>
+              {activeCycle.ganancia_ves >= 0 ? '+' : ''}Bs. {fmt(activeCycle.ganancia_ves)}
             </p>
           </div>
         </div>
       </Modal>
+
+      {/* ── Cycle Type Modal ── */}
+      <CycleTypeModal
+        isOpen={showTypeModal}
+        onClose={() => setShowTypeModal(false)}
+        bcvTasa={bcvRate?.tasa_bcv}
+        onConfirm={handleOpenCycle}
+      />
     </>
   );
 };

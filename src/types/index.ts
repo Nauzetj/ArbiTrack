@@ -1,4 +1,19 @@
 export type TradeType = "SELL" | "BUY";
+
+/** 5 tipos de operación del módulo unificado */
+export type OperationType =
+  | 'COMPRA_USDT'   // Compra de USDT en un exchange P2P
+  | 'VENTA_USDT'    // Venta de USDT en un exchange P2P
+  | 'RECOMPRA'      // Recompra de USDT en otro exchange P2P
+  | 'COMPRA_USD'    // Compra de dólares físicos/bancarios
+  | 'TRANSFERENCIA'; // Paso por tarjeta u otro canal con comisión
+
+/** Tipo de comisión */
+export type CommissionType = 'fixed' | 'percent';
+
+/** Modo de origen de la operación */
+export type OriginMode = 'auto' | 'manual';
+
 export type CycleStatus = "En curso" | "Completado" | "Con pérdida" | "Neutral";
 
 export type UserRole = 'admin' | 'vip_annual' | 'vip_semiannual' | 'vip_monthly' | 'vip_promo' | 'free';
@@ -33,22 +48,29 @@ export interface Config {
 
 export interface Order {
   id: string; // Our internal UUID
-  orderNumber: string; // Binance unique order number
+  orderNumber: string; // Binance unique order number / referencia manual
   tradeType: TradeType;
+  // ── Campos del módulo unificado (opcionales para retrocompatibilidad) ────
+  operationType?: OperationType;    // Tipo semántico de la operación
+  commissionType?: CommissionType;  // fixed | percent
+  originMode?: OriginMode;          // auto = exchange | manual = usuario
+  exchange?: string;                // Exchange / plataforma de la operación
+  // ────────────────────────────────────────────────────────────────────────
   asset: string; // 'USDT'
   fiat: string; // 'VES'
-  totalPrice: number; // total in VES
+  totalPrice: number; // total in VES (o USD para COMPRA_USD)
   unitPrice: number; // rate used
-  amount: number; // amount in USDT
-  commission: number; // calculated Binance commission
-  commissionAsset: string; // 'USDT'
+  amount: number; // amount in USDT or USD
+  commission: number; // calculated commission
+  commissionAsset: string; // 'USDT' | 'USD' | '%'
   counterPartNickName: string;
-  orderStatus: string; // usually 'Completed'
+  orderStatus: string; // usually 'COMPLETED'
   createTime_utc: string; // ISO string UTC
   createTime_local: string; // ISO string locale
   cycleId: string | null; // null if unassigned
   importedAt: string; // ISO string
   userId: string;
+  notas?: string; // Notas libres de la operación
 }
 
 export interface Cycle {

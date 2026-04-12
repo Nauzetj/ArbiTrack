@@ -208,3 +208,35 @@ CREATE INDEX IF NOT EXISTS idx_cycles_status    ON cycles(status);
 --       CHECK (cycle_type IN ('p2p','manual'));
 --
 -- Si ya tienes registros anteriores, todos quedarán como 'p2p' (correcto).
+
+-- ── 12. MIGRACIÓN: Módulo Unificado de Ciclos ────────────────────────────────
+-- Nuevas columnas para los 5 tipos de operación y modo auto/manual.
+-- Seguro de ejecutar múltiples veces (IF NOT EXISTS).
+
+ALTER TABLE orders
+  ADD COLUMN IF NOT EXISTS operation_type TEXT DEFAULT NULL
+    CHECK (
+      operation_type IS NULL OR
+      operation_type IN (
+        'VENTA_USDT', 'COMPRA_USDT', 'RECOMPRA', 'COMPRA_USD', 'TRANSFERENCIA'
+      )
+    );
+
+ALTER TABLE orders
+  ADD COLUMN IF NOT EXISTS commission_type TEXT DEFAULT NULL
+    CHECK (commission_type IS NULL OR commission_type IN ('fixed', 'percent'));
+
+ALTER TABLE orders
+  ADD COLUMN IF NOT EXISTS origin_mode TEXT DEFAULT NULL
+    CHECK (origin_mode IS NULL OR origin_mode IN ('auto', 'manual'));
+
+ALTER TABLE orders
+  ADD COLUMN IF NOT EXISTS exchange TEXT DEFAULT NULL;
+
+ALTER TABLE orders
+  ADD COLUMN IF NOT EXISTS notas TEXT DEFAULT NULL;
+
+-- Índices para consultas frecuentes por los nuevos campos
+CREATE INDEX IF NOT EXISTS idx_orders_exchange        ON orders(exchange)        WHERE exchange IS NOT NULL;
+CREATE INDEX IF NOT EXISTS idx_orders_operation_type  ON orders(operation_type)  WHERE operation_type IS NOT NULL;
+CREATE INDEX IF NOT EXISTS idx_orders_origin_mode     ON orders(origin_mode)     WHERE origin_mode IS NOT NULL;

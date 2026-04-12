@@ -35,6 +35,12 @@ function mapOrder(row: any): Order {
     cycleId: row.cycle_id ?? null,
     importedAt: row.imported_at,
     userId: row.user_id,
+    // Campos del módulo unificado
+    operationType: row.operation_type ?? undefined,
+    commissionType: row.commission_type ?? undefined,
+    originMode: row.origin_mode ?? undefined,
+    exchange: row.exchange ?? undefined,
+    notas: row.notas ?? undefined,
   };
 }
 
@@ -203,11 +209,25 @@ export const saveOrder = async (order: Order) => {
     cycle_id: order.cycleId,
     imported_at: order.importedAt,
     user_id: order.userId,
+    // Campos del módulo unificado
+    operation_type: order.operationType ?? null,
+    commission_type: order.commissionType ?? null,
+    origin_mode: order.originMode ?? null,
+    exchange: order.exchange ?? null,
+    notas: order.notas ?? null,
   });
   if (error) throw error;
 };
 
-// ─── CYCLES ──────────────────────────────────────────────────────────────────
+export const deleteOrder = async (orderId: string, userId: string): Promise<void> => {
+  const { error } = await supabase
+    .from('orders')
+    .delete()
+    .eq('id', orderId)
+    .eq('user_id', userId);
+  if (error) throw error;
+};
+
 
 export const getCyclesForUser = async (userId: string): Promise<Cycle[]> => {
   const { data, error } = await supabase
@@ -270,40 +290,74 @@ export const recalculateCycleMetrics = async (cycleId: string, userId: string): 
   // Get orders for this cycle
   const { data: orderRows } = await supabase.from('orders').select('*').eq('cycle_id', cycleId).eq('user_id', userId);
   const orders = (orderRows ?? []).map(mapOrder);
-  
-  const sellOrders = orders.filter(o => o.tradeType === 'SELL');
-  const buyOrders = orders.filter(o => o.tradeType === 'BUY');
-  const completedSell = sellOrders.filter(o => o.orderStatus?.toUpperCase() === 'COMPLETED');
-  const completedBuy = buyOrders.filter(o => o.orderStatus?.toUpperCase() === 'COMPLETED');
-  console.log('[RECALC] Orders:', orders.length, 'SELL:', completedSell.length, 'BUY:', completedBuy.length);
-  
-  let usdt_vendido = 0, usdt_recomprado = 0, ves_recibido = 0, ves_pagado = 0, comision_total = 0;
+
+  console.log('[RECALC] Orders:', orders.length);
+
+  let totalInvertido = 0;   // COMPRA_USDT + COMPRA_USD
+  let totalRecuperado = 0;  // VENTA_USDT + RECOMPRA
+  let comision_total = 0;   // Todas las operaciones (incluyendo TRANSFERENCIA)
+
+  // Compatibilidad con métricas heredadas (para el panel activo)
+  let usdt_vendido = 0, usdt_recomprado = 0, ves_recibido = 0, ves_pagado = 0;
 
   orders.forEach(o => {
-    // CORRECCIÓN: el estado de Binance viene como 'COMPLETED' (uppercase) desde la API.
-    // Se normaliza para comparar de forma robusta.
     if (o.orderStatus?.toUpperCase() !== 'COMPLETED') return;
-    comision_total += o.commission;
-    if (o.tradeType === 'SELL') { usdt_vendido += o.amount; ves_recibido += o.totalPrice; }
-    else if (o.tradeType === 'BUY') { usdt_recomprado += o.amount; ves_pagado += o.totalPrice; }
+
+    // Determinar el tipo semántico — si no existe operationType, inferir desde tradeType heredado
+    const opType = o.operationType ?? (o.tradeType === 'SELL' ? 'VENTA_USDT' : 'COMPRA_USDT');
+
+    comision_total += o.commission ?? 0;
+
+    switch (opType) {
+      case 'COMPRA_USDT':
+        totalInvertido += o.totalPrice;
+        usdt_recomprado += o.amount;
+        ves_pagado += o.totalPrice;
+        break;
+      case 'RECOMPRA':
+        totalRecuperado += o.totalPrice;
+        usdt_recomprado += o.amount;
+        ves_pagado += o.totalPrice;
+        break;
+      case 'VENTA_USDT':
+        totalRecuperado += o.totalPrice;
+        usdt_vendido += o.amount;
+        ves_recibido += o.totalPrice;
+        break;
+      case 'COMPRA_USD':
+        totalInvertido += o.totalPrice;
+        ves_pagado += o.totalPrice;
+        break;
+      case 'TRANSFERENCIA':
+        // Solo contribuye a comisiones (ya acumulada arriba)
+        break;
+    }
   });
 
   const tasa_venta_prom = usdt_vendido > 0 ? ves_recibido / usdt_vendido : 0;
   const tasa_compra_prom = usdt_recomprado > 0 ? ves_pagado / usdt_recomprado : 0;
   const diferencial_tasa = tasa_venta_prom > 0 && tasa_compra_prom > 0 ? tasa_venta_prom - tasa_compra_prom : 0;
-  const matchedVolume = Math.min(usdt_vendido, usdt_recomprado);
-  const ganancia_ves_bruta = matchedVolume * diferencial_tasa;
-  const ganancia_ves = ganancia_ves_bruta - (comision_total * tasa_compra_prom);
-  const ganancia_usdt = tasa_compra_prom > 0 ? (ganancia_ves_bruta / tasa_compra_prom) - comision_total : -comision_total;
 
-  // ROI calculado sobre el volumen de venta (capital desplegado)
-  const roi_percent = usdt_vendido > 0 ? (ganancia_usdt / usdt_vendido) * 100 : 0;
+  // Ganancia neta = recuperado − invertido − comisiones
+  const ganancia_ves = totalRecuperado - totalInvertido - comision_total;
+  const ganancia_usdt = tasa_compra_prom > 0 ? ganancia_ves / tasa_compra_prom : 0;
+
+  // ROI sobre capital invertido
+  const roi_percent = totalInvertido > 0 ? (ganancia_ves / totalInvertido) * 100 : 0;
 
   await saveCycle({
     ...cycle,
-    usdt_vendido, usdt_recomprado, ves_recibido, ves_pagado,
-    comision_total, tasa_venta_prom, tasa_compra_prom,
-    diferencial_tasa, ganancia_ves, ganancia_usdt, roi_percent,
+    usdt_vendido,
+    usdt_recomprado,
+    ves_recibido,
+    ves_pagado,
+    comision_total,
+    tasa_venta_prom,
+    tasa_compra_prom,
+    diferencial_tasa,
+    ganancia_ves,
+    ganancia_usdt,
+    roi_percent,
   });
 };
 
