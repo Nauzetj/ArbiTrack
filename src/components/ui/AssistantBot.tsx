@@ -123,6 +123,7 @@ function buildResponse(input: string, ctx: StoreCtx): { text: string; action?: F
       RECOMPRA: 'Recompra',
       COMPRA_USD: 'Compra USD',
       TRANSFERENCIA: 'Transferencia',
+      SOBRANTE: 'Sobrante',
     };
 
     return {
