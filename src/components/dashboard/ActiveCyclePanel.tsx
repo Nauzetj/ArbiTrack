@@ -98,7 +98,7 @@ interface UnifiedFormProps {
   compact?: boolean; // true = modal de venta rápida
 }
 
-const UnifiedForm: React.FC<UnifiedFormProps> = ({
+const UnifiedForm: React.FC<UnifiedFormProps> = React.memo(({
   cycleId, userId, opSeq, editingOrder, onSaved, onCancel, compact = false,
 }) => {
   const [form, setForm] = useState<FormData>(() => {
@@ -129,8 +129,8 @@ const UnifiedForm: React.FC<UnifiedFormProps> = ({
   const [totalEdited, setTotalEdited] = useState(false);
   const [commEdited, setCommEdited] = useState(false);
 
-  const set = (k: keyof FormData, v: string) =>
-    setForm(prev => ({ ...prev, [k]: v }));
+  const set = useCallback((k: keyof FormData, v: string) =>
+    setForm(prev => ({ ...prev, [k]: v })), []);
 
   React.useEffect(() => {
     const handleFill = (e: CustomEvent<any>) => {
@@ -547,7 +547,7 @@ const UnifiedForm: React.FC<UnifiedFormProps> = ({
       </div>
     </div>
   );
-};
+});
 
 // ─── Cycle Summary Panel ──────────────────────────────────────────────────────
 

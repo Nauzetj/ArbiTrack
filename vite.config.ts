@@ -10,20 +10,39 @@ export default defineConfig({
       registerType: 'autoUpdate',
       includeAssets: ['favicon.svg', 'icons.svg'],
       manifest: {
-        name: 'ArbiTrack P2P',
+        name: 'ArbiTrack P2P Trading System',
         short_name: 'ArbiTrack',
         description: 'Herramienta Profesional de Control de Capital P2P',
         theme_color: '#020B16',
         background_color: '#020B16',
         display: 'standalone',
         orientation: 'portrait',
+        scope: '/',
+        start_url: '/',
         icons: [
           {
-            // SVG es vectorial — 'any' indica que escala a cualquier tamaño
-            src: 'favicon.svg',
-            sizes: 'any',
-            type: 'image/svg+xml',
+            src: 'icons/icon-192x192.png',
+            sizes: '192x192',
+            type: 'image/png',
+          },
+          {
+            src: 'icons/icon-512x512.png',
+            sizes: '512x512',
+            type: 'image/png',
             purpose: 'any maskable'
+          }
+        ],
+        screenshots: [
+          {
+            src: "screenshots/shot1.png",
+            sizes: "1080x1920",
+            type: "image/png",
+            form_factor: "wide"
+          },
+          {
+            src: "screenshots/shot2.png",
+            sizes: "1080x1920",
+            type: "image/png"
           }
         ]
       },
@@ -31,19 +50,32 @@ export default defineConfig({
         cleanupOutdatedCaches: true,
         skipWaiting: true,
         clientsClaim: true,
-        navigateFallbackDenylist: [/^\/api\//],
         runtimeCaching: [
           {
-            urlPattern: /^https:\/\/.*\.supabase\.co\/.*/i,
-            handler: 'NetworkOnly',
+            urlPattern: /\.(js|css|png|svg|ico|woff2)$/,
+            handler: 'CacheFirst',
             options: {
+              cacheName: 'static-assets',
+              expiration: {
+                maxEntries: 100,
+                maxAgeSeconds: 30 * 24 * 60 * 60, // 30 dias
+              },
+            },
+          },
+          {
+            // API data y llamadas a Supabase
+            urlPattern: /(\/api\/|https:\/\/.*\.supabase\.co\/.*)/i,
+            handler: 'NetworkFirst',
+            options: {
+              cacheName: 'api-data',
+              networkTimeoutSeconds: 3,
               cacheableResponse: {
-                statuses: [0, 200]
-              }
-            }
-          }
-        ]
-      }
+                statuses: [0, 200],
+              },
+            },
+          },
+        ],
+      },
     })
   ],
   build: {
