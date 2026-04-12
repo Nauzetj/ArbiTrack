@@ -37,6 +37,7 @@ const OP_TYPES: { value: OperationType; label: string; icon: React.ReactNode; co
   { value: 'RECOMPRA',      label: 'Recompra',       icon: <RefreshCw size={12}/>,     color: 'var(--accent)' },
   { value: 'COMPRA_USD',    label: 'Compra USD',     icon: <Banknote size={12}/>,      color: '#f59e0b' },
   { value: 'TRANSFERENCIA', label: 'Transferencia',  icon: <CreditCard size={12}/>,    color: '#a78bfa' },
+  { value: 'SOBRANTE',      label: 'Sobrante',       icon: <CheckCircle2 size={12}/>,  color: '#34d399' },
 ];
 
 function getOpMeta(t?: OperationType) {
@@ -182,13 +183,13 @@ const UnifiedForm: React.FC<UnifiedFormProps> = React.memo(({
     const totalN = parseFloat(form.totalPrice);
 
     if (!amountN || amountN <= 0) { toast.error('Ingresa una cantidad válida.'); return; }
-    if (form.opType !== 'TRANSFERENCIA' && (!totalN || totalN <= 0)) {
+    if (!['TRANSFERENCIA', 'SOBRANTE'].includes(form.opType) && (!totalN || totalN <= 0)) {
       toast.error('Ingresa el valor total.'); return;
     }
 
     const commFinal = parseFloat(form.commissionCalc || form.commission) || 0;
     // Map operationType to legacy tradeType for compatibility
-    const legacyTradeType = ['VENTA_USDT'].includes(form.opType) ? 'SELL' : 'BUY';
+    const legacyTradeType = ['VENTA_USDT', 'RECOMPRA', 'SOBRANTE'].includes(form.opType) ? 'SELL' : 'BUY';
 
     const order: Order = {
       id: editingOrder?.id ?? generateUUID(),
@@ -847,42 +848,68 @@ const OpsTable: React.FC<{
 
 // ─── Metrics Bar ──────────────────────────────────────────────────────────────
 
-const MetricsBar: React.FC<{ orders: Order[] }> = ({ orders }) => {
-  const completed = orders.filter(o => o.orderStatus?.toUpperCase() === 'COMPLETED');
-  let totalInvertido = 0, totalRecuperado = 0, totalComisiones = 0;
+const MetricsBar: React.FC<{ activeCycle: Cycle }> = ({ activeCycle }) => {
+  const invVes = activeCycle.ves_pagado;
+  const invUsdt = activeCycle.usdt_recomprado;
+  
+  const recVes = activeCycle.ves_recibido;
+  const recUsdt = activeCycle.usdt_vendido;
+  
+  const comUsdt = activeCycle.comision_total;
+  
+  const ganVes = activeCycle.ganancia_ves;
+  const ganUsdt = activeCycle.ganancia_usdt;
 
-  completed.forEach(o => {
-    const opType = o.operationType ?? (o.tradeType === 'SELL' ? 'VENTA_USDT' : 'COMPRA_USDT');
-    totalComisiones += o.commission ?? 0;
-    if (opType === 'COMPRA_USDT' || opType === 'COMPRA_USD') totalInvertido += o.totalPrice;
-    if (opType === 'VENTA_USDT' || opType === 'RECOMPRA') totalRecuperado += o.totalPrice;
-  });
-
-  const gananciaNeta = totalRecuperado - totalInvertido - totalComisiones;
-  const isPos = gananciaNeta > 0;
-  const isNeutral = Math.abs(gananciaNeta) < 0.01;
+  const isPos = ganVes > 0;
+  const isNeutral = Math.abs(ganVes) < 0.01;
 
   return (
-    <div className="grid grid-cols-2 md:grid-cols-4 gap-[10px]">
+    <div className="grid grid-cols-2 lg:grid-cols-4 gap-[12px]">
       {[
-        { label: 'Total Invertido', val: totalInvertido, color: 'text-[var(--text-primary)]', prefix: 'Bs.' },
-        { label: 'Total Recuperado', val: totalRecuperado, color: 'text-[var(--profit)]', prefix: 'Bs.' },
-        { label: 'Total Comisiones', val: totalComisiones, color: 'text-[var(--warning)]', prefix: '' },
+        { 
+          label: 'Total Invertido', 
+          mainValue: `Bs. ${fmt(invVes)}`, 
+          subValue: `${fmt(invUsdt, 4)} USDT`,
+          color: 'text-[var(--text-primary)]' 
+        },
+        { 
+          label: 'Total Recuperado', 
+          mainValue: `Bs. ${fmt(recVes)}`, 
+          subValue: `${fmt(recUsdt, 4)} USDT`,
+          color: 'text-[var(--profit)]' 
+        },
+        { 
+          label: 'Total Comisiones', 
+          mainValue: `${fmt(comUsdt, 4)} USDT`, 
+          subValue: '',
+          color: 'text-[var(--warning)]' 
+        },
         {
           label: 'Ganancia Neta',
-          val: gananciaNeta,
+          mainValue: `Bs. ${fmt(Math.abs(ganVes))}`,
+          subValue: `${fmt(Math.abs(ganUsdt), 2)} USDT`,
           color: isNeutral ? 'text-[var(--text-secondary)]' : isPos ? 'text-[var(--profit)]' : 'text-[var(--loss)]',
-          prefix: 'Bs.',
+          showArrow: !isNeutral
         },
-      ].map(({ label, val, color, prefix }) => (
-        <div key={label} className="cycle-stat-group bg-[var(--bg-surface-3)] border border-[var(--border)] rounded-[10px] p-[12px] flex flex-col gap-[3px]">
-          <span className="text-[9px] font-bold text-[var(--text-tertiary)] uppercase tracking-[1px]">{label}</span>
-          <span className={`font-mono font-bold text-[14px] ${color}`}>
-            {prefix && `${prefix} `}{fmt(Math.abs(val))}
-            {!isNeutral && label === 'Ganancia Neta' && (
-              <span className="text-[10px] ml-[4px]">{isPos ? '▲' : '▼'}</span>
+      ].map(({ label, mainValue, subValue, color, showArrow }) => (
+        <div key={label} className="cycle-stat-group bg-[var(--bg-surface-3)] border border-[var(--border)] rounded-[12px] p-[14px] flex flex-col gap-[4px] relative overflow-hidden">
+          {showArrow && (
+            <div className={`absolute top-0 right-0 w-[40px] h-[40px] opacity-10 rounded-bl-full ${isPos ? 'bg-[var(--profit)]' : 'bg-[var(--loss)]'}`} />
+          )}
+          <span className="text-[10px] font-bold text-[var(--text-tertiary)] uppercase tracking-[1px]">{label}</span>
+          <div className="flex flex-col">
+            <span className={`font-mono font-bold text-[15px] ${color} flex items-center gap-[6px]`}>
+              {mainValue}
+              {showArrow && (
+                <span className="text-[11px]">{isPos ? '▲' : '▼'}</span>
+              )}
+            </span>
+            {subValue && (
+              <span className="font-mono text-[11px] text-[var(--text-secondary)] font-medium mt-[2px]">
+                {subValue}
+              </span>
             )}
-          </span>
+          </div>
         </div>
       ))}
     </div>
@@ -1149,7 +1176,7 @@ export const ActiveCyclePanel: React.FC = () => {
 
           {/* Metrics */}
           <div className="relative z-10">
-            <MetricsBar orders={cycleOrders}/>
+            <MetricsBar activeCycle={activeCycle}/>
           </div>
 
           {/* Opened at */}

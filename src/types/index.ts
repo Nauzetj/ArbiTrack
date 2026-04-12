@@ -6,7 +6,8 @@ export type OperationType =
   | 'VENTA_USDT'    // Venta de USDT en un exchange P2P
   | 'RECOMPRA'      // Recompra de USDT en otro exchange P2P
   | 'COMPRA_USD'    // Compra de dólares físicos/bancarios
-  | 'TRANSFERENCIA'; // Paso por tarjeta u otro canal con comisión
+  | 'TRANSFERENCIA' // Paso por tarjeta u otro canal con comisión
+  | 'SOBRANTE';     // Saldo residual en banco → ganancia directa en VES
 
 /** Tipo de comisión */
 export type CommissionType = 'fixed' | 'percent';

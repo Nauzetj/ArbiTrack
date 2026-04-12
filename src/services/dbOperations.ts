@@ -328,6 +328,11 @@ export const recalculateCycleMetrics = async (cycleId: string, userId: string): 
         totalInvertido += o.totalPrice;
         ves_pagado += o.totalPrice;
         break;
+      case 'SOBRANTE':
+        // Saldo residual bancario — se suma directamente como VES recuperado (ganancia directa)
+        totalRecuperado += o.totalPrice;
+        ves_recibido += o.totalPrice;
+        break;
       case 'TRANSFERENCIA':
         // Solo contribuye a comisiones (ya acumulada arriba)
         break;
