@@ -85,6 +85,8 @@ export const CycleCalendar: React.FC<CycleCalendarProps> = ({ cycles, onDateSele
   const todayKey = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
 
   const DayDetailsModal = () => {
+    const [expandedOrderId, setExpandedOrderId] = useState<string | null>(null);
+
     if (!detailsDate) return null;
     const info = dayMap[detailsDate];
     if (!info) return null;
@@ -135,18 +137,51 @@ export const CycleCalendar: React.FC<CycleCalendarProps> = ({ cycles, onDateSele
             ) : (
               <div className="flex flex-col gap-[8px]">
                 {info.orders.sort((a,b) => new Date(b.createTime_utc).getTime() - new Date(a.createTime_utc).getTime()).map(o => (
-                  <div key={o.id} className="flex items-center justify-between p-[12px] bg-[var(--bg-surface-2)] rounded-[10px] border border-[var(--border)] transition-colors hover:border-[var(--accent-border)]">
-                    <div className="flex items-center gap-[12px]">
-                      <div className={`w-[6px] h-[36px] rounded-full ${o.tradeType === 'BUY' ? 'bg-[var(--profit)]' : 'bg-[var(--loss)]'}`} />
-                      <div className="flex flex-col">
-                        <span className="text-[13px] font-bold text-[var(--text-primary)]">{o.tradeType === 'BUY' ? 'Compra' : 'Venta'} a {o.counterPartNickName}</span>
-                        <span className="text-[11px] text-[var(--text-tertiary)] mono">{new Date(o.createTime_utc).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}</span>
+                  <div key={o.id} className="flex flex-col bg-[var(--bg-surface-2)] rounded-[10px] border border-[var(--border)] transition-colors hover:border-[var(--accent-border)] overflow-hidden">
+                    <button 
+                      onClick={() => setExpandedOrderId(expandedOrderId === o.id ? null : o.id)}
+                      className="flex items-center justify-between p-[12px] w-full text-left"
+                    >
+                      <div className="flex items-center gap-[12px]">
+                        <div className={`w-[6px] h-[36px] rounded-full shrink-0 ${o.tradeType === 'BUY' ? 'bg-[var(--profit)]' : 'bg-[var(--loss)]'}`} />
+                        <div className="flex flex-col">
+                          <span className="text-[13px] font-bold text-[var(--text-primary)]">{o.tradeType === 'BUY' ? 'Compra' : 'Venta'} a {o.counterPartNickName}</span>
+                          <span className="text-[11px] text-[var(--text-tertiary)] mono">{new Date(o.createTime_utc).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}</span>
+                        </div>
                       </div>
-                    </div>
-                    <div className="flex flex-col items-end">
-                      <span className="font-mono font-bold text-[14px] text-[var(--text-primary)]">{o.amount.toFixed(2)} USDT</span>
-                      <span className="text-[11px] text-[var(--text-secondary)]">@ {o.unitPrice.toFixed(2)} VES</span>
-                    </div>
+                      <div className="flex flex-col items-end shrink-0 ml-[8px]">
+                        <span className="font-mono font-bold text-[14px] text-[var(--text-primary)]">{o.amount.toFixed(2)} USDT</span>
+                        <span className="text-[11px] text-[var(--text-secondary)]">@ {o.unitPrice.toFixed(2)} VES</span>
+                      </div>
+                    </button>
+                    {expandedOrderId === o.id && (
+                      <div className="p-[12px] pt-[4px] border-t border-[var(--border)] bg-[var(--bg-surface-3)] shadow-inner animate-fade-in-up">
+                        <div className="grid grid-cols-2 gap-y-[12px] gap-x-[8px] mt-[4px]">
+                          <div className="flex flex-col">
+                            <span className="text-[10px] text-[var(--text-tertiary)] uppercase font-semibold tracking-wider">N° Orden</span>
+                            <span className="text-[12px] font-mono text-[var(--text-secondary)] break-all mt-[2px]">{o.orderNumber || 'N/A'}</span>
+                          </div>
+                          <div className="flex flex-col">
+                            <span className="text-[10px] text-[var(--text-tertiary)] uppercase font-semibold tracking-wider">Total Fiat</span>
+                            <span className="text-[12px] font-mono text-[var(--text-secondary)] mt-[2px]">{o.totalPrice.toFixed(2)} {o.fiat}</span>
+                          </div>
+                          <div className="flex flex-col">
+                            <span className="text-[10px] text-[var(--text-tertiary)] uppercase font-semibold tracking-wider">Comisión</span>
+                            <span className="text-[12px] font-mono text-[var(--text-secondary)] mt-[2px]">{o.commission.toFixed(4)} {o.commissionAsset}</span>
+                          </div>
+                          <div className="flex flex-col">
+                            <span className="text-[10px] text-[var(--text-tertiary)] uppercase font-semibold tracking-wider">Plataforma</span>
+                            <span className="text-[12px] font-mono text-[var(--text-secondary)] capitalize mt-[2px]">{o.exchange || 'Binance'}</span>
+                          </div>
+                        </div>
+                        {o.notas && (
+                          <div className="mt-[12px] flex flex-col pt-[8px] border-t border-[var(--border)]">
+                            <span className="text-[10px] text-[var(--text-tertiary)] uppercase font-semibold tracking-wider">Notas</span>
+                            <span className="text-[12px] text-[var(--text-secondary)] italic mt-[4px] leading-relaxed">{o.notas}</span>
+                          </div>
+                        )}
+                      </div>
+                    )}
                   </div>
                 ))}
               </div>
