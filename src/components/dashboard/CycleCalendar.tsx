@@ -200,7 +200,7 @@ export const CycleCalendar: React.FC<CycleCalendarProps> = ({ cycles, onDateSele
     <>
       <div className="bg-[var(--bg-surface-2)] rounded-[16px] border border-[var(--border)] p-[24px]">
         {/* Header */}
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between mb-[24px] gap-[16px]">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between mb-[16px] gap-[16px]">
           <div>
             <h2 className="text-[16px] font-bold text-[var(--text-primary)]">Calendario de Actividad Opeartiva</h2>
             <p className="text-[12px] text-[var(--text-tertiary)] mt-[2px]">Vista de ganancias y operaciones diarias</p>
@@ -219,7 +219,7 @@ export const CycleCalendar: React.FC<CycleCalendarProps> = ({ cycles, onDateSele
         </div>
 
         {/* 12-month grid */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 xl:grid-cols-4 gap-[16px]">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-[12px] max-h-[480px] overflow-y-auto custom-scrollbar pr-[8px]">
           {MONTH_NAMES.map((monthName, monthIndex) => {
             const firstDay = new Date(year, monthIndex, 1).getDay(); // 0=Sun
             const daysInMonth = new Date(year, monthIndex + 1, 0).getDate();
@@ -229,7 +229,7 @@ export const CycleCalendar: React.FC<CycleCalendarProps> = ({ cycles, onDateSele
             const activityCount = Object.keys(dayMap).filter(k => k.startsWith(monthPrefix)).length;
 
             return (
-              <div key={monthIndex} className="bg-[var(--bg-surface-1)] rounded-[12px] p-[16px] border border-[var(--border-strong)] shadow-sm">
+              <div key={monthIndex} className="bg-[var(--bg-surface-1)] rounded-[12px] p-[12px] border border-[var(--border-strong)] shadow-sm">
                 {/* Month header */}
                 <div className="flex items-center justify-between mb-[12px]">
                   <span className="text-[11px] font-extrabold text-[var(--text-primary)] uppercase tracking-[1.5px]">{monthName}</span>
@@ -273,7 +273,7 @@ export const CycleCalendar: React.FC<CycleCalendarProps> = ({ cycles, onDateSele
                         onClick={() => { if(hasActivity) setDetailsDate(dayKey); }}
                         disabled={!hasActivity}
                         className={`
-                          group relative flex flex-col items-center justify-start rounded-[6px] h-[32px] pt-[3px] transition-all
+                          group relative flex flex-col items-center justify-start rounded-[6px] h-[28px] pt-[2px] transition-all
                           ${isToday ? 'bg-[var(--bg-surface-3)] ring-1 ring-[var(--accent)]/40 font-bold' : ''}
                           ${hasActivity ? 'hover:bg-[var(--bg-surface-4)] cursor-pointer shadow-sm border border-[var(--border)]' : 'cursor-default opacity-60 hover:opacity-100 border border-transparent'}
                         `}
@@ -290,7 +290,7 @@ export const CycleCalendar: React.FC<CycleCalendarProps> = ({ cycles, onDateSele
                                 {info.profitSum > 0 ? '+' : ''}{info.profitSum.toFixed(0)}
                               </span>
                             ) : (
-                              <span className="w-[4px] h-[4px] bg-[var(--text-tertiary)] rounded-full block" />
+                              <span className="w-[3px] h-[3px] bg-[var(--text-tertiary)] rounded-full block" />
                             )}
                           </div>
                         )}
