@@ -81,9 +81,9 @@ export const Modal: React.FC<ModalProps> = ({
       ref={overlayRef}
       className="fixed inset-0 z-[9999] flex items-center justify-center p-[16px]"
       style={{
-        background: 'rgba(2, 11, 22, 0.75)',
-        backdropFilter: 'blur(8px)',
-        WebkitBackdropFilter: 'blur(8px)',
+        background: 'rgba(10, 20, 35, 0.25)',
+        backdropFilter: 'blur(4px)',
+        WebkitBackdropFilter: 'blur(4px)',
       }}
       onClick={(e) => { if (e.target === overlayRef.current) onClose(); }}
     >

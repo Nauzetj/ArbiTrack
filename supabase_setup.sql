@@ -58,6 +58,8 @@ CREATE TABLE IF NOT EXISTS cycles (
   closed_at        TIMESTAMPTZ DEFAULT NULL,
   status           TEXT NOT NULL
                      CHECK (status IN ('En curso','Completado','Con pérdida','Neutral')),
+  cycle_type       TEXT NOT NULL DEFAULT 'p2p'
+                     CHECK (cycle_type IN ('p2p','manual')),
   usdt_vendido     NUMERIC DEFAULT 0,
   usdt_recomprado  NUMERIC DEFAULT 0,
   ves_recibido     NUMERIC DEFAULT 0,
@@ -197,3 +199,12 @@ CREATE INDEX IF NOT EXISTS idx_cycles_status    ON cycles(status);
 --   UPDATE profiles
 --   SET role = 'admin'
 --   WHERE email = 'TU_EMAIL_ADMIN@ejemplo.com';
+
+-- ── 11. MIGRACIÓN: agregar cycle_type a bases existentes ─────────────────────
+-- Si la tabla cycles ya existe sin la columna cycle_type, ejecuta este bloque:
+--
+--   ALTER TABLE cycles
+--     ADD COLUMN IF NOT EXISTS cycle_type TEXT NOT NULL DEFAULT 'p2p'
+--       CHECK (cycle_type IN ('p2p','manual'));
+--
+-- Si ya tienes registros anteriores, todos quedarán como 'p2p' (correcto).

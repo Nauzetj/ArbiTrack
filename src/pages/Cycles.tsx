@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { useAppStore } from '../store/useAppStore';
 import { Badge } from '../components/ui/Badge';
 import { CycleCalendar } from '../components/dashboard/CycleCalendar';
-import { CalendarDays, TableProperties } from 'lucide-react';
+import { CalendarDays, TableProperties, Zap, PenLine } from 'lucide-react';
 
 export const Cycles: React.FC = () => {
   const { cycles, orders } = useAppStore();
@@ -131,6 +131,7 @@ export const Cycles: React.FC = () => {
           <table className="w-full min-w-[800px] text-left border-collapse">
             <thead>
               <tr className="bg-[var(--bg-surface-3)] text-[10px] uppercase font-semibold text-[var(--text-tertiary)] tracking-[1px]">
+                <th className="p-[16px] border-b border-[var(--border-strong)]">Tipo</th>
                 <th className="p-[16px] border-b border-[var(--border-strong)]"># Ciclo</th>
                 <th className="p-[16px] border-b border-[var(--border-strong)] min-w-[140px]">Apertura</th>
                 <th className="p-[16px] border-b border-[var(--border-strong)] min-w-[140px]">Cierre</th>
@@ -143,7 +144,7 @@ export const Cycles: React.FC = () => {
             <tbody>
               {filteredCycles.length === 0 ? (
                 <tr>
-                  <td colSpan={7} className="p-[32px] text-center text-[var(--text-secondary)] text-[14px]">
+                  <td colSpan={8} className="p-[32px] text-center text-[var(--text-secondary)] text-[14px]">
                     {selectedDate
                       ? `No hay ciclos registrados el ${selectedDate}.`
                       : 'No hay ciclos que coincidan con el filtro.'}
@@ -159,6 +160,18 @@ export const Cycles: React.FC = () => {
                       onClick={() => setExpandedId(isExpanded ? null : c.id)}
                       className="table-glass-row border-b border-[var(--border)] group cursor-pointer"
                     >
+                      {/* Cycle type badge */}
+                      <td className="p-[16px]">
+                        {c.cycleType === 'manual' ? (
+                          <span className="inline-flex items-center gap-[4px] text-[9px] font-bold px-[7px] py-[3px] rounded-full bg-[rgba(124,58,237,0.15)] text-[#a78bfa] border border-[rgba(124,58,237,0.3)] uppercase tracking-wider whitespace-nowrap">
+                            <PenLine size={8} /> Manual
+                          </span>
+                        ) : (
+                          <span className="inline-flex items-center gap-[4px] text-[9px] font-bold px-[7px] py-[3px] rounded-full bg-[var(--accent-muted)] text-[var(--accent)] border border-[var(--accent-border)] uppercase tracking-wider whitespace-nowrap">
+                            <Zap size={8} /> P2P
+                          </span>
+                        )}
+                      </td>
                       <td className="p-[16px] mono text-[13px] font-medium text-[var(--accent)]">
                         {c.cycleNumber.toString().slice(-4)}
                       </td>
@@ -188,7 +201,7 @@ export const Cycles: React.FC = () => {
 
                     {isExpanded && (
                       <tr className="bg-[var(--bg-base)]">
-                        <td colSpan={7} className="p-[0] border-b border-[var(--border)]">
+                        <td colSpan={8} className="p-[0] border-b border-[var(--border)]">
                           <div className="border-l-2 border-[var(--accent)] ml-[24px] my-[16px] py-[8px] pl-[20px] pr-[24px]">
                             <div className="flex justify-between items-center mb-[12px]">
                               <h4 className="text-[12px] font-semibold text-[var(--text-secondary)] uppercase tracking-[1px]">Órdenes del Ciclo</h4>

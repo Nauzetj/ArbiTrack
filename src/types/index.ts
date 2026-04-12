@@ -57,6 +57,8 @@ export interface Cycle {
   openedAt: string; // ISO
   closedAt: string | null; // ISO
   status: CycleStatus;
+  /** 'p2p' = órdenes auto-sincronizadas desde Binance | 'manual' = registro manual multi-exchange */
+  cycleType: 'p2p' | 'manual';
   usdt_vendido: number;
   usdt_recomprado: number;
   ves_recibido: number;

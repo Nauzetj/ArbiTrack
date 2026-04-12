@@ -156,8 +156,17 @@ export const Login: React.FC = () => {
   const [error, setError] = useState('');
   const [isLoading, setIsLoading] = useState(false);
 
-  const { login: storeLogin } = useAppStore();
+  const { login: storeLogin, currentUser } = useAppStore();
   const navigate = useNavigate();
+
+  // Guard: si ya hay sesión activa, redirigir directamente al dashboard
+  // Esto previene que el botón "Atrás" del navegador regrese al login
+  // cuando el usuario ya está autenticado
+  React.useEffect(() => {
+    if (currentUser) {
+      navigate('/', { replace: true });
+    }
+  }, [currentUser, navigate]);
 
   // ── Register ──────────────────────────────────────────────────────────────
   const handleRegister = async (e: React.FormEvent) => {

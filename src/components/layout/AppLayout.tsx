@@ -99,8 +99,9 @@ export const AppLayout: React.FC = () => {
 
   useEffect(() => {
     // Solo redirigir si no hay usuario autenticado
+    // replace:true elimina la ruta del historial → el botón "Atrás" no vuelve aquí
     if (!currentUser) {
-      navigate('/login');
+      navigate('/login', { replace: true });
       return;
     }
 

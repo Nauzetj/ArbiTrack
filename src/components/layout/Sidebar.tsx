@@ -1,5 +1,5 @@
 import React, { useRef, useEffect } from 'react';
-import { NavLink, useNavigate, useLocation } from 'react-router-dom';
+import { NavLink, useLocation } from 'react-router-dom';
 import {
   LayoutDashboard, History, ListOrdered, BarChart2, Settings,
   LogOut, Activity, Shield, Moon, Sun,
@@ -18,7 +18,6 @@ const NAV_ITEMS = [
 
 export const Sidebar: React.FC = () => {
   const { currentUser, logout, isMobileMenuOpen, setMobileMenuOpen } = useAppStore();
-  const navigate   = useNavigate();
   const location   = useLocation();
   const sidebarRef = useRef<HTMLElement>(null);
   const logoRef    = useRef<HTMLDivElement>(null);
@@ -115,7 +114,11 @@ export const Sidebar: React.FC = () => {
     }
   };
 
-  const handleLogout = () => { logout(); navigate('/login'); };
+  const handleLogout = async () => {
+    // store.logout() ya hace: supabase.signOut → limpiar estado → window.location.href = '/login'
+    // No llamamos navigate() para evitar carrera entre React Router y la recarga de página.
+    await logout();
+  };
 
   const isNauzetj = currentUser?.username === 'Nauzetj' ||
     currentUser?.username?.toLowerCase() === 'henderrtj' ||

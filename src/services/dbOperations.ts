@@ -45,6 +45,8 @@ function mapCycle(row: any): Cycle {
     openedAt: row.opened_at,
     closedAt: row.closed_at ?? null,
     status: row.status,
+    // Fallback a 'p2p' para ciclos existentes sin la columna
+    cycleType: (row.cycle_type === 'manual' ? 'manual' : 'p2p') as 'p2p' | 'manual',
     usdt_vendido: Number(row.usdt_vendido),
     usdt_recomprado: Number(row.usdt_recomprado),
     ves_recibido: Number(row.ves_recibido),
@@ -235,6 +237,7 @@ export const saveCycle = async (cycle: Cycle) => {
     opened_at: cycle.openedAt,
     closed_at: cycle.closedAt,
     status: cycle.status,
+    cycle_type: cycle.cycleType ?? 'p2p',
     usdt_vendido: cycle.usdt_vendido,
     usdt_recomprado: cycle.usdt_recomprado,
     ves_recibido: cycle.ves_recibido,
