@@ -848,73 +848,89 @@ const OpsTable: React.FC<{
 
 // ─── Metrics Bar ──────────────────────────────────────────────────────────────
 
-const MetricsBar: React.FC<{ activeCycle: Cycle }> = ({ activeCycle }) => {
-  const invVes = activeCycle.ves_pagado;
-  const invUsdt = activeCycle.usdt_recomprado;
-  
-  const recVes = activeCycle.ves_recibido;
-  const recUsdt = activeCycle.usdt_vendido;
-  
-  const comUsdt = activeCycle.comision_total;
-  
-  const ganVes = activeCycle.ganancia_ves;
-  const ganUsdt = activeCycle.ganancia_usdt;
+const MetricsBar: React.FC<{ activeCycle: Cycle; orders: Order[] }> = ({ activeCycle, orders }) => {
+  // Detect cycle direction by finding earliest completed op
+  const firstOp = [...orders]
+    .filter(o => o.orderStatus?.toUpperCase() === 'COMPLETED')
+    .sort((a, b) => new Date(a.createTime_utc).getTime() - new Date(b.createTime_utc).getTime())[0];
+  const firstOpType = firstOp
+    ? (firstOp.operationType ?? (firstOp.tradeType === 'SELL' ? 'VENTA_USDT' : 'COMPRA_USDT'))
+    : null;
+  const isVentaPrimero = firstOpType === 'VENTA_USDT' || firstOpType === 'RECOMPRA';
 
-  const isPos = ganVes > 0;
+  // Venta-primero:  capital = USDT vendido → Bs ingresados; gasto = Bs recompra
+  // Compra-primero: capital = Bs invertidos → USDT comprado; ganancia = Bs venta
+  const col1Label = isVentaPrimero ? 'Capital (USDT vendido)' : 'Total Invertido (VES)';
+  const col1Main  = isVentaPrimero
+    ? `$ ${fmt(activeCycle.usdt_vendido, 4)} USDT`
+    : `Bs. ${fmt(activeCycle.ves_pagado)}`;
+  const col1Sub   = isVentaPrimero
+    ? `Bs. ${fmt(activeCycle.ves_recibido)}`
+    : `${fmt(activeCycle.usdt_recomprado, 4)} USDT`;
+
+  const col2Label = isVentaPrimero ? 'USDT recomprado' : 'Total Recuperado (VES)';
+  const col2Main  = isVentaPrimero
+    ? `$ ${fmt(activeCycle.usdt_recomprado, 4)} USDT`
+    : `Bs. ${fmt(activeCycle.ves_recibido)}`;
+  const col2Sub   = isVentaPrimero
+    ? `Bs. ${fmt(activeCycle.ves_pagado)}`
+    : `${fmt(activeCycle.usdt_vendido, 4)} USDT`;
+
+  const ganVes   = activeCycle.ganancia_ves;
+  const ganUsdt  = activeCycle.ganancia_usdt;
+  const comUsdt  = activeCycle.comision_total;
+
+  const isPos     = ganVes > 0;
   const isNeutral = Math.abs(ganVes) < 0.01;
+  const ganColor  = isNeutral
+    ? 'text-[var(--text-secondary)]'
+    : isPos ? 'text-[var(--profit)]' : 'text-[var(--loss)]';
+
+  const sign = (n: number) => (n >= 0 ? '+' : '');
 
   return (
     <div className="grid grid-cols-2 lg:grid-cols-4 gap-[12px]">
-      {[
-        { 
-          label: 'Total Invertido', 
-          mainValue: `Bs. ${fmt(invVes)}`, 
-          subValue: `${fmt(invUsdt, 4)} USDT`,
-          color: 'text-[var(--text-primary)]' 
-        },
-        { 
-          label: 'Total Recuperado', 
-          mainValue: `Bs. ${fmt(recVes)}`, 
-          subValue: `${fmt(recUsdt, 4)} USDT`,
-          color: 'text-[var(--profit)]' 
-        },
-        { 
-          label: 'Total Comisiones', 
-          mainValue: `${fmt(comUsdt, 4)} USDT`, 
-          subValue: '',
-          color: 'text-[var(--warning)]' 
-        },
-        {
-          label: 'Ganancia Neta',
-          mainValue: `Bs. ${fmt(Math.abs(ganVes))}`,
-          subValue: `${fmt(Math.abs(ganUsdt), 2)} USDT`,
-          color: isNeutral ? 'text-[var(--text-secondary)]' : isPos ? 'text-[var(--profit)]' : 'text-[var(--loss)]',
-          showArrow: !isNeutral
-        },
-      ].map(({ label, mainValue, subValue, color, showArrow }) => (
-        <div key={label} className="cycle-stat-group bg-[var(--bg-surface-3)] border border-[var(--border)] rounded-[12px] p-[14px] flex flex-col gap-[4px] relative overflow-hidden">
-          {showArrow && (
-            <div className={`absolute top-0 right-0 w-[40px] h-[40px] opacity-10 rounded-bl-full ${isPos ? 'bg-[var(--profit)]' : 'bg-[var(--loss)]'}`} />
-          )}
-          <span className="text-[10px] font-bold text-[var(--text-tertiary)] uppercase tracking-[1px]">{label}</span>
-          <div className="flex flex-col">
-            <span className={`font-mono font-bold text-[15px] ${color} flex items-center gap-[6px]`}>
-              {mainValue}
-              {showArrow && (
-                <span className="text-[11px]">{isPos ? '▲' : '▼'}</span>
-              )}
-            </span>
-            {subValue && (
-              <span className="font-mono text-[11px] text-[var(--text-secondary)] font-medium mt-[2px]">
-                {subValue}
-              </span>
-            )}
-          </div>
-        </div>
-      ))}
+      {/* Col 1 */}
+      <div className="cycle-stat-group bg-[var(--bg-surface-3)] border border-[var(--border)] rounded-[12px] p-[14px] flex flex-col gap-[4px]">
+        <span className="text-[10px] font-bold text-[var(--text-tertiary)] uppercase tracking-[1px]">{col1Label}</span>
+        <span className="font-mono font-bold text-[15px] text-[var(--text-primary)]">{col1Main}</span>
+        <span className="font-mono text-[11px] text-[var(--text-secondary)] mt-[2px]">{col1Sub}</span>
+      </div>
+
+      {/* Col 2 */}
+      <div className="cycle-stat-group bg-[var(--bg-surface-3)] border border-[var(--border)] rounded-[12px] p-[14px] flex flex-col gap-[4px]">
+        <span className="text-[10px] font-bold text-[var(--text-tertiary)] uppercase tracking-[1px]">{col2Label}</span>
+        <span className="font-mono font-bold text-[15px] text-[var(--profit)]">{col2Main}</span>
+        <span className="font-mono text-[11px] text-[var(--text-secondary)] mt-[2px]">{col2Sub}</span>
+      </div>
+
+      {/* Comisiones */}
+      <div className="cycle-stat-group bg-[var(--bg-surface-3)] border border-[var(--border)] rounded-[12px] p-[14px] flex flex-col gap-[4px]">
+        <span className="text-[10px] font-bold text-[var(--text-tertiary)] uppercase tracking-[1px]">Total Comisiones</span>
+        <span className="font-mono font-bold text-[15px] text-[var(--warning)]">{fmt(comUsdt, 4)} USDT</span>
+        <span className="font-mono text-[11px] text-[var(--text-secondary)] mt-[2px]">
+          ≈ Bs. {fmt(comUsdt * (activeCycle.tasa_compra_prom || activeCycle.tasa_venta_prom || 1))}
+        </span>
+      </div>
+
+      {/* Ganancia Neta */}
+      <div className="cycle-stat-group bg-[var(--bg-surface-3)] border border-[var(--border)] rounded-[12px] p-[14px] flex flex-col gap-[4px] relative overflow-hidden">
+        {!isNeutral && (
+          <div className={`absolute top-0 right-0 w-[40px] h-[40px] opacity-10 rounded-bl-full ${isPos ? 'bg-[var(--profit)]' : 'bg-[var(--loss)]'}`} />
+        )}
+        <span className="text-[10px] font-bold text-[var(--text-tertiary)] uppercase tracking-[1px]">Ganancia Neta</span>
+        <span className={`font-mono font-bold text-[15px] ${ganColor} flex items-center gap-[6px]`}>
+          {sign(ganVes)}Bs. {fmt(Math.abs(ganVes))}
+          {!isNeutral && <span className="text-[11px]">{isPos ? '▲' : '▼'}</span>}
+        </span>
+        <span className={`font-mono text-[11px] mt-[2px] ${ganColor}`}>
+          {sign(ganUsdt)}{fmt(Math.abs(ganUsdt), 4)} USDT
+        </span>
+      </div>
     </div>
   );
 };
+
 
 // ─── Main Component ───────────────────────────────────────────────────────────
 
@@ -1176,7 +1192,7 @@ export const ActiveCyclePanel: React.FC = () => {
 
           {/* Metrics */}
           <div className="relative z-10">
-            <MetricsBar activeCycle={activeCycle}/>
+            <MetricsBar activeCycle={activeCycle} orders={cycleOrders}/>
           </div>
 
           {/* Opened at */}

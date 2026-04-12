@@ -343,12 +343,44 @@ export const recalculateCycleMetrics = async (cycleId: string, userId: string): 
   const tasa_compra_prom = usdt_recomprado > 0 ? ves_pagado / usdt_recomprado : 0;
   const diferencial_tasa = tasa_venta_prom > 0 && tasa_compra_prom > 0 ? tasa_venta_prom - tasa_compra_prom : 0;
 
-  // Ganancia neta = recuperado − invertido − comisiones
-  const ganancia_ves = totalRecuperado - totalInvertido - comision_total;
-  const ganancia_usdt = tasa_compra_prom > 0 ? ganancia_ves / tasa_compra_prom : 0;
+  // ── Ganancia en VES (sin mezclar divisas) ───────────────────────────────────
+  // VES neto = lo que entró en VES − lo que salió en VES
+  // Las comisiones están en USDT, no se restan de VES directamente
+  const ganancia_ves_bruta = ves_recibido - ves_pagado;
 
-  // ROI sobre capital invertido
-  const roi_percent = totalInvertido > 0 ? (ganancia_ves / totalInvertido) * 100 : 0;
+  // ── Detectar dirección del ciclo ────────────────────────────────────────────
+  // "Venta primero"  → el operador empieza con USDT y los vende (VENTA_USDT es la primera op SELL)
+  // "Compra primero" → el operador empieza con VES y compra USDT (COMPRA_USDT es la primera op BUY)
+  const sortedOrders = [...orders]
+    .filter(o => o.orderStatus?.toUpperCase() === 'COMPLETED')
+    .sort((a, b) => new Date(a.createTime_utc).getTime() - new Date(b.createTime_utc).getTime());
+
+  const firstOpType = sortedOrders[0]
+    ? (sortedOrders[0].operationType ?? (sortedOrders[0].tradeType === 'SELL' ? 'VENTA_USDT' : 'COMPRA_USDT'))
+    : null;
+
+  const isVentaPrimero = firstOpType === 'VENTA_USDT' || firstOpType === 'RECOMPRA';
+
+  // ── Ganancia en USDT ────────────────────────────────────────────────────────
+  // Para convertir VES → USDT usamos siempre la tasa de compra (lo que pagarías para
+  // recuperar USDT), independientemente de la dirección del ciclo.
+  // Luego restamos las comisiones (que están en USDT).
+  const tasaRef = tasa_compra_prom > 0 ? tasa_compra_prom
+                : tasa_venta_prom > 0 ? tasa_venta_prom
+                : 1;
+
+  const ganancia_usdt = (ganancia_ves_bruta / tasaRef) - comision_total;
+  const ganancia_ves  = ganancia_ves_bruta - (comision_total * tasaRef); // comisión convertida a VES
+
+  // ── ROI ─────────────────────────────────────────────────────────────────────
+  // Base de capital:
+  //   Venta primero  → capital es USDT vendido valorado a tasa_venta_prom
+  //   Compra primero → capital es VES invertido (ves_pagado)
+  const capitalBase = isVentaPrimero
+    ? usdt_vendido * tasa_venta_prom   // VES equivalente del capital USDT inicial
+    : ves_pagado;                       // VES directamente invertidas
+
+  const roi_percent = capitalBase > 0 ? (ganancia_ves / capitalBase) * 100 : 0;
 
   await saveCycle({
     ...cycle,
