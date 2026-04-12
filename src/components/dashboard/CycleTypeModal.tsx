@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Activity, PenLine, X, ArrowRight, Zap, ChevronRight } from 'lucide-react';
+import { Activity, PenLine, X, Zap, ChevronRight } from 'lucide-react';
 
 type CycleType = 'p2p' | 'manual';
 
