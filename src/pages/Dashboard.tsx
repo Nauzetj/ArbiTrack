@@ -7,6 +7,7 @@ import { MetricCard } from '../components/ui/MetricCard';
 import { ActiveCyclePanel } from '../components/dashboard/ActiveCyclePanel';
 import { MiniChart } from '../components/dashboard/MiniChart';
 import { RecentCyclesTable } from '../components/dashboard/RecentCyclesTable';
+import { UnassignedOrdersPool } from '../components/dashboard/UnassignedOrdersPool';
 
 export const Dashboard: React.FC = () => {
   const { orders, cycles } = useAppStore();
@@ -77,8 +78,15 @@ export const Dashboard: React.FC = () => {
       </div>
 
       {/* Active Cycle Panel */}
-      <div className="active-cycle-panel">
-        <ActiveCyclePanel />
+      <div className="active-cycle-panel max-w-full">
+        <div className="flex flex-col xl:flex-row gap-[12px] md:gap-[20px]">
+          <div className="flex-1 min-w-[0]">
+            <ActiveCyclePanel />
+          </div>
+          <div className="xl:w-[320px] shrink-0 h-full">
+            <UnassignedOrdersPool />
+          </div>
+        </div>
       </div>
 
       {/* Chart + Info: side by side on XL, stacked on mobile */}

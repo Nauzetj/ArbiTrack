@@ -48,6 +48,14 @@ const migrations = [
     `,
   },
   {
+    name: 'cycle_type column',
+    sql: `
+      ALTER TABLE cycles
+        ADD COLUMN IF NOT EXISTS cycle_type TEXT NOT NULL DEFAULT 'p2p'
+          CHECK (cycle_type IN ('p2p','manual'));
+    `,
+  },
+  {
     name: 'commission_type column',
     sql: `
       ALTER TABLE orders

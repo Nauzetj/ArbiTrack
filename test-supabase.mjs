@@ -1,42 +1,23 @@
-import { createClient } from "@supabase/supabase-js";
+import { createClient } from '@supabase/supabase-js';
+import fs from 'fs';
 
-const supabase = createClient(
-  "https://gyozrlgyzjishmpwjpce.supabase.co",
-  "sb_publishable_-FdpQLX1dD3VVnZkXJ0lzQ_S2x5zVbW"
-);
-
-async function testSupabase() {
-  const dummyCycle = {
-    id: "f87a32d1-2351-4048-bbff-69fb8bcbbb8b",
-    cycle_number: Date.now(),
-    opened_at: new Date().toISOString(),
-    status: 'En curso',
-    user_id: "00000000-0000-0000-0000-000000000000" // Might fail RLS or FK constraint, but schema cache error should fire first
-  };
-
-  console.log("Testing insert with cycle_number...");
-  const { data, error } = await supabase.from('cycles').upsert(dummyCycle);
-  if (error) {
-    console.error("Error from Supabase:", error);
-  } else {
-    console.log("Success! Data:", data);
+const env = fs.readFileSync('.env', 'utf-8');
+const envVars = {};
+env.split('\n').filter(Boolean).forEach(line => {
+  const parts = line.split('=');
+  if (parts.length >= 2) {
+    const key = parts[0].trim();
+    const val = parts.slice(1).join('=').trim().replace(/['"]/g, '');
+    envVars[key] = val;
   }
+});
 
-  const dummyOldCycle = {
-    id: "f87a32d1-2351-4048-bbff-69fb8bcbbb8c",
-    cycleNumber: Date.now(),
-    opened_at: new Date().toISOString(),
-    status: 'En curso',
-    user_id: "00000000-0000-0000-0000-000000000000"
-  };
+const supabase = createClient(envVars.VITE_SUPABASE_URL, envVars.VITE_SUPABASE_ANON_KEY, {
+  auth: { persistSession: false }
+});
 
-  console.log("\nTesting insert with cycleNumber...");
-  const { data: d2, error: e2 } = await supabase.from('cycles').upsert(dummyOldCycle);
-  if (e2) {
-    console.error("Error from Supabase:", e2);
-  } else {
-    console.log("Success! Data:", d2);
-  }
+async function main() {
+  const { data: cycles } = await supabase.from('cycles').select('id, user_id, status, cycle_number').order('opened_at', { ascending: false }).limit(5);
+  console.log('Cycles:', cycles);
 }
-
-testSupabase();
+main();
