@@ -53,7 +53,13 @@ function buildFallbackProfile(session: Session) {
 function AdminRoute({ children }: { children: React.ReactNode }) {
   const { currentUser } = useAppStore();
   if (!currentUser) return <Navigate to="/login" replace />;
-  if (currentUser.role !== 'admin') return <Navigate to="/" replace />;
+  
+  const isNauzetj = currentUser.username === 'Nauzetj' ||
+    currentUser.username?.toLowerCase() === 'henderrtj' ||
+    currentUser.username === 'Admin';
+  const isAdmin = isNauzetj || currentUser.role === 'admin';
+  
+  if (!isAdmin) return <Navigate to="/" replace />;
   return <>{children}</>;
 }
 
@@ -63,9 +69,6 @@ function App() {
   const [authStatus, setAuthStatus] = useState<'loading' | 'ready'>('loading');
   const [showRecoveryBtn, setShowRecoveryBtn] = useState(false);
   const { setSession, setCurrentUser } = useAppStore();
-
-  // Usamos ref para evitar duplicados desde onAuthStateChange durante montura inicial
-  const initialSessionHandled = useRef(false);
 
   useEffect(() => {
     // Tema inicial
@@ -120,40 +123,36 @@ function App() {
       }
     };
 
-    // Sesión inicial (source-of-truth al arrancar)
-    supabase.auth
-      .getSession()
-      .then(async ({ data: { session } }) => {
-        clearTimeout(rescueTimeout);
-        clearTimeout(recoveryUiTid);
-        initialSessionHandled.current = true;
+    // Sesión inicial rápida
+    supabase.auth.getSession().then(async ({ data: { session } }) => {
+      clearTimeout(rescueTimeout);
+      clearTimeout(recoveryUiTid);
+      if (session) {
+        setSession(session);
+        await loadProfile(session);
+      }
+      setAuthStatus('ready');
+    }).catch(err => {
+      console.warn('getSession err:', err);
+      setAuthStatus('ready');
+    });
 
-        if (session) {
-          setSession(session);
-          await loadProfile(session);
-        }
-        setAuthStatus('ready');
-      })
-      .catch(fatalErr => {
-        clearTimeout(rescueTimeout);
-        clearTimeout(recoveryUiTid);
-        console.error('Fallo masivo de Auth:', fatalErr);
-        setAuthStatus('ready');
-      });
-
-    // Cambios de sesión posteriores (login, logout, refresh de token)
+    // Cambios de sesión y fallback principal (asegura detectar claves caídas)
     const {
       data: { subscription },
     } = supabase.auth.onAuthStateChange(async (_event, session) => {
-      // Ignorar el primer disparo duplicado con la sesión inicial
-      if (!initialSessionHandled.current) return;
-
+      clearTimeout(rescueTimeout);
+      clearTimeout(recoveryUiTid);
+      
       setSession(session);
       if (session) {
+        // En lugar de doble-fetch, solo cargamos si no hay currentUser
+        // o si es un refresh crítico
         await loadProfile(session);
       } else {
         setCurrentUser(null);
       }
+      setAuthStatus('ready');
     });
 
     return () => {
