@@ -100,7 +100,7 @@ export const CycleCalendar: React.FC<CycleCalendarProps> = ({ cycles, onDateSele
     const displayDate = dateObj.toLocaleDateString('es-VE', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' });
 
     return (
-      <div className="fixed inset-0 bg-transparent flex items-center justify-center z-[100] p-[16px] md:p-[32px] animate-fade-in-up" onClick={closeDetailsModal}>
+      <div className="fixed inset-0 bg-transparent flex justify-center z-[100] pt-[60px] sm:pt-[8vh] px-[16px] animate-fade-in-up" onClick={closeDetailsModal}>
         <div className="bg-[var(--bg-surface-1)] rounded-[20px] border border-[var(--border-strong)] max-w-[600px] w-full max-h-[85vh] overflow-hidden flex flex-col shadow-[0_20px_60px_-15px_rgba(0,0,0,0.5)]" onClick={e => e.stopPropagation()}>
           
           {/* Header */}
