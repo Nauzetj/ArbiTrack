@@ -132,6 +132,25 @@ const UnifiedForm: React.FC<UnifiedFormProps> = ({
   const set = (k: keyof FormData, v: string) =>
     setForm(prev => ({ ...prev, [k]: v }));
 
+  React.useEffect(() => {
+    const handleFill = (e: CustomEvent<any>) => {
+      const data = e.detail;
+      setForm(prev => ({
+        ...prev,
+        ...(data.opType && { opType: data.opType }),
+        ...(data.mode && { mode: data.mode }),
+        ...(data.amount && { amount: data.amount }),
+        ...(data.rate && { rate: data.rate }),
+        ...(data.exchange && { exchange: data.exchange }),
+        ...(data.counterpart && { counterpart: data.counterpart }),
+      }));
+      setTotalEdited(false);
+      setCommEdited(false);
+    };
+    window.addEventListener('arbi:fill-form', handleFill as EventListener);
+    return () => window.removeEventListener('arbi:fill-form', handleFill as EventListener);
+  }, []);
+
   // Auto-calc total
   const rate = parseFloat(form.rate) || 0;
   const amount = parseFloat(form.amount) || 0;
@@ -1205,13 +1224,14 @@ export const ActiveCyclePanel: React.FC = () => {
         cancelText=""
         onConfirm={() => {}}
         icon="info"
+        maxWidth="680px"
       >
-        <div className="flex flex-col gap-[12px]">
+        <div className="flex flex-col gap-[16px] mt-[-10px]">
           <div className="flex items-center gap-[8px] mb-[4px]">
-            <Bolt size={16} className="text-[var(--warning)]"/>
-            <span className="text-[14px] font-bold text-[var(--text-primary)]">Venta Rápida de Emergencia</span>
+            <Bolt size={18} className="text-[var(--warning)]"/>
+            <span className="text-[16px] font-bold text-[var(--text-primary)]">Venta Rápida de Emergencia</span>
           </div>
-          <p className="text-[12px] text-[var(--text-secondary)]">
+          <p className="text-[13px] text-[var(--text-secondary)] -mt-[12px] mb-[8px]">
             Registra una operación urgente. Puedes editarla después con todos los detalles.
           </p>
           <UnifiedForm
@@ -1220,7 +1240,7 @@ export const ActiveCyclePanel: React.FC = () => {
             opSeq={opSeq}
             onSaved={handleFormSaved}
             onCancel={() => setShowQuickSale(false)}
-            compact
+            compact={false}
           />
         </div>
       </Modal>

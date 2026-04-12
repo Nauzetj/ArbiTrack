@@ -16,6 +16,8 @@ interface ModalProps {
   icon?: 'danger' | 'info' | 'none';
   /** If true, the confirm button will be disabled (e.g. during loading) */
   loading?: boolean;
+  /** Optional custom max width for the modal */
+  maxWidth?: string;
 }
 
 export const Modal: React.FC<ModalProps> = ({
@@ -29,6 +31,7 @@ export const Modal: React.FC<ModalProps> = ({
   confirmVariant = 'primary',
   icon = 'none',
   loading = false,
+  maxWidth = '420px',
 }) => {
   const overlayRef = useRef<HTMLDivElement>(null);
   const contentRef = useRef<HTMLDivElement>(null);
@@ -90,8 +93,9 @@ export const Modal: React.FC<ModalProps> = ({
     >
       <div
         ref={contentRef}
-        className="relative w-full max-w-[420px] rounded-[20px] border shadow-2xl overflow-hidden"
+        className="relative w-full rounded-[20px] border shadow-2xl overflow-hidden"
         style={{
+          maxWidth,
           background: 'var(--bg-surface-2)',
           borderColor: isDanger ? 'rgba(255, 78, 78, 0.25)' : 'var(--border)',
           boxShadow: isDanger

@@ -1,12 +1,30 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { useAppStore } from '../../store/useAppStore';
-import { Bot, X, Send, ChevronDown, Sparkles } from 'lucide-react';
+import { Bot, X, Send, ChevronDown, Sparkles, Zap, FilePen, HelpCircle } from 'lucide-react';
+import type { OperationType } from '../../types';
 
-// ── Types ────────────────────────────────────────────────────────────────────
+// ── Types ─────────────────────────────────────────────────────────────────────
 interface Message {
   role: 'user' | 'bot';
   text: string;
+  action?: FormFillAction; // optional action card
   ts: number;
+}
+
+interface FormFillAction {
+  type: 'fill_form';
+  label: string;
+  fields: Partial<{
+    opType: OperationType;
+    mode: 'auto' | 'manual';
+    exchange: string;
+    rate: string;
+    amount: string;
+    counterpart: string;
+    commission: string;
+    commissionType: 'fixed' | 'percent';
+    notas: string;
+  }>;
 }
 
 type StoreCtx = {
@@ -18,7 +36,7 @@ type StoreCtx = {
 };
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
-function fmt(n: number, decimals = 2) {
+function fmtN(n: number, decimals = 2) {
   return (n >= 0 ? '+' : '') + n.toFixed(decimals);
 }
 function fmtAbs(n: number, decimals = 2) {
@@ -28,8 +46,46 @@ function localDate(iso: string) {
   return new Date(iso).toLocaleString('es-VE', { dateStyle: 'short', timeStyle: 'short' });
 }
 
-// ── Intent Engine ─────────────────────────────────────────────────────────────
-function buildResponse(input: string, ctx: StoreCtx): string {
+// ── Sistema de conocimiento del módulo unificado ──────────────────────────────
+const SYSTEM_KNOWLEDGE = `
+ARBI es el asistente de ArbiTrack, un sistema P2P de trading de USDT en Venezuela.
+
+TIPOS DE OPERACIÓN (5):
+• VENTA_USDT — Vender USDT en un exchange P2P (ingresas Bs, recibes USDT del comprador)
+• COMPRA_USDT — Comprar USDT en un exchange P2P
+• RECOMPRA — Recomprar USDT en otro exchange P2P (para cerrar el diferencial de tasa)
+• COMPRA_USD — Comprar dólares físicos o bancarios directamente
+• TRANSFERENCIA — Paso por tarjeta u otro canal con comisión (solo fee, no volumen)
+
+CICLOS:
+• Un ciclo agrupa todas las operaciones de una ronda de trading
+• Abre con la primera operación y cierra cuando el usuario decide
+• Puede mezclar cualquier tipo de operación en cualquier combinación
+• GANANCIA NETA = Total recuperado (VENTA_USDT + RECOMPRA) - Total invertido (COMPRA_USDT + COMPRA_USD) - Todas las comisiones
+
+MODOS DE REGISTRO:
+• AUTOMÁTICO — Datos pre-cargados del exchange (badge azul [Exchange])
+• MANUAL — Usuario ingresa a mano; N° operación y fecha se asignan automáticamente (badge gris [Manual])
+• En ambos modos, TODOS los campos son siempre editables
+
+COMISIONES:
+• Tipo FIJA — monto fijo en USDT (ej: 0.5 USDT)
+• Tipo PORCENTUAL — % del monto operado (ej: 0.25% = nivel normal Binance)
+• Niveles Binance: Normal 0.25%, Bronce 0.20%, Plata 0.175%, Oro 0.125%, Promo 0%
+
+VENTA RÁPIDA DE EMERGENCIA:
+• Botón amarillo "Venta rápida" en el panel del ciclo activo
+• Modal compacto para registrar una operación urgente
+• Se puede completar o editar después con todos los detalles
+
+PARA LLENAR EL FORMULARIO:
+• Di "llena el formulario con:" o "registra una venta de X USDT a tasa Y en Z exchange"
+• ARBI pre-llenará los campos automáticamente
+• Solo tienes que revisar y presionar Registrar
+`;
+
+// ── Intent Engine ────────────────────────────────────────────────────────────
+function buildResponse(input: string, ctx: StoreCtx): { text: string; action?: FormFillAction } {
   const q = input.toLowerCase().trim();
   const { cycles, orders, activeCycle, bcvRate, currentUser } = ctx;
 
@@ -37,185 +93,248 @@ function buildResponse(input: string, ctx: StoreCtx): string {
   const todayStart = new Date(); todayStart.setHours(0, 0, 0, 0);
   const monthStart = new Date(); monthStart.setDate(1); monthStart.setHours(0, 0, 0, 0);
 
-  // ── 1. BCV rate ─────────────────────────────────────────────────────────────
-  if (/bcv|tasa|cambio|dolar|bolívar|bolivar/.test(q) && !/orden|ciclo|transac/.test(q)) {
-    if (!bcvRate) return '💱 Tasa BCV aún no sincronizada. Espera unos segundos.';
-    return `💱 **Tasa BCV actual:** ${fmtAbs(bcvRate.tasa_bcv)} Bs/USD`;
+  // ── 0. Llenar formulario ────────────────────────────────────────────────────
+  const fillMatch = q.match(/(?:llena|rellena|registra|anota|agrega)\s+(?:el\s+formulario\s+con\s*:?\s*)?(?:una?\s+)?(venta|compra|recompra|transferencia)(?:\s+de)?\s*([\d.,]+)?\s*(?:usdt|usd|usdt)?\s*(?:a\s+(?:tasa\s+)?)?([\d.,]+)?\s*(?:en\s+(.+))?/i);
+
+  if (fillMatch || /llena|rellena|formulario con|pre.?llena|autocompleta/.test(q)) {
+    // Detectar tipo de operación
+    let opType: OperationType = 'VENTA_USDT';
+    if (/recompra/.test(q)) opType = 'RECOMPRA';
+    else if (/compra usdt|comprar usdt/.test(q)) opType = 'COMPRA_USDT';
+    else if (/compra usd|comprar usd|dolar/.test(q)) opType = 'COMPRA_USD';
+    else if (/transferencia|transfer/.test(q)) opType = 'TRANSFERENCIA';
+    else if (/venta|vender|sell/.test(q)) opType = 'VENTA_USDT';
+
+    // Extraer cantidad
+    const amountMatch = q.match(/\b([\d]+(?:[.,][\d]+)?)\s*(?:usdt|usd)?\b/);
+    const amount = amountMatch ? amountMatch[1].replace(',', '.') : '';
+
+    // Extraer tasa
+    const rateMatch = q.match(/(?:tasa|precio|rate|a)\s+([\d]+(?:[.,][\d]+)?)/i);
+    const rate = rateMatch ? rateMatch[1].replace(',', '.') : '';
+
+    // Extraer exchange
+    const exchangeMatch = q.match(/(?:en|exchange|plataforma)\s+([a-z0-9]+(?:\s+[a-z0-9]+)?)/i);
+    const exchange = exchangeMatch ? exchangeMatch[1].trim() : '';
+
+    const labels: Record<OperationType, string> = {
+      VENTA_USDT: 'Venta USDT',
+      COMPRA_USDT: 'Compra USDT',
+      RECOMPRA: 'Recompra',
+      COMPRA_USD: 'Compra USD',
+      TRANSFERENCIA: 'Transferencia',
+    };
+
+    return {
+      text: `✏️ **Llenando formulario: ${labels[opType]}**\n\n${amount ? `• Cantidad: ${amount} USDT\n` : ''}${rate ? `• Tasa: ${rate} Bs\n` : ''}${exchange ? `• Exchange: ${exchange}\n` : ''}\nHaz clic en **"Aplicar al formulario"** para pre-llenar los campos. Luego revisa y registra.`,
+      action: {
+        type: 'fill_form',
+        label: `Aplicar: ${labels[opType]}${amount ? ` · ${amount}` : ''}${rate ? ` @ ${rate}` : ''}`,
+        fields: {
+          opType,
+          mode: 'manual',
+          ...(amount && { amount }),
+          ...(rate && { rate }),
+          ...(exchange && { exchange }),
+        },
+      },
+    };
   }
 
-  // ── 2. Buscar orden por número de orden ─────────────────────────────────────
+  // ── 1. Preguntas sobre el sistema ──────────────────────────────────────────
+  if (/cómo funciona|como funciona|qué es|que es|para qué|para que|sistema|manual|automático|automatico/.test(q) && !/orden|ciclo específico/.test(q)) {
+    if (/modo|automático|automatico|manual/.test(q)) {
+      return { text: `🔄 **Modos de registro:**\n\n**Automático** → Los campos llegan pre-cargados del exchange. Badge azul [Exchange]. Todos editables.\n\n**Manual** → Tú ingresas todos los datos. N° operación y fecha/hora se asignan solos. Badge gris [Manual].\n\n💡 Cambiar de modo NO borra los datos ya ingresados, solo cambia el badge de origen.` };
+    }
+    if (/tipo|operación|compra|venta|recompra|transferencia/.test(q)) {
+      return { text: `📋 **Tipos de operación disponibles:**\n\n🔴 **VENTA_USDT** — Vendes USDT en exchange P2P\n🟢 **COMPRA_USDT** — Compras USDT en exchange P2P\n🔵 **RECOMPRA** — Recompras USDT en otro exchange\n🟡 **COMPRA_USD** — Compras dólares físicos/bancarios\n🟣 **TRANSFERENCIA** — Canal con comisión (tarjeta/banco)\n\nPuedes mezclar cualquier combinación en un mismo ciclo.` };
+    }
+    if (/comisión|comision|fee|nivel/.test(q)) {
+      return { text: `💰 **Tipos de comisión:**\n\n**Fija** — Monto USDT fijo (ej: 0.50 USDT)\n**Porcentual** — % del monto operado\n\n**Niveles Binance P2P:**\n• Normal: 0.25%\n• 🛡 Bronce: 0.20%\n• ⚔ Plata: 0.175%\n• 👑 Oro: 0.125%\n• 🎉 Promo: 0%\n\nEl sistema calcula la comisión en tiempo real y el resultado es editable.` };
+    }
+    if (/ganancia|calcul|formula/.test(q)) {
+      return { text: `📐 **Fórmula de ganancia:**\n\n**Total invertido** = COMPRA_USDT + COMPRA_USD\n**Total recuperado** = VENTA_USDT + RECOMPRA\n**Total comisiones** = Σ comisiones de todas las ops\n\n**Ganancia neta = Recuperado − Invertido − Comisiones**\n\nSe calcula en tiempo real con cada operación que agregas.` };
+    }
+    if (/ciclo|abrir|cerrar/.test(q)) {
+      return { text: `🔄 **¿Cómo funciona un ciclo?**\n\n1. Abre un ciclo nuevo desde el Dashboard\n2. Registra operaciones (usando el formulario inline o Venta Rápida)\n3. Las métricas se actualizan en tiempo real\n4. Cuando termines, presiona "Cerrar ciclo"\n5. Se genera el resumen financiero completo\n6. Puedes reabrir el ciclo si necesitas corregir algo\n\n💡 Un ciclo puede tener cualquier combinación de los 5 tipos de operación.` };
+    }
+    if (/venta rápida|emergencia|rapida/.test(q)) {
+      return { text: `⚡ **Venta Rápida de Emergencia**\n\nBotón amarillo "Venta rápida" en el panel del ciclo activo.\n\nÚsalo cuando necesites registrar una operación urgentemente sin pasar por el formulario completo. Puedes editarla después con todos los detalles.\n\n💡 También puedes decirme "registra una venta de 200 USDT a tasa 38.50 en Binance" y yo pre-lleno el formulario por ti.` };
+    }
+    return { text: `ℹ️ **¿Cómo funciona ArbiTrack?**\n\nArbiTrack registra tus operaciones de trading P2P en Venezuela.\n\n**Pregúntame sobre:**\n• "¿Cómo funciona el modo automático?"\n• "¿Qué tipos de operación existen?"\n• "¿Cómo se calculan las ganancias?"\n• "¿Cómo funciona un ciclo?"\n• "¿Cómo funciona la venta rápida?"\n• "¿Cuáles son los niveles de comisión?"\n\nO pídeme que llene el formulario: "Registra una venta de 200 USDT a tasa 38.50 en Binance"` };
+  }
+
+  // ── 2. BCV rate ────────────────────────────────────────────────────────────
+  if (/bcv|tasa|cambio|dolar|bolívar|bolivar/.test(q) && !/orden|ciclo|transac/.test(q)) {
+    if (!bcvRate) return { text: '💱 Tasa BCV aún no sincronizada. Espera unos segundos.' };
+    return { text: `💱 **Tasa BCV actual:** ${fmtAbs(bcvRate.tasa_bcv)} Bs/USD` };
+  }
+
+  // ── 3. Buscar orden por número ────────────────────────────────────────────
   const orderNumMatch = input.match(/(?:orden|order|#)\s*([A-Z0-9]{8,})/i)
     || input.match(/\b([0-9]{10,})\b/);
   if (orderNumMatch) {
     const term = orderNumMatch[1].toUpperCase();
     const found = orders.find(o => o.orderNumber?.toUpperCase().includes(term));
-    if (!found) return `🔍 No encontré ninguna orden que contenga **"${term}"**.\nVerifica el número e intenta de nuevo.`;
+    if (!found) return { text: `🔍 No encontré ninguna orden con **"${term}"**.` };
     const cycle = found.cycleId ? cycles.find(c => c.id === found.cycleId) : null;
-    return `📋 **Orden encontrada:**\n• Número: ${found.orderNumber}\n• Tipo: ${found.tradeType === 'BUY' ? '🟢 COMPRA' : '🔴 VENTA'}\n• Monto: ${fmtAbs(found.amount, 4)} USDT\n• Precio total: ${fmtAbs(found.totalPrice, 2)} Bs\n• Tasa: ${fmtAbs(found.unitPrice, 4)} Bs/USDT\n• Contraparte: ${found.counterPartNickName || '—'}\n• Estado: ${found.orderStatus}\n• Fecha: ${localDate(found.createTime_utc)}\n• Ciclo: ${cycle ? '#' + cycle.cycleNumber.toString().slice(-4) : 'Sin asignar'}`;
+    const opType = found.operationType ?? (found.tradeType === 'SELL' ? 'VENTA_USDT' : 'COMPRA_USDT');
+    return { text: `📋 **Orden ${found.orderNumber}**\n• Tipo: ${opType}\n• Monto: ${fmtAbs(found.amount, 4)} USDT\n• Total: ${fmtAbs(found.totalPrice, 2)} Bs\n• Tasa: ${fmtAbs(found.unitPrice, 4)} Bs/USDT\n• Exchange: ${found.exchange || '—'}\n• Contraparte: ${found.counterPartNickName || '—'}\n• Comisión: ${fmtAbs(found.commission, 4)}\n• Origen: ${found.originMode === 'auto' ? '[Exchange]' : '[Manual]'}\n• Fecha: ${localDate(found.createTime_utc)}\n• Ciclo: ${cycle ? '#' + cycle.cycleNumber.toString().slice(-4) : 'Sin asignar'}` };
   }
 
-  // ── 3. Buscar por contraparte ────────────────────────────────────────────────
+  // ── 4. Buscar por contraparte ─────────────────────────────────────────────
   const contraMatch = q.match(/(?:contraparte|usuario|nick|trader)\s+(.{3,})/);
   if (contraMatch || /busca|buscar|busco/.test(q)) {
     const nameTerm = contraMatch?.[1] || q.replace(/busca[r]?\s+/i, '').trim();
     if (nameTerm.length >= 3) {
-      const hits = orders.filter(o =>
-        o.counterPartNickName?.toLowerCase().includes(nameTerm)
-      ).slice(0, 5);
-      if (hits.length === 0) return `🔍 No encontré órdenes con contraparte **"${nameTerm}"**.`;
-      const lines = hits.map(o =>
-        `• ${o.tradeType === 'BUY' ? '🟢' : '🔴'} ${o.orderNumber} — ${fmtAbs(o.amount, 2)} USDT — ${localDate(o.createTime_utc)}`
-      );
-      return `🔍 **${hits.length} orden(es) de "${nameTerm}":**\n${lines.join('\n')}`;
+      const hits = orders.filter(o => o.counterPartNickName?.toLowerCase().includes(nameTerm)).slice(0, 5);
+      if (hits.length === 0) return { text: `🔍 Sin órdenes de **"${nameTerm}"**.` };
+      const lines = hits.map(o => `• ${o.tradeType === 'BUY' ? '🟢' : '🔴'} ${o.orderNumber} — ${fmtAbs(o.amount, 2)} USDT — ${localDate(o.createTime_utc)}`);
+      return { text: `🔍 **${hits.length} orden(es) de "${nameTerm}":**\n${lines.join('\n')}` };
     }
   }
 
-  // ── 4. Órdenes de hoy ────────────────────────────────────────────────────────
+  // ── 5. Órdenes de hoy ────────────────────────────────────────────────────
   if (/órdenes de hoy|ordenes de hoy|transacciones de hoy/.test(q)) {
     const todays = orders.filter(o => new Date(o.createTime_utc) >= todayStart);
-    if (todays.length === 0) return '📅 No hay órdenes registradas hoy todavía.';
-    const buys  = todays.filter(o => o.tradeType === 'BUY');
-    const sells = todays.filter(o => o.tradeType === 'SELL');
-    const vol   = todays.filter(o => o.orderStatus === 'COMPLETED' && o.tradeType === 'SELL').reduce((s, o) => s + o.amount, 0);
-    return `📅 **Órdenes de hoy (${todays.length}):**\n• 🟢 Compras: ${buys.length}\n• 🔴 Ventas: ${sells.length}\n• Volumen vendido: ${fmtAbs(vol, 2)} USDT`;
+    if (todays.length === 0) return { text: '📅 No hay órdenes registradas hoy todavía.' };
+    const ventas = todays.filter(o => (o.operationType ?? o.tradeType) === 'VENTA_USDT' || o.tradeType === 'SELL');
+    const compras = todays.filter(o => (o.operationType ?? o.tradeType) === 'COMPRA_USDT' || o.tradeType === 'BUY');
+    return { text: `📅 **Órdenes de hoy (${todays.length}):**\n• 🔴 Ventas: ${ventas.length}\n• 🟢 Compras: ${compras.length}` };
   }
 
-  // ── 5. Activo actual / ciclo activo ──────────────────────────────────────────
+  // ── 6. Ciclo activo ───────────────────────────────────────────────────────
   if (/ciclo activo|en curso|abierto|ciclo actual/.test(q)) {
-    if (!activeCycle) return '📭 No hay ningún ciclo activo. Puedes abrir uno desde el Dashboard.';
-    const gain = activeCycle.ganancia_usdt;
-    const assignedOrders = orders.filter(o => o.cycleId === activeCycle.id);
-    return `🔄 **Ciclo #${activeCycle.cycleNumber.toString().slice(-4)} en curso**\n• USDT vendido: ${fmtAbs(activeCycle.usdt_vendido, 2)}\n• USDT recomprado: ${fmtAbs(activeCycle.usdt_recomprado, 2)}\n• Ganancia parcial: ${fmt(gain, 4)} USDT\n• Órdenes asignadas: ${assignedOrders.length}\n• Abierto: ${localDate(activeCycle.openedAt)}`;
+    if (!activeCycle) return { text: '📭 No hay ningún ciclo activo. Puedes abrir uno desde el Dashboard.' };
+    const cycleOrders = orders.filter(o => o.cycleId === activeCycle.id);
+    let totalInv = 0, totalRec = 0, totalComm = 0;
+    cycleOrders.filter(o => o.orderStatus?.toUpperCase() === 'COMPLETED').forEach(o => {
+      const t = o.operationType ?? (o.tradeType === 'SELL' ? 'VENTA_USDT' : 'COMPRA_USDT');
+      totalComm += o.commission ?? 0;
+      if (['COMPRA_USDT','COMPRA_USD'].includes(t)) totalInv += o.totalPrice;
+      if (['VENTA_USDT','RECOMPRA'].includes(t)) totalRec += o.totalPrice;
+    });
+    const ganancia = totalRec - totalInv - totalComm;
+    return { text: `🔄 **Ciclo #${activeCycle.cycleNumber.toString().slice(-4)} en curso**\n• Operaciones: ${cycleOrders.length}\n• Invertido: Bs. ${fmtAbs(totalInv)}\n• Recuperado: Bs. ${fmtAbs(totalRec)}\n• Comisiones: ${fmtAbs(totalComm, 4)}\n• Ganancia neta: Bs. ${fmtN(ganancia)}\n• Modo: ${activeCycle.cycleType === 'manual' ? 'Multi-Exchange' : 'P2P Auto'}\n• Abierto: ${localDate(activeCycle.openedAt)}` };
   }
 
-  // ── 6. Ganancia total ────────────────────────────────────────────────────────
-  if (/ganancia total|utilidad total|beneficio total|cuánto gané|cuanto gane|profit total/.test(q)) {
+  // ── 7. Ganancia total ────────────────────────────────────────────────────
+  if (/ganancia total|utilidad total|cuánto gané|cuanto gane|profit total/.test(q)) {
     const total    = completed.reduce((s, c) => s + c.ganancia_usdt, 0);
     const totalVes = completed.reduce((s, c) => s + c.ganancia_ves, 0);
-    return `💰 **Ganancia acumulada (${completed.length} ciclos):**\n• ${fmt(total, 4)} USDT\n• ${fmt(totalVes, 2)} Bs`;
+    return { text: `💰 **Ganancia acumulada (${completed.length} ciclos):**\n• ${fmtN(total, 4)} USDT\n• Bs. ${fmtN(totalVes, 2)}` };
   }
 
-  // ── 7. Ganancia del mes ──────────────────────────────────────────────────────
+  // ── 8. Ganancia del mes ──────────────────────────────────────────────────
   if (/mes|mensual|este mes/.test(q) && !/bcv|tasa/.test(q)) {
     const monthCycles = completed.filter(c => c.closedAt && new Date(c.closedAt) >= monthStart);
     const gainMonth = monthCycles.reduce((s, c) => s + c.ganancia_usdt, 0);
-    return `📆 **Este mes (${monthCycles.length} ciclos):**\n• Ganancia: ${fmt(gainMonth, 4)} USDT\n• Bs.: ${fmt(monthCycles.reduce((s,c) => s + c.ganancia_ves, 0), 2)}`;
+    return { text: `📆 **Este mes (${monthCycles.length} ciclos):**\n• USDT: ${fmtN(gainMonth, 4)}\n• Bs.: ${fmtN(monthCycles.reduce((s,c) => s + c.ganancia_ves, 0), 2)}` };
   }
 
-  // ── 8. Ganancia de hoy ───────────────────────────────────────────────────────
-  if (/hoy|día de hoy|ganancia de hoy/.test(q)) {
+  // ── 9. Ganancia hoy ──────────────────────────────────────────────────────
+  if (/hoy|ganancia de hoy/.test(q) && !/orden/.test(q)) {
     const todayCycles = completed.filter(c => c.closedAt && new Date(c.closedAt) >= todayStart);
     const gain = todayCycles.reduce((s, c) => s + c.ganancia_usdt, 0);
-    return `📅 **Hoy (${todayCycles.length} ciclo${todayCycles.length !== 1 ? 's' : ''}):**\n• Ganancia: ${fmt(gain, 4)} USDT`;
+    return { text: `📅 **Hoy (${todayCycles.length} ciclo${todayCycles.length !== 1 ? 's' : ''}):**\n• Ganancia: ${fmtN(gain, 4)} USDT` };
   }
 
-  // ── 9. Mejor ciclo ───────────────────────────────────────────────────────────
+  // ── 10. Mejor ciclo ──────────────────────────────────────────────────────
   if (/mejor ciclo|más rentable|mayor ganancia|top ciclo/.test(q)) {
-    if (completed.length === 0) return '📭 Sin ciclos completados aún.';
+    if (completed.length === 0) return { text: '📭 Sin ciclos completados aún.' };
     const best = completed.reduce((a, b) => a.ganancia_usdt > b.ganancia_usdt ? a : b);
-    return `🏆 **Mejor ciclo: #${best.cycleNumber.toString().slice(-4)}**\n• Ganancia: ${fmt(best.ganancia_usdt, 4)} USDT\n• ROI: ${fmtAbs(best.roi_percent, 2)}%\n• Tasa promedio venta: ${fmtAbs(best.tasa_venta_prom, 2)} Bs/USDT\n• Fecha: ${best.closedAt ? localDate(best.closedAt) : '—'}`;
+    return { text: `🏆 **Mejor ciclo: #${best.cycleNumber.toString().slice(-4)}**\n• Ganancia: ${fmtN(best.ganancia_usdt, 4)} USDT\n• ROI: ${fmtAbs(best.roi_percent, 2)}%\n• Fecha: ${best.closedAt ? localDate(best.closedAt) : '—'}` };
   }
 
-  // ── 10. Peor ciclo ───────────────────────────────────────────────────────────
+  // ── 11. Peor ciclo ───────────────────────────────────────────────────────
   if (/peor ciclo|menor ganancia|pérdida|perdida|ciclo negativo/.test(q)) {
-    if (completed.length === 0) return '📭 Sin ciclos completados aún.';
+    if (completed.length === 0) return { text: '📭 Sin ciclos completados aún.' };
     const worst = completed.reduce((a, b) => a.ganancia_usdt < b.ganancia_usdt ? a : b);
-    return `📉 **Ciclo menos rentable: #${worst.cycleNumber.toString().slice(-4)}**\n• Resultado: ${fmt(worst.ganancia_usdt, 4)} USDT\n• ROI: ${fmtAbs(worst.roi_percent, 2)}%\n• Fecha: ${worst.closedAt ? localDate(worst.closedAt) : '—'}`;
+    return { text: `📉 **Ciclo menos rentable: #${worst.cycleNumber.toString().slice(-4)}**\n• Resultado: ${fmtN(worst.ganancia_usdt, 4)} USDT\n• ROI: ${fmtAbs(worst.roi_percent, 2)}%` };
   }
 
-  // ── 11. Resumen de ciclo específico por número ───────────────────────────────
+  // ── 12. Ciclo específico ─────────────────────────────────────────────────
   const cycleNumMatch = q.match(/ciclo\s*#?(\d+)/i);
   if (cycleNumMatch) {
     const num = cycleNumMatch[1];
     const c = cycles.find(cy => cy.cycleNumber.toString().slice(-4) === num || cy.cycleNumber.toString() === num);
-    if (!c) return `🔍 No encontré el ciclo **#${num}**. Prueba con los últimos 4 dígitos.`;
-    return `📊 **Ciclo #${c.cycleNumber.toString().slice(-4)} (${c.status})**\n• USDT vendido: ${fmtAbs(c.usdt_vendido, 2)}\n• USDT recomprado: ${fmtAbs(c.usdt_recomprado, 2)}\n• Ganancia USDT: ${fmt(c.ganancia_usdt, 4)}\n• Ganancia Bs: ${fmt(c.ganancia_ves, 2)}\n• ROI: ${fmtAbs(c.roi_percent, 2)}%\n• Tasa venta: ${fmtAbs(c.tasa_venta_prom, 2)} | Compra: ${fmtAbs(c.tasa_compra_prom, 2)}\n• Abierto: ${localDate(c.openedAt)}\n• Cerrado: ${c.closedAt ? localDate(c.closedAt) : 'En curso'}`;
+    if (!c) return { text: `🔍 No encontré el ciclo **#${num}**.` };
+    return { text: `📊 **Ciclo #${c.cycleNumber.toString().slice(-4)} (${c.status})**\n• USDT vendido: ${fmtAbs(c.usdt_vendido, 2)}\n• USDT recomprado: ${fmtAbs(c.usdt_recomprado, 2)}\n• Ganancia USDT: ${fmtN(c.ganancia_usdt, 4)}\n• Ganancia Bs: ${fmtN(c.ganancia_ves, 2)}\n• ROI: ${fmtAbs(c.roi_percent, 2)}%\n• Tasa venta: ${fmtAbs(c.tasa_venta_prom, 2)} | Compra: ${fmtAbs(c.tasa_compra_prom, 2)}\n• Abierto: ${localDate(c.openedAt)}\n• Cerrado: ${c.closedAt ? localDate(c.closedAt) : 'En curso'}` };
   }
 
-  // ── 12. Conteo de órdenes ────────────────────────────────────────────────────
-  if (/cuántas órdenes|cuantas ordenes|total de órdenes|transacciones/.test(q)) {
-    const buys  = orders.filter(o => o.tradeType === 'BUY').length;
-    const sells = orders.filter(o => o.tradeType === 'SELL').length;
+  // ── 13. Conteos ──────────────────────────────────────────────────────────
+  if (/cuántas órdenes|cuantas ordenes|total de órdenes/.test(q)) {
     const unassigned = orders.filter(o => !o.cycleId).length;
-    return `📋 **Órdenes registradas: ${orders.length}**\n• 🟢 Compras (BUY): ${buys}\n• 🔴 Ventas (SELL): ${sells}\n• Sin asignar: ${unassigned}`;
+    return { text: `📋 **Órdenes registradas: ${orders.length}**\n• Sin asignar a ciclo: ${unassigned}` };
   }
-
-  // ── 13. Conteo de ciclos ─────────────────────────────────────────────────────
   if (/cuántos ciclos|cuantos ciclos|total ciclos|ciclos completados/.test(q)) {
     const enCurso = cycles.filter(c => c.status === 'En curso').length;
-    return `📊 **Ciclos registrados: ${cycles.length}**\n• Completados: ${completed.length}\n• En curso: ${enCurso}`;
+    return { text: `📊 **Ciclos: ${cycles.length} total**\n• Completados: ${completed.length}\n• En curso: ${enCurso}` };
   }
 
-  // ── 14. ROI / Rendimiento ────────────────────────────────────────────────────
-  if (/roi|rendimiento|rentabilidad|porcentaje/.test(q)) {
-    if (completed.length === 0) return '📭 Sin ciclos completados para calcular ROI.';
+  // ── 14. ROI ──────────────────────────────────────────────────────────────
+  if (/roi|rendimiento|rentabilidad/.test(q)) {
+    if (completed.length === 0) return { text: '📭 Sin ciclos completados para calcular ROI.' };
     const avgRoi = completed.reduce((s, c) => s + c.roi_percent, 0) / completed.length;
     const best   = completed.reduce((a, b) => a.roi_percent > b.roi_percent ? a : b);
-    return `📈 **ROI promedio: ${fmtAbs(avgRoi, 2)}%**\n• Mejor ROI: ${fmtAbs(best.roi_percent, 2)}% (Ciclo #${best.cycleNumber.toString().slice(-4)})\n• Basado en ${completed.length} ciclos`;
+    return { text: `📈 **ROI promedio: ${fmtAbs(avgRoi, 2)}%**\n• Mejor: ${fmtAbs(best.roi_percent, 2)}% (Ciclo #${best.cycleNumber.toString().slice(-4)})\n• Basado en ${completed.length} ciclos` };
   }
 
-  // ── 15. Volumen operado ──────────────────────────────────────────────────────
+  // ── 15. Volumen ──────────────────────────────────────────────────────────
   if (/volumen|operado|cuánto usdt|cuanto usdt/.test(q)) {
-    const totalSold    = orders.filter(o => o.tradeType === 'SELL' && o.orderStatus === 'COMPLETED').reduce((s, o) => s + o.amount, 0);
-    const totalBought  = orders.filter(o => o.tradeType === 'BUY'  && o.orderStatus === 'COMPLETED').reduce((s, o) => s + o.amount, 0);
-    return `📊 **Volumen total operado:**\n• Vendido: ${fmtAbs(totalSold, 2)} USDT\n• Recomprado: ${fmtAbs(totalBought, 2)} USDT`;
+    const sold   = orders.filter(o => ['VENTA_USDT','SELL'].includes(o.operationType ?? o.tradeType) && o.orderStatus === 'COMPLETED').reduce((s, o) => s + o.amount, 0);
+    const bought = orders.filter(o => ['COMPRA_USDT','BUY'].includes(o.operationType ?? o.tradeType) && o.orderStatus === 'COMPLETED').reduce((s, o) => s + o.amount, 0);
+    return { text: `📊 **Volumen total:**\n• Vendido: ${fmtAbs(sold, 2)} USDT\n• Comprado: ${fmtAbs(bought, 2)} USDT` };
   }
 
-  // ── 16. Última orden ─────────────────────────────────────────────────────────
-  if (/última orden|ultima orden|orden más reciente|orden reciente/.test(q)) {
-    if (orders.length === 0) return '📭 No tienes órdenes registradas aún.';
+  // ── 16. Última orden ────────────────────────────────────────────────────
+  if (/última orden|ultima orden|orden reciente/.test(q)) {
+    if (orders.length === 0) return { text: '📭 No hay órdenes registradas.' };
     const last = [...orders].sort((a, b) => new Date(b.createTime_utc).getTime() - new Date(a.createTime_utc).getTime())[0];
-    return `🕐 **Última orden:**\n• ${last.tradeType === 'BUY' ? '🟢 COMPRA' : '🔴 VENTA'} — ${fmtAbs(last.amount, 4)} USDT\n• Contraparte: ${last.counterPartNickName || '—'}\n• Tasa: ${fmtAbs(last.unitPrice, 4)} Bs/USDT\n• Fecha: ${localDate(last.createTime_utc)}\n• Número: ${last.orderNumber}`;
+    const opType = last.operationType ?? (last.tradeType === 'SELL' ? 'VENTA_USDT' : 'COMPRA_USDT');
+    return { text: `🕐 **Última orden:**\n• Tipo: ${opType}\n• Monto: ${fmtAbs(last.amount, 4)} USDT\n• Exchange: ${last.exchange || '—'}\n• Contraparte: ${last.counterPartNickName || '—'}\n• Tasa: ${fmtAbs(last.unitPrice, 4)} Bs/USDT\n• Origen: ${last.originMode === 'auto' ? '[Exchange]' : '[Manual]'}\n• Fecha: ${localDate(last.createTime_utc)}` };
   }
 
-  // ── 17. Último ciclo cerrado ─────────────────────────────────────────────────
-  if (/último ciclo|ultimo ciclo|ciclo reciente|ciclo anterior/.test(q)) {
-    if (completed.length === 0) return '📭 No hay ciclos completados aún.';
-    const last = [...completed].sort((a, b) => new Date(b.closedAt!).getTime() - new Date(a.closedAt!).getTime())[0];
-    return `🔁 **Último ciclo cerrado: #${last.cycleNumber.toString().slice(-4)}**\n• Ganancia: ${fmt(last.ganancia_usdt, 4)} USDT\n• ROI: ${fmtAbs(last.roi_percent, 2)}%\n• Cerrado: ${localDate(last.closedAt!)}`;
-  }
-
-  // ── 18. Mi usuario / saludo ──────────────────────────────────────────────────
-  if (/hola|hey|buenas|saludo|hello|buenos días|buenas noches/.test(q)) {
+  // ── 17. Saludo ───────────────────────────────────────────────────────────
+  if (/hola|hey|buenas|hello|buenos/.test(q)) {
     const hour = new Date().getHours();
     const greeting = hour < 12 ? 'Buenos días' : hour < 18 ? 'Buenas tardes' : 'Buenas noches';
-    return `👋 **${greeting}${currentUser ? ', ' + currentUser.username : ''}!** Soy ARBI, tu asistente de datos.\n\nEscribe **"ayuda"** para ver todo lo que puedo consultar por ti.`;
+    return { text: `👋 **${greeting}${currentUser ? ', ' + currentUser.username : ''}!** Soy ARBI.\n\nPuedo consultar tus datos Y pre-llenar el formulario por ti.\n\nEscribe **"ayuda"** para ver todo lo que sé hacer, o dime algo como:\n_"Registra una venta de 200 USDT a tasa 38.50 en Binance"_` };
   }
 
-  // ── 19. Ayuda ────────────────────────────────────────────────────────────────
+  // ── 18. Ayuda ────────────────────────────────────────────────────────────
   if (/ayuda|help|qué puedes|que puedes|comandos/.test(q)) {
-    return `🤖 **Comandos disponibles:**\n\n📦 **Órdenes:**\n• "Orden #12345678"\n• "Última orden"\n• "Órdenes de hoy"\n• "Buscar contraparte NombreNick"\n• "¿Cuántas órdenes tengo?"\n• "Volumen operado"\n\n📊 **Ciclos:**\n• "Ciclo activo"\n• "Ciclo #1234"\n• "Último ciclo"\n• "Mejor ciclo" / "Peor ciclo"\n• "¿Cuántos ciclos completados?"\n\n💰 **Ganancias:**\n• "Ganancia de hoy"\n• "Ganancia del mes"\n• "Ganancia total"\n• "ROI promedio"\n\n💱 **Otro:**\n• "Tasa BCV"`;
+    return { text: `🤖 **ARBI — Lo que sé hacer:**\n\n✏️ **Pre-llenar formulario:**\n• "Registra una venta de 200 USDT a 38.50 en Binance"\n• "Llena el formulario con: recompra 150 USDT en Bybit"\n• "Agrega una compra USD de 50"\n\nℹ️ **Sobre el sistema:**\n• "¿Cómo funciona el modo automático?"\n• "¿Qué tipos de operación hay?"\n• "¿Cómo se calculan las ganancias?"\n• "¿Cómo funciona la venta rápida?"\n• "Niveles de comisión Binance"\n\n📊 **Mis datos:**\n• "Ciclo activo", "Último ciclo", "Mejor ciclo"\n• "Ganancia hoy / mes / total" · "ROI"\n• "Orden #12345678" · "Tasa BCV"` };
   }
 
-  // ── Fallback ─────────────────────────────────────────────────────────────────
-  return `🤔 No entendí eso. Escribe **"ayuda"** para ver los comandos disponibles.\n\nTambién puedes buscar directamente:\n• Un número de orden: **"Orden 12345678"**\n• Una contraparte: **"Buscar NombreNick"**\n• Un ciclo: **"Ciclo #1234"**`;
+  // ── Fallback ─────────────────────────────────────────────────────────────
+  return { text: `🤔 No entendí eso. Escribe **"ayuda"** para ver todo lo que puedo hacer.\n\nO dime algo como:\n_"Registra una venta de 200 USDT a tasa 38.50 en Binance P2P"_` };
+}
+
+// ── Evento personalizado para comunicar con ActiveCyclePanel ─────────────────
+export function dispatchFillForm(fields: FormFillAction['fields']) {
+  window.dispatchEvent(new CustomEvent('arbi:fill-form', { detail: fields }));
 }
 
 // ── Component ─────────────────────────────────────────────────────────────────
 export const AssistantBot: React.FC = () => {
   const { cycles, orders, activeCycle, bcvRate, currentUser } = useAppStore();
   const [open, setOpen] = useState(false);
+  const [tab, setTab] = useState<'chat' | 'help'>('chat');
   const [input, setInput] = useState('');
   const [messages, setMessages] = useState<Message[]>([{
     role: 'bot',
-    text: `👋 ¡Hola${currentUser ? ', ' + currentUser.username : ''}! Soy **ARBI**, tu asistente de datos.\n\nPuedo buscar órdenes, ciclos, ganancias y mucho más. Escribe **"ayuda"** para ver todo lo que sé hacer.`,
-    ts: Date.now()
+    text: `👋 ¡Hola${currentUser ? ', ' + currentUser.username : ''}! Soy **ARBI**.\n\nPuedo consultar tus datos y también **pre-llenar el formulario** por ti.\n\nEscribe **"ayuda"** o prueba:\n_"Registra una venta de 200 USDT a tasa 38.50 en Binance"_`,
+    ts: Date.now(),
   }]);
   const [isTyping, setIsTyping] = useState(false);
   const bottomRef = useRef<HTMLDivElement>(null);
   const inputRef  = useRef<HTMLInputElement>(null);
 
-  useEffect(() => {
-    if (open) {
-      setTimeout(() => inputRef.current?.focus(), 150);
-    }
-  }, [open]);
+  useEffect(() => { if (open) setTimeout(() => inputRef.current?.focus(), 150); }, [open]);
+  useEffect(() => { bottomRef.current?.scrollIntoView({ behavior: 'smooth' }); }, [messages]);
 
-  useEffect(() => {
-    bottomRef.current?.scrollIntoView({ behavior: 'smooth' });
-  }, [messages]);
-
-  const handleSend = () => {
+  const handleSend = useCallback(() => {
     const trimmed = input.trim();
     if (!trimmed) return;
     const userMsg: Message = { role: 'user', text: trimmed, ts: Date.now() };
@@ -223,122 +342,230 @@ export const AssistantBot: React.FC = () => {
     setInput('');
     setIsTyping(true);
     setTimeout(() => {
-      const text = buildResponse(trimmed, { cycles, orders, activeCycle, bcvRate, currentUser });
-      setMessages(prev => [...prev, { role: 'bot', text, ts: Date.now() }]);
+      const result = buildResponse(trimmed, { cycles, orders, activeCycle, bcvRate, currentUser });
+      setMessages(prev => [...prev, { role: 'bot', text: result.text, action: result.action, ts: Date.now() }]);
       setIsTyping(false);
-    }, 500 + Math.random() * 400);
-  };
+    }, 400 + Math.random() * 300);
+  }, [input, cycles, orders, activeCycle, bcvRate, currentUser]);
 
   const handleKey = (e: React.KeyboardEvent) => {
     if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleSend(); }
   };
 
-  // Render **bold** and \n
-  const fmt = (text: string) =>
+  const handleQuickSend = (text: string) => {
+    setInput(text);
+    setTimeout(() => {
+      const userMsg: Message = { role: 'user', text, ts: Date.now() };
+      setMessages(prev => [...prev, userMsg]);
+      setIsTyping(true);
+      setTimeout(() => {
+        const result = buildResponse(text, { cycles, orders, activeCycle, bcvRate, currentUser });
+        setMessages(prev => [...prev, { role: 'bot', text: result.text, action: result.action, ts: Date.now() }]);
+        setIsTyping(false);
+      }, 400);
+      setInput('');
+    }, 10);
+  };
+
+  const handleFillForm = (fields: FormFillAction['fields']) => {
+    dispatchFillForm(fields);
+    setOpen(false);
+    // Show confirmation
+    const confirmMsg: Message = {
+      role: 'bot',
+      text: '✅ **¡Formulario pre-llenado!** Revisa los campos y presiona Registrar cuando estés listo.',
+      ts: Date.now(),
+    };
+    setTimeout(() => setMessages(prev => [...prev, confirmMsg]), 200);
+  };
+
+  // Render markdown (**bold** and \n)
+  const renderText = (text: string) =>
     text.split('\n').map((line, i, arr) => (
       <span key={i}>
         {line.split(/(\*\*[^*]+\*\*)/).map((part, j) =>
           part.startsWith('**') && part.endsWith('**')
             ? <strong key={j}>{part.slice(2, -2)}</strong>
+            : part.startsWith('_') && part.endsWith('_')
+            ? <em key={j}>{part.slice(1, -1)}</em>
             : part
         )}
         {i < arr.length - 1 && <br />}
       </span>
     ));
 
+  const quickPrompts = [
+    { label: 'Ganancia hoy', text: 'Ganancia de hoy' },
+    { label: 'Ciclo activo', text: 'Ciclo activo' },
+    { label: 'Tasa BCV', text: 'Tasa BCV' },
+    { label: 'Última orden', text: 'Última orden' },
+    { label: '¿Cómo funciona?', text: '¿Cómo funciona el sistema?' },
+  ];
+
   return (
     <>
-      {/* Trigger button */}
+      {/* Trigger */}
       <button
         id="assistant-bot-trigger"
         onClick={() => setOpen(v => !v)}
         className={`fixed bottom-[80px] md:bottom-[28px] right-[20px] z-[200] w-[52px] h-[52px] rounded-full
           flex items-center justify-center shadow-lg transition-all duration-300
-          ${open ? 'bg-[var(--bg-surface-3)] border border-[var(--border-strong)] scale-95' : 'bg-[var(--accent)] hover:scale-110 animate-bot-bounce'}
-        `}
+          ${open ? 'bg-[var(--bg-surface-3)] border border-[var(--border-strong)] scale-95' : 'bg-[var(--accent)] hover:scale-110 animate-bot-bounce'}`}
         title="Asistente ARBI"
         aria-label="Abrir asistente"
       >
-        {open ? <X size={22} className="text-[var(--text-primary)]" /> : <Bot size={22} className="text-white" />}
+        {open ? <X size={22} className="text-[var(--text-primary)]"/> : <Bot size={22} className="text-white"/>}
       </button>
 
-      {/* Chat panel */}
+      {/* Panel */}
       <div className={`fixed bottom-[144px] md:bottom-[90px] right-[20px] z-[199]
-        w-[340px] max-h-[500px] rounded-[18px] flex flex-col overflow-hidden
+        w-[360px] max-h-[540px] rounded-[18px] flex flex-col overflow-hidden
         border border-[var(--border-strong)] shadow-[0_20px_60px_rgba(0,0,0,0.3)]
         bg-[var(--bg-surface-1)]
         transition-all duration-300 origin-bottom-right
-        ${open ? 'scale-100 opacity-100 pointer-events-auto' : 'scale-90 opacity-0 pointer-events-none'}
-      `}>
+        ${open ? 'scale-100 opacity-100 pointer-events-auto' : 'scale-90 opacity-0 pointer-events-none'}`}>
+
         {/* Header */}
         <div className="flex items-center justify-between px-[16px] py-[12px] border-b border-[var(--border)] bg-[var(--bg-surface-2)] flex-shrink-0">
           <div className="flex items-center gap-[10px]">
             <div className="w-[32px] h-[32px] rounded-full bg-[var(--accent)] flex items-center justify-center">
-              <Sparkles size={15} className="text-white" />
+              <Sparkles size={15} className="text-white"/>
             </div>
             <div>
               <p className="font-bold text-[13px] leading-tight">ARBI</p>
-              <p className="text-[10px] text-[var(--text-tertiary)]">Asistente de datos</p>
+              <p className="text-[10px] text-[var(--text-tertiary)]">Asistente · Pre-llena formularios</p>
             </div>
           </div>
-          <button onClick={() => setOpen(false)} className="text-[var(--text-tertiary)] hover:text-[var(--text-primary)] transition-colors p-[4px] rounded-full hover:bg-[var(--bg-surface-3)]">
-            <ChevronDown size={18} />
-          </button>
-        </div>
-
-        {/* Messages */}
-        <div className="flex-1 overflow-y-auto p-[14px] flex flex-col gap-[10px] custom-scrollbar">
-          {messages.map((msg, i) => (
-            <div key={i} className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
-              <div className={`max-w-[88%] rounded-[14px] px-[12px] py-[9px] text-[12.5px] leading-[1.6]
-                ${msg.role === 'user'
-                  ? 'bg-[var(--accent)] text-white rounded-br-[3px]'
-                  : 'bg-[var(--bg-surface-2)] text-[var(--text-primary)] border border-[var(--border)] rounded-bl-[3px]'}`}>
-                {fmt(msg.text)}
-              </div>
-            </div>
-          ))}
-          {isTyping && (
-            <div className="flex justify-start">
-              <div className="bg-[var(--bg-surface-2)] border border-[var(--border)] rounded-[14px] rounded-bl-[3px] px-[14px] py-[12px] flex gap-[5px] items-center">
-                <span className="bot-dot w-[6px] h-[6px] bg-[var(--text-tertiary)] rounded-full" />
-                <span className="bot-dot w-[6px] h-[6px] bg-[var(--text-tertiary)] rounded-full" />
-                <span className="bot-dot w-[6px] h-[6px] bg-[var(--text-tertiary)] rounded-full" />
-              </div>
-            </div>
-          )}
-          <div ref={bottomRef} />
-        </div>
-
-        {/* Quick suggestions */}
-        <div className="px-[12px] pt-[8px] pb-[4px] flex gap-[6px] flex-wrap border-t border-[var(--border)] bg-[var(--bg-surface-2)] flex-shrink-0">
-          {['Ganancia hoy', 'Última orden', 'Ciclo activo', 'Tasa BCV'].map(s => (
-            <button key={s} onClick={() => {
-              setInput(s);
-              setTimeout(() => handleSend(), 10);
-            }}
-              className="text-[10.5px] font-medium px-[9px] py-[4px] rounded-full bg-[var(--bg-surface-3)] text-[var(--text-secondary)] hover:bg-[var(--accent-muted)] hover:text-[var(--accent)] transition-all border border-[var(--border)]">
-              {s}
+          <div className="flex items-center gap-[4px]">
+            <button
+              onClick={() => setTab(t => t === 'help' ? 'chat' : 'help')}
+              className={`p-[5px] rounded-full transition-colors ${tab === 'help' ? 'bg-[var(--accent-muted)] text-[var(--accent)]' : 'text-[var(--text-tertiary)] hover:text-[var(--text-primary)]'}`}
+              title="Ayuda del sistema"
+            >
+              <HelpCircle size={16}/>
             </button>
-          ))}
+            <button onClick={() => setOpen(false)} className="text-[var(--text-tertiary)] hover:text-[var(--text-primary)] transition-colors p-[4px] rounded-full hover:bg-[var(--bg-surface-3)]">
+              <ChevronDown size={18}/>
+            </button>
+          </div>
         </div>
 
-        {/* Input */}
-        <div className="flex items-center gap-[8px] px-[12px] py-[10px] bg-[var(--bg-surface-2)] flex-shrink-0">
-          <input
-            ref={inputRef}
-            value={input}
-            onChange={e => setInput(e.target.value)}
-            onKeyDown={handleKey}
-            placeholder='Ej: "Orden #123456" o "Mejor ciclo"'
-            className="flex-1 bg-[var(--bg-surface-3)] border border-[var(--border)] rounded-[10px] text-[12.5px] px-[12px] py-[8px] outline-none text-[var(--text-primary)] placeholder:text-[var(--text-tertiary)] focus:border-[var(--accent)] transition-colors"
-          />
-          <button onClick={handleSend} disabled={!input.trim()}
-            className="w-[36px] h-[36px] rounded-[10px] bg-[var(--accent)] text-white flex items-center justify-center disabled:opacity-30 hover:opacity-90 transition-all hover:scale-105 active:scale-95 flex-shrink-0">
-            <Send size={15} />
-          </button>
-        </div>
+        {/* Help tab */}
+        {tab === 'help' && (
+          <div className="flex-1 overflow-y-auto p-[14px] flex flex-col gap-[10px] custom-scrollbar">
+            <p className="text-[11px] font-bold text-[var(--text-tertiary)] uppercase tracking-wider">Comandos rápidos</p>
+
+            {[
+              { icon: <FilePen size={11}/>, label: 'Formulario', prompts: [
+                'Registra una venta de 200 USDT a tasa 38.50 en Binance',
+                'Llena recompra 100 USDT en Bybit',
+                'Agrega una transferencia de 50 USD',
+              ]},
+              { icon: <Zap size={11}/>, label: 'Datos', prompts: [
+                'Ciclo activo', 'Ganancia total', 'ROI promedio',
+                'Mejor ciclo', 'Volumen operado', 'Tasa BCV',
+              ]},
+              { icon: <HelpCircle size={11}/>, label: 'Sistema', prompts: [
+                '¿Cómo funciona el modo automático?',
+                '¿Qué tipos de operación existen?',
+                '¿Cómo se calculan las ganancias?',
+                '¿Qué son los niveles de comisión?',
+              ]},
+            ].map(group => (
+              <div key={group.label}>
+                <div className="flex items-center gap-[5px] mb-[6px] text-[10px] font-bold text-[var(--text-secondary)] uppercase tracking-wider">
+                  {group.icon} {group.label}
+                </div>
+                <div className="flex flex-col gap-[3px]">
+                  {group.prompts.map(p => (
+                    <button
+                      key={p}
+                      onClick={() => { setTab('chat'); handleQuickSend(p); }}
+                      className="text-left text-[11.5px] px-[10px] py-[6px] rounded-[7px] bg-[var(--bg-surface-2)] hover:bg-[var(--accent-muted)] hover:text-[var(--accent)] text-[var(--text-secondary)] transition-all border border-transparent hover:border-[var(--accent-border)]"
+                    >
+                      {p}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+
+        {/* Chat tab */}
+        {tab === 'chat' && (
+          <>
+            {/* Messages */}
+            <div className="flex-1 overflow-y-auto p-[14px] flex flex-col gap-[10px] custom-scrollbar">
+              {messages.map((msg, i) => (
+                <div key={i} className={`flex flex-col ${msg.role === 'user' ? 'items-end' : 'items-start'} gap-[6px]`}>
+                  <div className={`max-w-[90%] rounded-[14px] px-[12px] py-[9px] text-[12.5px] leading-[1.6]
+                    ${msg.role === 'user'
+                      ? 'bg-[var(--accent)] text-white rounded-br-[3px]'
+                      : 'bg-[var(--bg-surface-2)] text-[var(--text-primary)] border border-[var(--border)] rounded-bl-[3px]'}`}>
+                    {renderText(msg.text)}
+                  </div>
+                  {/* Action card */}
+                  {msg.action?.type === 'fill_form' && (
+                    <button
+                      onClick={() => handleFillForm(msg.action!.fields)}
+                      className="flex items-center gap-[6px] px-[12px] py-[7px] rounded-[10px] bg-[var(--accent)] hover:brightness-110 text-white text-[11px] font-bold transition-all shadow-[0_2px_8px_rgba(37,99,235,0.3)] animate-fade-in-up"
+                    >
+                      <FilePen size={11}/>
+                      {msg.action.label}
+                    </button>
+                  )}
+                </div>
+              ))}
+              {isTyping && (
+                <div className="flex justify-start">
+                  <div className="bg-[var(--bg-surface-2)] border border-[var(--border)] rounded-[14px] rounded-bl-[3px] px-[14px] py-[12px] flex gap-[5px] items-center">
+                    <span className="bot-dot w-[6px] h-[6px] bg-[var(--text-tertiary)] rounded-full"/>
+                    <span className="bot-dot w-[6px] h-[6px] bg-[var(--text-tertiary)] rounded-full"/>
+                    <span className="bot-dot w-[6px] h-[6px] bg-[var(--text-tertiary)] rounded-full"/>
+                  </div>
+                </div>
+              )}
+              <div ref={bottomRef}/>
+            </div>
+
+            {/* Quick suggestions */}
+            <div className="px-[12px] pt-[8px] pb-[4px] flex gap-[5px] flex-wrap border-t border-[var(--border)] bg-[var(--bg-surface-2)] flex-shrink-0">
+              {quickPrompts.map(({ label, text }) => (
+                <button
+                  key={label}
+                  onClick={() => handleQuickSend(text)}
+                  className="text-[10px] font-medium px-[8px] py-[4px] rounded-full bg-[var(--bg-surface-3)] text-[var(--text-secondary)] hover:bg-[var(--accent-muted)] hover:text-[var(--accent)] transition-all border border-[var(--border)]"
+                >
+                  {label}
+                </button>
+              ))}
+            </div>
+
+            {/* Input */}
+            <div className="flex items-center gap-[8px] px-[12px] py-[10px] bg-[var(--bg-surface-2)] flex-shrink-0">
+              <input
+                ref={inputRef}
+                value={input}
+                onChange={e => setInput(e.target.value)}
+                onKeyDown={handleKey}
+                placeholder='"Registra venta 200 USDT @ 38.50"'
+                className="flex-1 bg-[var(--bg-surface-3)] border border-[var(--border)] rounded-[10px] text-[12px] px-[12px] py-[8px] outline-none text-[var(--text-primary)] placeholder:text-[var(--text-tertiary)] focus:border-[var(--accent)] transition-colors"
+              />
+              <button
+                onClick={handleSend}
+                disabled={!input.trim()}
+                className="w-[36px] h-[36px] rounded-[10px] bg-[var(--accent)] text-white flex items-center justify-center disabled:opacity-30 hover:opacity-90 transition-all hover:scale-105 active:scale-95 flex-shrink-0"
+              >
+                <Send size={15}/>
+              </button>
+            </div>
+          </>
+        )}
       </div>
     </>
   );
 };
+
+// ── Re-export knowledge for potential future use ──────────────────────────────
+export { SYSTEM_KNOWLEDGE };
