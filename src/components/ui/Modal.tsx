@@ -77,7 +77,7 @@ export const Modal: React.FC<ModalProps> = ({
 
   const isDanger = confirmVariant === 'danger';
 
-  return (
+  return createPortal(
     <div
       ref={overlayRef}
       className="fixed inset-0 z-[9999] flex items-center justify-center p-[16px]"
