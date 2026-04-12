@@ -2,7 +2,6 @@ import React, { useState, useMemo } from 'react';
 import { useAppStore } from '../../store/useAppStore';
 import type { Order } from '../../types';
 import { Search, X, ChevronUp, ChevronDown, ListFilter, Download, ChevronLeft, ChevronRight, Calendar } from 'lucide-react';
-import { Badge } from '../ui/Badge';
 import { saveOrder, recalculateCycleMetrics, getCyclesForUser, getOrdersForUser } from '../../services/dbOperations';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
