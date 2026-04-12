@@ -72,10 +72,15 @@ export const Settings: React.FC = () => {
       const { error: cyclesErr } = await supabase.from('cycles').delete().eq('user_id', currentUser.id);
       if (cyclesErr) throw new Error(`Error al borrar ciclos: ${cyclesErr.message}`);
 
+      // Clear the pin/cache in Zustand immediately so UI updates
+      const store = useAppStore.getState();
+      if (store.setOrders) store.setOrders([]);
+      if (store.setCycles) store.setCycles([]);
+
+      toast.success('Toda tu información ha sido reseteada. Claves intactas.');
       setShowClearModal(false);
-      await logout();
     } catch (e: any) {
-      alert(e.message || 'Error al limpiar los datos.');
+      toast.error(e.message || 'Error al limpiar los datos.');
     } finally {
       setIsClearing(false);
     }
