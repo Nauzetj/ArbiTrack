@@ -29,7 +29,7 @@ interface AppState {
   setSession: (session: Session | null) => void;
   setCurrentUser: (user: User | null) => void;
   login: (user: User, session: Session, apiKey: string, secretKey: string) => void;
-  logout: () => Promise<void>;
+  logout: () => void;
 
   setOrders: (orders: Order[]) => void;
   setCycles: (cycles: Cycle[]) => void;
@@ -74,11 +74,8 @@ export const useAppStore = create<AppState>()(
           binanceKeys: { apiKey, secretKey },
         }),
 
-      logout: async () => {
-        // 1. Cerrar sesión en Supabase (invalida el token en el servidor)
-        await supabase.auth.signOut({ scope: 'local' });
-
-        // 2. Limpiar TODOS los datos del store en memoria
+      logout: () => {
+        // Ejecutamos limpieza de memoria (Zustand) INMEDIATAMENTE
         set({
           session: null,
           currentUser: null,
@@ -86,20 +83,21 @@ export const useAppStore = create<AppState>()(
           orders: [],
           cycles: [],
           activeCycle: null,
+          isSyncing: false,
         });
 
-        // 3. Borrar el cache de sesión de Supabase en localStorage
-        //    (prefijos sb- y supabase-) para que getSession() devuelva null
+        // Borrar el cache de sesión instántaneamente de localStorage
         Object.keys(localStorage).forEach((key) => {
-          if (key.startsWith('sb-') || key.startsWith('supabase-')) {
+          if (key.startsWith('sb-') || key.startsWith('supabase-') || key === 'arbitrack-storage') {
             localStorage.removeItem(key);
           }
         });
 
-        // 4. Reemplazar el historial del navegador con /login para que
-        //    el botón "Atrás" no devuelva al usuario a la app autenticada
-        window.history.replaceState(null, '', '/login');
-        window.location.href = '/login';
+        // Enviar la petición de red a Supabase para deslogear el servidor SIN BLOQUEAR la UI
+        supabase.auth.signOut({ scope: 'local' }).catch(console.error);
+
+        // ¡Sustituye la ruta AL INSTANTE!
+        window.location.replace('/login');
       },
 
       setOrders: (orders) => set({ orders }),

@@ -114,10 +114,9 @@ export const Sidebar: React.FC = () => {
     }
   };
 
-  const handleLogout = async () => {
-    // store.logout() ya hace: supabase.signOut → limpiar estado → window.location.href = '/login'
-    // No llamamos navigate() para evitar carrera entre React Router y la recarga de página.
-    await logout();
+  const handleLogout = () => {
+    // El store.logout() ya hace limpieza síncrona inmediata y redirige
+    logout();
   };
 
   const isNauzetj = currentUser?.username === 'Nauzetj' ||
