@@ -66,6 +66,7 @@ export default defineConfig({
             // API data y llamadas a Supabase
             urlPattern: /(\/api\/|https:\/\/.*\.supabase\.co\/.*)/i,
             handler: 'NetworkFirst',
+            method: 'GET',
             options: {
               cacheName: 'api-data',
               networkTimeoutSeconds: 3,
