@@ -52,7 +52,11 @@ export const TransactionsTable: React.FC = () => {
     return orders.filter(o => {
       if (o.orderStatus !== 'COMPLETED') return false; // Solo completadas tienen validez contable real en la vista final por defecto
       
-      const matchSearch = search ? o.counterPartNickName.toLowerCase().includes(search.toLowerCase()) : true;
+      const searchTerm = search.toLowerCase();
+      const matchSearch = search ? (
+        o.counterPartNickName.toLowerCase().includes(searchTerm) ||
+        (o.orderNumber && o.orderNumber.toLowerCase().includes(searchTerm))
+      ) : true;
       
       // La fecha viene como string "DD/MM/YYYY, HH:MM:SS" o similar desde Binance. Parsear o comparar string.
       // Ya que el guardado local tiene createTime_local. Mejor comparamos la fecha ISO si la tuvieramos.
@@ -131,7 +135,7 @@ export const TransactionsTable: React.FC = () => {
 
   const getBadgeStyle = (type: string, value: string) => {
     if (type === 'type') {
-      return value === 'BUY' ? 'bg-[#00e5c3]/10 text-[#00e5c3] border-[#00e5c3]/20' : 'bg-[#ff4e4e]/10 text-[#ff4e4e] border-[#ff4e4e]/20';
+      return value === 'BUY' ? 'bg-[#00e5c3]/15 text-[#00e5c3] border-[#00e5c3]/70 font-extrabold shadow-sm' : 'bg-[#ff4e4e]/15 text-[#ff4e4e] border-[#ff4e4e]/70 font-extrabold shadow-sm';
     }
     if (type === 'status') {
       return value === 'ASSIGNED' ? 'bg-[#4e8dff]/10 text-[#4e8dff] border-[#4e8dff]/20' : 'bg-[#ffae4e]/10 text-[#ffae4e] border-[#ffae4e]/20';
@@ -241,36 +245,46 @@ export const TransactionsTable: React.FC = () => {
 
         <div className="flex flex-col xl:flex-row gap-[12px] bg-[var(--bg-surface-1)] p-[12px] rounded-[12px] border border-[var(--border-strong)]">
           {/* Search */}
-          <div className="flex-1 relative border border-[var(--border)] rounded-[8px] bg-[var(--bg-surface-2)] focus-within:border-[var(--accent)] focus-within:ring-1 focus-within:ring-[var(--accent)]/20 transition-all shadow-inner">
-            <Search size={14} className="absolute left-[12px] top-1/2 -translate-y-1/2 text-[var(--text-tertiary)]" />
+          <div className="flex-1 relative border border-[var(--border)] rounded-[10px] bg-[var(--bg-surface-2)] focus-within:border-[var(--accent)] focus-within:ring-1 focus-within:ring-[var(--accent)]/20 transition-all shadow-sm hover:border-[var(--border-strong)]">
+            <Search size={16} className="absolute left-[14px] top-1/2 -translate-y-1/2 text-[var(--text-tertiary)]" />
             <input 
               type="text" 
-              placeholder="Buscar contraparte..." 
+              placeholder="Buscar por contraparte o N° de Orden..." 
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              className="w-full bg-transparent border-none text-[13px] text-[var(--text-primary)] py-[9px] pl-[36px] pr-[12px] outline-none placeholder:text-[var(--text-tertiary)]"
+              className="w-full bg-transparent border-none text-[13px] text-[var(--text-primary)] py-[10px] pl-[40px] pr-[12px] outline-none placeholder:text-[var(--text-tertiary)]"
             />
           </div>
 
-          <div className="flex items-center bg-[var(--bg-surface-2)] border border-[var(--border)] rounded-[8px] overflow-hidden focus-within:border-[var(--accent)] transition-all shadow-inner">
-             <div className="pl-[12px] pr-[6px] flex items-center text-[var(--text-tertiary)] pointer-events-none">
-                <Calendar size={14} />
+          {/* Date Filters */}
+          <div className="flex flex-col sm:flex-row items-center gap-[8px]">
+             <div className="w-full sm:w-auto relative flex items-center bg-[var(--bg-surface-2)] border border-[var(--border)] rounded-[10px] overflow-hidden hover:border-[var(--border-strong)] focus-within:border-[var(--accent)] focus-within:ring-1 focus-within:ring-[var(--accent)]/20 transition-all shadow-sm">
+                <div className="pl-[12px] flex items-center text-[var(--text-tertiary)] pointer-events-none">
+                   <Calendar size={14} className="text-[var(--accent)]" />
+                   <span className="ml-[6px] text-[10px] font-bold uppercase tracking-wider text-[var(--text-secondary)]">Desde</span>
+                </div>
+                <input 
+                  type="date" 
+                  value={dateFrom} 
+                  onChange={e => setDateFrom(e.target.value)} 
+                  onClick={e => { try { (e.target as HTMLInputElement).showPicker() } catch(e){} }}
+                  className="bg-transparent border-none text-[13px] pl-[6px] pr-[10px] py-[10px] text-[var(--text-primary)] outline-none cursor-pointer w-[125px] font-medium [&::-webkit-calendar-picker-indicator]:opacity-50 hover:[&::-webkit-calendar-picker-indicator]:opacity-100" 
+                />
              </div>
-             <input 
-               type="date" 
-               value={dateFrom} 
-               onChange={e => setDateFrom(e.target.value)} 
-               onClick={e => { try { (e.target as HTMLInputElement).showPicker() } catch(e){} }}
-               className="bg-transparent border-none text-[13px] px-[8px] py-[9px] text-[var(--text-secondary)] outline-none cursor-pointer hover:text-[var(--text-primary)] min-w-[120px] transition-colors" 
-             />
-             <div className="px-[8px] text-[var(--text-tertiary)] text-[10px] font-bold uppercase border-l border-r border-[var(--border)] flex items-center bg-[var(--bg-surface-3)]">A</div>
-             <input 
-               type="date" 
-               value={dateTo} 
-               onChange={e => setDateTo(e.target.value)} 
-               onClick={e => { try { (e.target as HTMLInputElement).showPicker() } catch(e){} }}
-               className="bg-transparent border-none text-[13px] px-[8px] py-[9px] text-[var(--text-secondary)] outline-none cursor-pointer hover:text-[var(--text-primary)] min-w-[120px] transition-colors" 
-             />
+             <span className="hidden sm:block text-[var(--text-tertiary)]">-</span>
+             <div className="w-full sm:w-auto relative flex items-center bg-[var(--bg-surface-2)] border border-[var(--border)] rounded-[10px] overflow-hidden hover:border-[var(--border-strong)] focus-within:border-[var(--accent)] focus-within:ring-1 focus-within:ring-[var(--accent)]/20 transition-all shadow-sm">
+                <div className="pl-[12px] flex items-center text-[var(--text-tertiary)] pointer-events-none">
+                   <Calendar size={14} className="text-[var(--accent)]" />
+                   <span className="ml-[6px] text-[10px] font-bold uppercase tracking-wider text-[var(--text-secondary)]">Hasta</span>
+                </div>
+                <input 
+                  type="date" 
+                  value={dateTo} 
+                  onChange={e => setDateTo(e.target.value)} 
+                  onClick={e => { try { (e.target as HTMLInputElement).showPicker() } catch(e){} }}
+                  className="bg-transparent border-none text-[13px] pl-[6px] pr-[10px] py-[10px] text-[var(--text-primary)] outline-none cursor-pointer w-[125px] font-medium [&::-webkit-calendar-picker-indicator]:opacity-50 hover:[&::-webkit-calendar-picker-indicator]:opacity-100" 
+                />
+             </div>
           </div>
 
           <div className="flex flex-col sm:flex-row gap-[12px]">
