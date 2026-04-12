@@ -12,7 +12,15 @@ import { generateUUID } from '../../crypto/auth';
 import { PenLine, Zap, Plus, ArrowUpRight, ArrowDownLeft } from 'lucide-react';
 import type { Cycle, Order } from '../../types';
 
-// ── Manual order form (for 'manual' cycle type) ──────────────────────────────
+const MAKER_FEES = {
+  standard: 0.0025, // 0.25%
+  bronze: 0.0020,   // 0.20%
+  silver: 0.00175,  // 0.175%
+  gold: 0.00125,    // 0.125%
+  zero: 0.0000,     // 0% Promo
+  manual: 'manual'  // Ingreso manual
+};
+
 const ManualOrderForm: React.FC<{
   cycleId: string;
   userId: string;
@@ -21,11 +29,30 @@ const ManualOrderForm: React.FC<{
   const [tradeType, setTradeType] = useState<'SELL' | 'BUY'>('SELL');
   const [amount, setAmount] = useState('');
   const [unitPrice, setUnitPrice] = useState('');
+  
+  // Comisión state
+  const [tier, setTier] = useState<number | 'manual'>(MAKER_FEES.standard);
   const [commission, setCommission] = useState('');
+  const [isCommissionManuallyEdited, setIsCommissionManuallyEdited] = useState(false);
+  
   const [notes, setNotes] = useState('');
   const [saving, setSaving] = useState(false);
 
   const totalPrice = (parseFloat(amount) || 0) * (parseFloat(unitPrice) || 0);
+
+  // Auto-calcular comisión cuando cambia monto o nivel, a menos que el usuario lo haya editado a mano
+  React.useEffect(() => {
+    if (tier !== 'manual' && !isCommissionManuallyEdited) {
+      const amt = parseFloat(amount) || 0;
+      if (amt > 0) {
+        // Redondear a 4 decimales
+        const calc = amt * (tier as number);
+        setCommission(calc.toFixed(4).replace(/\.?0+$/, '')); // trim zeros
+      } else {
+        setCommission('');
+      }
+    }
+  }, [amount, tier, isCommissionManuallyEdited]);
 
   const handleSave = async () => {
     const amountN = parseFloat(amount);
@@ -72,6 +99,7 @@ const ManualOrderForm: React.FC<{
       setAmount('');
       setUnitPrice('');
       setCommission('');
+      setIsCommissionManuallyEdited(false);
       setNotes('');
       onOrderSaved();
     } catch (err: any) {
@@ -82,58 +110,62 @@ const ManualOrderForm: React.FC<{
   };
 
   return (
-    <div className="bg-[var(--bg-surface-3)] border border-[rgba(124,58,237,0.25)] rounded-[14px] p-[16px] flex flex-col gap-[14px]">
-      {/* Header */}
-      <div className="flex items-center gap-[8px]">
-        <PenLine size={14} className="text-[#a78bfa]" />
-        <span className="text-[12px] font-bold text-[#a78bfa] uppercase tracking-wider">Registrar Orden Manual</span>
+    <div className="bg-[var(--bg-surface-3)] border border-[rgba(124,58,237,0.25)] rounded-[10px] p-[16px] flex flex-col gap-[12px] shadow-sm">
+      {/* Header compact */}
+      <div className="flex items-center gap-[8px] mb-[4px]">
+        <PenLine size={12} className="text-[#a78bfa]" />
+        <span className="text-[11px] font-bold text-[#a78bfa] uppercase tracking-wider">Registrar Orden Manual</span>
       </div>
 
-      {/* Trade type toggle */}
-      <div className="flex bg-[var(--bg-surface-2)] p-[4px] rounded-[10px] border border-[var(--border-strong)] gap-[4px]">
+      {/* Trade type toggle (Compacto) */}
+      <div className="flex bg-[var(--bg-surface-2)] p-[3px] rounded-[8px] border border-[var(--border-strong)] gap-[2px] max-w-[280px]">
         <button
           onClick={() => setTradeType('SELL')}
-          className={`flex-1 flex items-center justify-center gap-[6px] py-[8px] rounded-[8px] text-[13px] font-semibold transition-all ${
+          className={`flex-1 flex items-center justify-center gap-[4px] py-[6px] rounded-[6px] text-[12px] font-bold transition-all ${
             tradeType === 'SELL'
-              ? 'bg-[var(--loss-bg)] text-[var(--loss)] border border-[rgba(255,76,106,0.3)] shadow-sm'
+              ? 'bg-[var(--loss-bg)] text-[var(--loss)] shadow-sm'
               : 'text-[var(--text-tertiary)] hover:text-[var(--text-secondary)]'
           }`}
         >
-          <ArrowUpRight size={14} />
-          Venta USDT
+          <ArrowUpRight size={13} />
+          Venta
         </button>
         <button
           onClick={() => setTradeType('BUY')}
-          className={`flex-1 flex items-center justify-center gap-[6px] py-[8px] rounded-[8px] text-[13px] font-semibold transition-all ${
+          className={`flex-1 flex items-center justify-center gap-[4px] py-[6px] rounded-[6px] text-[12px] font-bold transition-all ${
             tradeType === 'BUY'
-              ? 'bg-[var(--profit-bg)] text-[var(--profit)] border border-[rgba(0,229,195,0.3)] shadow-sm'
+              ? 'bg-[var(--profit-bg)] text-[var(--profit)] shadow-sm'
               : 'text-[var(--text-tertiary)] hover:text-[var(--text-secondary)]'
           }`}
         >
-          <ArrowDownLeft size={14} />
-          Compra USDT
+          <ArrowDownLeft size={13} />
+          Compra
         </button>
       </div>
 
-      {/* Fields row 1 */}
-      <div className="grid grid-cols-2 gap-[10px]">
-        <div className="flex flex-col gap-[5px]">
-          <label className="text-[10px] font-semibold text-[var(--text-tertiary)] uppercase tracking-wider">
-            Cantidad USDT *
+      {/* Fields */}
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-[10px] mt-[4px]">
+        
+        {/* Monto */}
+        <div className="flex flex-col gap-[4px]">
+          <label className="text-[9px] font-bold text-[var(--text-tertiary)] uppercase tracking-wider">
+            Cant. USDT *
           </label>
           <input
             type="number"
             min="0"
             step="any"
-            placeholder="Ej: 150.00"
+            placeholder="Ej: 150"
             value={amount}
             onChange={e => setAmount(e.target.value)}
-            className="bg-[var(--bg-surface-2)] border border-[var(--border-strong)] rounded-[10px] px-[12px] py-[9px] text-[13px] font-mono text-[var(--text-primary)] outline-none focus:border-[#7c3aed] transition-colors"
+            className="w-full bg-[var(--bg-surface-2)] border border-[var(--border-strong)] rounded-[8px] px-[10px] py-[7px] text-[12px] font-mono text-[var(--text-primary)] outline-none focus:border-[#7c3aed] transition-colors"
           />
         </div>
-        <div className="flex flex-col gap-[5px]">
-          <label className="text-[10px] font-semibold text-[var(--text-tertiary)] uppercase tracking-wider">
-            Precio (Bs/USDT) *
+
+        {/* Precio */}
+        <div className="flex flex-col gap-[4px]">
+          <label className="text-[9px] font-bold text-[var(--text-tertiary)] uppercase tracking-wider">
+            Precio (Bs) *
           </label>
           <input
             type="number"
@@ -142,64 +174,93 @@ const ManualOrderForm: React.FC<{
             placeholder="Ej: 65.50"
             value={unitPrice}
             onChange={e => setUnitPrice(e.target.value)}
-            className="bg-[var(--bg-surface-2)] border border-[var(--border-strong)] rounded-[10px] px-[12px] py-[9px] text-[13px] font-mono text-[var(--text-primary)] outline-none focus:border-[#7c3aed] transition-colors"
+            className="w-full bg-[var(--bg-surface-2)] border border-[var(--border-strong)] rounded-[8px] px-[10px] py-[7px] text-[12px] font-mono text-[var(--text-primary)] outline-none focus:border-[#7c3aed] transition-colors"
           />
         </div>
-      </div>
 
-      {/* Fields row 2 */}
-      <div className="grid grid-cols-2 gap-[10px]">
-        <div className="flex flex-col gap-[5px]">
-          <label className="text-[10px] font-semibold text-[var(--text-tertiary)] uppercase tracking-wider">
-            Comisión (USDT)
-          </label>
-          <input
-            type="number"
-            min="0"
-            step="any"
-            placeholder="Ej: 0.50"
-            value={commission}
-            onChange={e => setCommission(e.target.value)}
-            className="bg-[var(--bg-surface-2)] border border-[var(--border-strong)] rounded-[10px] px-[12px] py-[9px] text-[13px] font-mono text-[var(--text-primary)] outline-none focus:border-[#7c3aed] transition-colors"
-          />
+        {/* Comisión auto/manual */}
+        <div className="flex flex-col gap-[4px]">
+          <div className="flex items-center justify-between">
+            <label className="text-[9px] font-bold text-[var(--text-tertiary)] uppercase tracking-wider">
+              Comisión (USDT)
+            </label>
+          </div>
+          <div className="relative">
+            <input
+              type="number"
+              min="0"
+              step="any"
+              placeholder="Ej: 0.50"
+              value={commission}
+              onChange={e => {
+                setCommission(e.target.value);
+                setIsCommissionManuallyEdited(true);
+                setTier('manual');
+              }}
+              className="w-full bg-[var(--bg-surface-2)] border border-[var(--border-strong)] rounded-[8px] px-[10px] py-[7px] pb-[16px] text-[12px] font-mono text-[var(--text-primary)] outline-none focus:border-[#7c3aed] transition-colors"
+            />
+            {/* Tiny selector inside input area for tier */}
+            <select 
+              className="absolute bottom-[2px] left-0 w-full px-[8px] bg-transparent text-[8.5px] font-bold text-[#a78bfa] outline-none cursor-pointer text-ellipsis overflow-hidden"
+              value={tier}
+              onChange={(e) => {
+                const val = e.target.value;
+                setTier(val === 'manual' ? 'manual' : parseFloat(val));
+                if (val !== 'manual') setIsCommissionManuallyEdited(false);
+              }}
+            >
+              <option value={MAKER_FEES.standard} className="bg-[var(--bg-surface-2)]">Binance Normal (0.25%)</option>
+              <option value={MAKER_FEES.bronze} className="bg-[var(--bg-surface-2)]">🛡️ Bronce (0.20%)</option>
+              <option value={MAKER_FEES.silver} className="bg-[var(--bg-surface-2)]">⚔️ Plata (0.175%)</option>
+              <option value={MAKER_FEES.gold} className="bg-[var(--bg-surface-2)]">👑 Oro (0.125%)</option>
+              <option value={MAKER_FEES.zero} className="bg-[var(--bg-surface-2)]">🎉 Promo (0%)</option>
+              <option value="manual" className="bg-[var(--bg-surface-2)]">✍️ Ingreso Manual</option>
+            </select>
+          </div>
         </div>
-        <div className="flex flex-col gap-[5px]">
-          <label className="text-[10px] font-semibold text-[var(--text-tertiary)] uppercase tracking-wider">
-            Nota / Exchange
+
+        {/* Notas */}
+        <div className="flex flex-col gap-[4px]">
+          <label className="text-[9px] font-bold text-[var(--text-tertiary)] uppercase tracking-wider">
+            Exchange
           </label>
           <input
             type="text"
-            placeholder="Ej: Bybit, OKX..."
+            placeholder="Ej: Bybit / OKX"
             value={notes}
             onChange={e => setNotes(e.target.value)}
-            className="bg-[var(--bg-surface-2)] border border-[var(--border-strong)] rounded-[10px] px-[12px] py-[9px] text-[13px] text-[var(--text-primary)] outline-none focus:border-[#7c3aed] transition-colors"
+            className="w-full bg-[var(--bg-surface-2)] border border-[var(--border-strong)] rounded-[8px] px-[10px] py-[7px] text-[12px] text-[var(--text-primary)] outline-none focus:border-[#7c3aed] transition-colors"
           />
         </div>
+
       </div>
 
-      {/* Total preview */}
-      {totalPrice > 0 && (
-        <div className="flex items-center justify-between bg-[var(--bg-surface-2)] rounded-[10px] px-[14px] py-[8px] border border-[var(--border)]">
-          <span className="text-[12px] text-[var(--text-secondary)]">Total a recibir/pagar:</span>
-          <span className="font-mono font-bold text-[14px] text-[var(--text-primary)]">
-            Bs. {totalPrice.toFixed(2)}
-          </span>
+      {/* Footer Row: Total + Button */}
+      <div className="flex items-center justify-between mt-[6px] gap-[16px] pt-[8px] border-t border-[var(--border)]">
+        <div className="flex flex-col">
+          <span className="text-[10px] text-[var(--text-secondary)] font-medium">Total a operar:</span>
+          {totalPrice > 0 ? (
+            <span className="font-mono font-bold text-[13px] text-[var(--text-primary)]">
+              Bs. {totalPrice.toFixed(2)}
+            </span>
+          ) : (
+             <span className="text-[13px] text-[var(--text-tertiary)]">-</span>
+          )}
         </div>
-      )}
 
-      {/* Save */}
-      <button
-        onClick={handleSave}
-        disabled={saving}
-        className="w-full flex items-center justify-center gap-[8px] py-[11px] rounded-[10px] bg-[#7c3aed] hover:bg-[#6d28d9] text-white font-bold text-[13px] transition-colors disabled:opacity-60 shadow-[0_4px_16px_rgba(124,58,237,0.25)]"
-      >
-        {saving ? (
-          <span className="animate-spin w-[14px] h-[14px] border-2 border-white border-t-transparent rounded-full inline-block" />
-        ) : (
-          <Plus size={15} />
-        )}
-        {saving ? 'Guardando...' : `Registrar ${tradeType === 'SELL' ? 'Venta' : 'Compra'}`}
-      </button>
+        <button
+          onClick={handleSave}
+          disabled={saving}
+          className="flex items-center justify-center gap-[6px] px-[24px] py-[8px] rounded-[8px] bg-[#7c3aed] hover:bg-[#6d28d9] text-white font-bold text-[12px] transition-all disabled:opacity-60 shadow-[0_2px_10px_rgba(124,58,237,0.2)]"
+        >
+          {saving ? (
+            <span className="animate-spin w-[13px] h-[13px] border-[1.5px] border-white border-t-transparent rounded-full inline-block" />
+          ) : (
+            <Plus size={13} />
+          )}
+          {saving ? 'Guardando' : `Registrar ${tradeType === 'SELL' ? 'Venta' : 'Compra'}`}
+        </button>
+      </div>
     </div>
   );
 };
