@@ -101,7 +101,7 @@ export const CycleCalendar: React.FC<CycleCalendarProps> = ({ cycles, onDateSele
 
     return (
       <div className="fixed inset-0 bg-transparent flex items-center justify-center z-[100] p-[16px] md:p-[32px] animate-fade-in-up" onClick={closeDetailsModal}>
-        <div className="bg-[var(--bg-surface-1)] rounded-[20px] border border-[var(--border-strong)] max-w-[600px] w-full max-h-[90vh] overflow-hidden flex flex-col shadow-[0_20px_60px_-15px_rgba(0,0,0,0.5)]" onClick={e => e.stopPropagation()}>
+        <div className="bg-[var(--bg-surface-1)] rounded-[20px] border border-[var(--border-strong)] max-w-[600px] w-full max-h-[85vh] overflow-hidden flex flex-col shadow-[0_20px_60px_-15px_rgba(0,0,0,0.5)]" onClick={e => e.stopPropagation()}>
           
           {/* Header */}
           <div className="p-[24px] border-b border-[var(--border)] relative bg-[var(--bg-surface-2)] shrink-0">
@@ -129,7 +129,7 @@ export const CycleCalendar: React.FC<CycleCalendarProps> = ({ cycles, onDateSele
           </div>
 
           {/* List Area */}
-          <div className="p-[20px] overflow-y-auto custom-scrollbar bg-[var(--bg-surface-1)] relative flex-1">
+          <div className="p-[20px] overflow-y-auto custom-scrollbar bg-[var(--bg-surface-1)] relative flex-1 min-h-0">
             <h4 className="text-[13px] font-bold text-[var(--text-secondary)] mb-[12px] flex items-center gap-[8px]">
               <ListFilter size={14} /> Operaciones del Día
             </h4>
