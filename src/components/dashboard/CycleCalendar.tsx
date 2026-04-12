@@ -34,6 +34,7 @@ export const CycleCalendar: React.FC<CycleCalendarProps> = ({ cycles, onDateSele
   const { orders } = useAppStore();
   const [year, setYear] = useState(new Date().getFullYear());
   const [detailsDate, setDetailsDate] = useState<string | null>(null);
+  const [expandedOrderId, setExpandedOrderId] = useState<string | null>(null);
 
   // Keyboard escape handler for modal
   useEffect(() => {
@@ -84,9 +85,12 @@ export const CycleCalendar: React.FC<CycleCalendarProps> = ({ cycles, onDateSele
   const today = new Date();
   const todayKey = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
 
-  const DayDetailsModal = () => {
-    const [expandedOrderId, setExpandedOrderId] = useState<string | null>(null);
+  const closeDetailsModal = () => {
+    setDetailsDate(null);
+    setExpandedOrderId(null);
+  };
 
+  const renderDayDetailsModal = () => {
     if (!detailsDate) return null;
     const info = dayMap[detailsDate];
     if (!info) return null;
@@ -96,12 +100,12 @@ export const CycleCalendar: React.FC<CycleCalendarProps> = ({ cycles, onDateSele
     const displayDate = dateObj.toLocaleDateString('es-VE', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' });
 
     return (
-      <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-[100] p-[16px] md:p-[32px] animate-fade-in-up" onClick={() => setDetailsDate(null)}>
+      <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-[100] p-[16px] md:p-[32px] animate-fade-in-up" onClick={closeDetailsModal}>
         <div className="bg-[var(--bg-surface-1)] rounded-[20px] border border-[var(--border)] max-w-[600px] w-full max-h-[90vh] overflow-hidden flex flex-col shadow-2xl" onClick={e => e.stopPropagation()}>
           
           {/* Header */}
           <div className="p-[24px] border-b border-[var(--border)] relative bg-[var(--bg-surface-2)]">
-            <button onClick={() => setDetailsDate(null)} className="absolute top-[20px] right-[20px] p-[8px] rounded-[8px] hover:bg-[var(--bg-surface-3)] text-[var(--text-tertiary)] hover:text-[var(--text-primary)] transition-colors">
+            <button onClick={closeDetailsModal} className="absolute top-[20px] right-[20px] p-[8px] rounded-[8px] hover:bg-[var(--bg-surface-3)] text-[var(--text-tertiary)] hover:text-[var(--text-primary)] transition-colors">
               <X size={18} />
             </button>
             <h3 className="text-[18px] font-bold text-[var(--text-primary)] capitalize">{displayDate}</h3>
@@ -155,7 +159,7 @@ export const CycleCalendar: React.FC<CycleCalendarProps> = ({ cycles, onDateSele
                       </div>
                     </button>
                     {expandedOrderId === o.id && (
-                      <div className="p-[12px] pt-[4px] border-t border-[var(--border)] bg-[var(--bg-surface-3)] shadow-inner animate-fade-in-up">
+                      <div className="p-[12px] pt-[4px] border-t border-[var(--border)] bg-[var(--bg-surface-2)] animate-fade-in-up">
                         <div className="grid grid-cols-2 gap-y-[12px] gap-x-[8px] mt-[4px]">
                           <div className="flex flex-col">
                             <span className="text-[10px] text-[var(--text-tertiary)] uppercase font-semibold tracking-wider">N° Orden</span>
@@ -300,7 +304,7 @@ export const CycleCalendar: React.FC<CycleCalendarProps> = ({ cycles, onDateSele
         </div>
       </div>
       
-      <DayDetailsModal />
+      {renderDayDetailsModal()}
     </>
   );
 };
