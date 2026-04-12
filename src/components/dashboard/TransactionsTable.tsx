@@ -198,6 +198,17 @@ export const TransactionsTable: React.FC = () => {
       theme: 'grid',
       styles: { fontSize: 8 },
       headStyles: { fillColor: [0, 229, 195], textColor: 0 }, // Using primary accent color
+      didParseCell: (data) => {
+        if (data.section === 'body' && data.column.index === 3) { // 'Tipo' Column
+          if (data.cell.raw === 'BUY') {
+            data.cell.styles.textColor = [0, 200, 150]; // Greenish
+            data.cell.styles.fontStyle = 'bold';
+          } else if (data.cell.raw === 'SELL') {
+            data.cell.styles.textColor = [255, 78, 78]; // Reddish
+            data.cell.styles.fontStyle = 'bold';
+          }
+        }
+      }
     });
 
     doc.save(`orders_export_${new Date().getTime()}.pdf`);
@@ -335,9 +346,9 @@ export const TransactionsTable: React.FC = () => {
                       {o.orderNumber || 'N/A'}
                     </td>
                     <td className="py-[10px] px-[16px]">
-                      <Badge variant="neutral" className={`border text-[10px] uppercase font-bold py-[2px] px-[6px] ${getBadgeStyle('type', o.tradeType)}`}>
+                      <span className={`inline-block border text-[10px] uppercase font-bold py-[2px] px-[8px] rounded-[6px] ${getBadgeStyle('type', o.tradeType)}`}>
                         {o.tradeType}
-                      </Badge>
+                      </span>
                     </td>
                     <td className="py-[10px] px-[16px] font-mono text-[var(--text-secondary)]">
                       {o.unitPrice.toFixed(2)}
