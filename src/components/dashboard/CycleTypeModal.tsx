@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { createPortal } from 'react-dom';
 import { Activity, PenLine, X, Zap, ChevronRight } from 'lucide-react';
 
 type CycleType = 'p2p' | 'manual';
@@ -21,9 +22,9 @@ export const CycleTypeModal: React.FC<CycleTypeModalProps> = ({
 
   if (!isOpen) return null;
 
-  return (
+  return createPortal(
     <div
-      className="fixed inset-0 z-[200] flex items-end sm:items-center justify-center p-0 sm:p-4"
+      className="fixed inset-0 z-[99999] flex items-end sm:items-center justify-center p-0 sm:p-4"
       style={{ background: 'rgba(2,11,22,0.82)', backdropFilter: 'blur(8px)' }}
       onClick={onClose}
     >
@@ -172,6 +173,7 @@ export const CycleTypeModal: React.FC<CycleTypeModalProps> = ({
           </button>
         </div>
       </div>
-    </div>
+    </div>,
+    document.body
   );
 };
