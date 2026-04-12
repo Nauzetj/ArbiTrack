@@ -7,7 +7,7 @@ import { saveOrder, recalculateCycleMetrics, getCyclesForUser, getOrdersForUser 
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 
-type SortField = 'createTime_local' | 'counterPartNickName' | 'tradeType' | 'unitPrice' | 'totalPrice' | 'amount' | 'cycleId';
+type SortField = 'createTime_local' | 'counterPartNickName' | 'orderNumber' | 'tradeType' | 'unitPrice' | 'totalPrice' | 'amount' | 'cycleId';
 type SortDirection = 'asc' | 'desc' | null;
 
 /** Registros por página — evita renders lentos con catálogos grandes */
@@ -179,10 +179,11 @@ export const TransactionsTable: React.FC = () => {
     doc.setTextColor(100);
     doc.text(`Generado el: ${new Date().toLocaleString()}`, 14, 28);
     
-    const tableColumn = ["Fecha", "Nombre", "Tipo", "Tasa", "Precio (Bs)", "Monto (USDT)", "Estado"];
+    const tableColumn = ["Fecha", "Nombre", "N° Orden", "Tipo", "Tasa", "Precio (Bs)", "Monto (USDT)", "Estado"];
     const tableRows = sortedOrders.map(o => [
       new Date(o.createTime_utc).toLocaleString([], { dateStyle: 'short', timeStyle: 'short' }),
       o.counterPartNickName,
+      o.orderNumber || 'N/A',
       o.tradeType,
       o.unitPrice.toFixed(2),
       o.totalPrice.toFixed(2),
@@ -308,6 +309,7 @@ export const TransactionsTable: React.FC = () => {
             <tr>
               <th className="py-[12px] px-[16px] font-medium cursor-pointer hover:text-[var(--accent)] transition-colors" onClick={() => handleSort('createTime_local')}>Fecha <SortIcon field="createTime_local" /></th>
               <th className="py-[12px] px-[16px] font-medium cursor-pointer hover:text-[var(--accent)] transition-colors" onClick={() => handleSort('counterPartNickName')}>Nombre <SortIcon field="counterPartNickName" /></th>
+              <th className="py-[12px] px-[16px] font-medium cursor-pointer hover:text-[var(--accent)] transition-colors" onClick={() => handleSort('orderNumber')}>N° Orden <SortIcon field="orderNumber" /></th>
               <th className="py-[12px] px-[16px] font-medium cursor-pointer hover:text-[var(--accent)] transition-colors" onClick={() => handleSort('tradeType')}>Tipo <SortIcon field="tradeType" /></th>
               <th className="py-[12px] px-[16px] font-medium cursor-pointer hover:text-[var(--accent)] transition-colors" onClick={() => handleSort('unitPrice')}>Tasa <SortIcon field="unitPrice" /></th>
               <th className="py-[12px] px-[16px] font-medium cursor-pointer hover:text-[var(--accent)] transition-colors" onClick={() => handleSort('totalPrice')}>Precio (Bs) <SortIcon field="totalPrice" /></th>
@@ -328,6 +330,9 @@ export const TransactionsTable: React.FC = () => {
                     </td>
                     <td className="py-[10px] px-[16px] text-[var(--text-primary)] font-medium">
                       {o.counterPartNickName}
+                    </td>
+                    <td className="py-[10px] px-[16px] text-[var(--text-secondary)] font-mono text-[10px] break-all max-w-[140px]">
+                      {o.orderNumber || 'N/A'}
                     </td>
                     <td className="py-[10px] px-[16px]">
                       <Badge variant="neutral" className={`border text-[10px] uppercase font-bold py-[2px] px-[6px] ${getBadgeStyle('type', o.tradeType)}`}>
