@@ -123,36 +123,59 @@ function App() {
       }
     };
 
-    // Sesión inicial rápida
-    supabase.auth.getSession().then(async ({ data: { session } }) => {
-      clearTimeout(rescueTimeout);
-      clearTimeout(recoveryUiTid);
-      if (session) {
-        setSession(session);
-        await loadProfile(session);
-      }
-      setAuthStatus('ready');
-    }).catch(err => {
-      console.warn('getSession err:', err);
-      setAuthStatus('ready');
-    });
+    let isResolved = false;
 
-    // Cambios de sesión y fallback principal (asegura detectar claves caídas)
-    const {
-      data: { subscription },
-    } = supabase.auth.onAuthStateChange(async (_event, session) => {
+    const resolveAuth = () => {
+      if (isResolved) return;
+      isResolved = true;
+      setAuthStatus('ready');
       clearTimeout(rescueTimeout);
       clearTimeout(recoveryUiTid);
-      
+    };
+
+    const handleSession = async (session: Session | null) => {
       setSession(session);
       if (session) {
-        // En lugar de doble-fetch, solo cargamos si no hay currentUser
-        // o si es un refresh crítico
-        await loadProfile(session);
+        // Encerramos en try/catch y le damos un límite de tiempo si falla para no colgar la UI
+        try {
+          await Promise.race([
+            loadProfile(session),
+            new Promise((_, reject) => setTimeout(() => reject(new Error('timeout')), 5000))
+          ]);
+        } catch (e) {
+          console.warn('Fallback profile used due to load delay', e);
+          setCurrentUser(buildFallbackProfile(session));
+        }
       } else {
         setCurrentUser(null);
       }
-      setAuthStatus('ready');
+      resolveAuth();
+    };
+
+    // 1. Obtener la sesión inicial de forma segura
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      handleSession(session);
+    }).catch(err => {
+      console.warn('Fallo getSession', err);
+      resolveAuth();
+    });
+
+    // 2. Escuchar cambios, pero sin bloquear el resolve inicial si ya pasó
+    const {
+      data: { subscription },
+    } = supabase.auth.onAuthStateChange(async (_event, session) => {
+      // Si onAuthStateChange dispara un cambio tras resolver, mutar silenciosamente
+      if (isResolved) {
+        setSession(session);
+        if (session) {
+          await loadProfile(session);
+        } else {
+          setCurrentUser(null);
+        }
+      } else {
+        // Si no, lo usamos como resolvador primario
+        handleSession(session);
+      }
     });
 
     return () => {
