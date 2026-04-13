@@ -847,47 +847,55 @@ const OpsTable: React.FC<{
 
 // ─── Metrics Bar ──────────────────────────────────────────────────────────────
 
-const MetricsBar: React.FC<{ activeCycle: Cycle; orders?: Order[] }> = ({ activeCycle }) => {
-  // Arbitrage Model (Venta-Primero estricto):
-  // Capital invertido = Liquidez obtenida al vender USDT (Bs ingresados)
-  // Recomprado = USDT recuperado con esa misma liquidez (Bs pagados)
-  
-  const col1Label = 'Capital / Liquidez (VES)';
-  const col1Main  = `Bs. ${fmt(activeCycle.ves_recibido)}`;
-  const col1Sub   = `$ ${fmt(activeCycle.usdt_vendido, 4)} USDT vendidos`;
+const MetricsBar: React.FC<{ activeCycle?: Cycle; orders: Order[] }> = ({ orders }) => {
+  // ── Recalculate LIVE from orders — never trust stale DB value ──
+  let usdt_vendido    = 0;
+  let usdt_recomprado = 0;
+  let ves_recibido    = 0;
+  let ves_pagado      = 0;
+  let comision_total  = 0;
+  orders.forEach(o => {
+    const opType = o.operationType ?? (o.tradeType === 'SELL' ? 'VENTA_USDT' : 'COMPRA_USDT');
+    comision_total += o.commission ?? 0;
+    switch (opType) {
+      case 'VENTA_USDT':  usdt_vendido    += o.amount;     ves_recibido += o.totalPrice; break;
+      case 'COMPRA_USDT': usdt_recomprado += o.amount;     ves_pagado   += o.totalPrice; break;
+      case 'RECOMPRA':    usdt_recomprado += o.amount;     ves_pagado   += o.totalPrice; ves_recibido += o.totalPrice; break;
+      case 'COMPRA_USD':  ves_pagado      += o.totalPrice; break;
+      case 'SOBRANTE':    ves_recibido    += o.totalPrice; break;
+    }
+  });
+  const tasa_venta_prom  = usdt_vendido    > 0 ? ves_recibido / usdt_vendido    : 0;
+  const tasa_compra_prom = usdt_recomprado > 0 ? ves_pagado   / usdt_recomprado : 0;
+  const diferencial_tasa = tasa_venta_prom > 0 && tasa_compra_prom > 0 ? tasa_venta_prom - tasa_compra_prom : 0;
+  const matched_vol      = Math.min(usdt_vendido, usdt_recomprado);
+  const ganancia_ves     = matched_vol * diferencial_tasa;
+  const ganancia_usdt    = tasa_compra_prom > 0 ? (ganancia_ves / tasa_compra_prom) - comision_total : -comision_total;
 
-  const col2Label = 'USDT Recomprado';
-  const col2Main  = `$ ${fmt(activeCycle.usdt_recomprado, 4)} USDT`;
-  const col2Sub   = `Bs. ${fmt(activeCycle.ves_pagado)} costo recom.`;
+  const liquidezDisponible = ves_recibido - ves_pagado;
+  const pct_recomprado     = usdt_vendido > 0 ? Math.min((usdt_recomprado / usdt_vendido) * 100, 100) : 0;
+  const usdt_faltante      = Math.max(usdt_vendido - usdt_recomprado, 0);
 
-  const ganVes   = activeCycle.ganancia_ves;
-  const ganUsdt  = activeCycle.ganancia_usdt;
-  const comUsdt  = activeCycle.comision_total;
-
-  const isPos     = ganVes > 0;
-  const isNeutral = Math.abs(ganVes) < 0.01;
-  const ganColor  = isNeutral
-    ? 'text-[var(--text-secondary)]'
-    : isPos ? 'text-[var(--profit)]' : 'text-[var(--loss)]';
-
+  const isPos     = ganancia_usdt > 0;
+  const isNeutral = usdt_recomprado === 0 || Math.abs(ganancia_usdt) < 0.001;
+  const ganColor  = isNeutral ? 'text-[var(--text-secondary)]' : isPos ? 'text-[var(--profit)]' : 'text-[var(--loss)]';
   const sign = (n: number) => (n >= 0 ? '+' : '');
 
-  const liquidezDisponible = activeCycle.ves_recibido - activeCycle.ves_pagado;
-
   return (
-    <div className="grid grid-cols-2 lg:grid-cols-5 gap-[12px]">
+    <div className="flex flex-col gap-[12px]">
+      <div className="grid grid-cols-2 lg:grid-cols-5 gap-[12px]">
       {/* Col 1 */}
       <div className="cycle-stat-group bg-[var(--bg-surface-3)] border border-[var(--border)] rounded-[12px] p-[14px] flex flex-col gap-[4px]">
-        <span className="text-[10px] font-bold text-[var(--text-tertiary)] uppercase tracking-[1px]">{col1Label}</span>
-        <span className="font-mono font-bold text-[15px] text-[var(--text-primary)]">{col1Main}</span>
-        <span className="font-mono text-[11px] text-[var(--text-secondary)] mt-[2px]">{col1Sub}</span>
+        <span className="text-[10px] font-bold text-[var(--text-tertiary)] uppercase tracking-[1px]">Capital / Liquidez (VES)</span>
+        <span className="font-mono font-bold text-[15px] text-[var(--text-primary)]">Bs. {fmt(ves_recibido)}</span>
+        <span className="font-mono text-[11px] text-[var(--text-secondary)] mt-[2px]">$ {fmt(usdt_vendido, 4)} USDT vendidos</span>
       </div>
 
       {/* Col 2 */}
       <div className="cycle-stat-group bg-[var(--bg-surface-3)] border border-[var(--border)] rounded-[12px] p-[14px] flex flex-col gap-[4px]">
-        <span className="text-[10px] font-bold text-[var(--text-tertiary)] uppercase tracking-[1px]">{col2Label}</span>
-        <span className="font-mono font-bold text-[15px] text-[var(--profit)]">{col2Main}</span>
-        <span className="font-mono text-[11px] text-[var(--text-secondary)] mt-[2px]">{col2Sub}</span>
+        <span className="text-[10px] font-bold text-[var(--text-tertiary)] uppercase tracking-[1px]">USDT Recomprado</span>
+        <span className="font-mono font-bold text-[15px] text-[var(--profit)]">$ {fmt(usdt_recomprado, 4)} USDT</span>
+        <span className="font-mono text-[11px] text-[var(--text-secondary)] mt-[2px]">Bs. {fmt(ves_pagado)} costo recom.</span>
       </div>
 
       {/* Liquidez Restante */}
@@ -904,38 +912,69 @@ const MetricsBar: React.FC<{ activeCycle: Cycle; orders?: Order[] }> = ({ active
       {/* Comisiones */}
       <div className="cycle-stat-group bg-[var(--bg-surface-3)] border border-[var(--border)] rounded-[12px] p-[14px] flex flex-col gap-[4px]">
         <span className="text-[10px] font-bold text-[var(--text-tertiary)] uppercase tracking-[1px]">Total Comisiones</span>
-        <span className="font-mono font-bold text-[15px] text-[var(--warning)]">{fmt(comUsdt, 2)} USDT</span>
+        <span className="font-mono font-bold text-[15px] text-[var(--warning)]">{fmt(comision_total, 2)} USDT</span>
         <span className="font-mono text-[11px] text-[var(--text-secondary)] mt-[2px]">
-          ≈ Bs. {fmt(comUsdt * (activeCycle.tasa_compra_prom || activeCycle.tasa_venta_prom || 1))}
+          ≈ Bs. {fmt(comision_total * (tasa_compra_prom || tasa_venta_prom || 1))}
         </span>
       </div>
 
       {/* Ganancia Neta */}
       <div className="cycle-stat-group bg-[var(--bg-surface-3)] border border-[var(--border)] rounded-[12px] p-[14px] flex flex-col gap-[4px] relative overflow-hidden">
-        {!isNeutral && activeCycle.usdt_recomprado > 0 && (
+        {!isNeutral && usdt_recomprado > 0 && (
           <div className={`absolute top-0 right-0 w-[40px] h-[40px] opacity-10 rounded-bl-full ${isPos ? 'bg-[var(--profit)]' : 'bg-[var(--loss)]'}`} />
         )}
         <span className="text-[10px] font-bold text-[var(--text-tertiary)] uppercase tracking-[1px] flex gap-1 items-center">
-          Ganancia Neta 
-          {activeCycle.usdt_recomprado > 0 && activeCycle.usdt_recomprado < activeCycle.usdt_vendido && (
+          Ganancia Neta
+          {usdt_recomprado > 0 && usdt_recomprado < usdt_vendido && (
              <span className="text-[9px] bg-[var(--bg-surface-1)] px-1 rounded normal-case tracking-normal">(Parcial)</span>
           )}
         </span>
-        
-        {activeCycle.usdt_recomprado === 0 ? (
+
+        {usdt_recomprado === 0 ? (
           <span className="font-mono font-bold text-[13px] text-[var(--text-tertiary)] mt-[4px]">Esperando compras...</span>
         ) : (
           <>
             <span className={`font-mono font-bold text-[15px] ${ganColor} flex items-center gap-[6px]`}>
-              {sign(ganUsdt)}{fmt(Math.abs(ganUsdt), 2)} USDT
+              {sign(ganancia_usdt)}{fmt(Math.abs(ganancia_usdt), 2)} USDT
               {!isNeutral && <span className="text-[11px]">{isPos ? '▲' : '▼'}</span>}
             </span>
             <span className={`font-mono text-[11px] mt-[2px] opacity-80 ${ganColor}`}>
-              ≈ {sign(ganVes)}Bs. {fmt(Math.abs(ganVes))}
+              ≈ {sign(ganancia_ves)}Bs. {fmt(Math.abs(ganancia_ves))}
             </span>
           </>
         )}
       </div>
+      </div>
+
+      {/* ── Barra de progreso de recompra ── */}
+      {usdt_vendido > 0 && (
+        <div className="bg-[var(--bg-surface-3)] border border-[var(--border)] rounded-[12px] p-[14px] flex flex-col gap-[8px]">
+          <div className="flex items-center justify-between">
+            <span className="text-[10px] font-bold text-[var(--text-tertiary)] uppercase tracking-[1px]">Progreso de Recompra</span>
+            <div className="flex items-center gap-[12px]">
+              <span className="font-mono text-[11px] text-[var(--text-secondary)]">{fmt(usdt_recomprado, 2)} / {fmt(usdt_vendido, 2)} USDT</span>
+              <span className={`font-mono text-[12px] font-bold ${pct_recomprado >= 100 ? 'text-[var(--profit)]' : 'text-[var(--accent)]'}`}>{pct_recomprado.toFixed(1)}%</span>
+            </div>
+          </div>
+          <div className="w-full h-[8px] bg-[var(--bg-surface-1)] rounded-full overflow-hidden">
+            <div
+              className="h-full rounded-full transition-all duration-500"
+              style={{
+                width: `${pct_recomprado}%`,
+                background: pct_recomprado >= 100 ? 'var(--profit)' : 'linear-gradient(90deg,#6366f1,#34d399)',
+              }}
+            />
+          </div>
+          <div className="flex items-center justify-between">
+            <span className="font-mono text-[10px] text-[var(--text-tertiary)">Bs. {fmt(ves_pagado)} gastados</span>
+            {usdt_faltante > 0 ? (
+              <span className="font-mono text-[10px] text-[var(--warning)]">Faltan ${fmt(usdt_faltante, 2)} USDT · Bs. {fmt(usdt_faltante * tasa_venta_prom)} aprox.</span>
+            ) : (
+              <span className="font-mono text-[10px] text-[var(--profit)] font-bold">✓ Recompra completa</span>
+            )}
+          </div>
+        </div>
+      )}
     </div>
   );
 };
