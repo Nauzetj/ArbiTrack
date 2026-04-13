@@ -847,7 +847,7 @@ const OpsTable: React.FC<{
 
 // ─── Metrics Bar ──────────────────────────────────────────────────────────────
 
-const MetricsBar: React.FC<{ activeCycle: Cycle; orders: Order[] }> = ({ activeCycle, orders }) => {
+const MetricsBar: React.FC<{ activeCycle: Cycle; orders?: Order[] }> = ({ activeCycle }) => {
   // Arbitrage Model (Venta-Primero estricto):
   // Capital invertido = Liquidez obtenida al vender USDT (Bs ingresados)
   // Recomprado = USDT recuperado con esa misma liquidez (Bs pagados)
