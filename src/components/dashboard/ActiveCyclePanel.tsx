@@ -1,4 +1,5 @@
 import React, { useRef, useState, useCallback, useMemo } from 'react';
+import { createPortal } from 'react-dom';
 import { useGSAP } from '@gsap/react';
 import { gsap } from 'gsap';
 import { useAppStore } from '../../store/useAppStore';
@@ -1281,76 +1282,23 @@ export const ActiveCyclePanel: React.FC = () => {
             <div className="flex items-center gap-[8px]">
               {/* Sobrante button */}
               <button
-                onClick={() => { setShowSobrante(v => !v); setShowForm(false); }}
-                className={`flex items-center gap-[6px] px-[12px] py-[7px] rounded-[8px] font-bold text-[12px] transition-all border ${showSobrante ? 'bg-[rgba(52,211,153,0.15)] border-[#34d399] text-[#34d399]' : 'bg-[var(--bg-surface-3)] border-[var(--border)] text-[var(--text-secondary)] hover:border-[#34d399] hover:text-[#34d399]'}`}
+                onClick={() => { setShowSobrante(true); }}
+                className="flex items-center gap-[6px] px-[12px] py-[7px] rounded-[8px] font-bold text-[12px] transition-all border bg-[var(--bg-surface-3)] border-[var(--border)] text-[var(--text-secondary)] hover:border-[#34d399] hover:text-[#34d399]"
                 title="Registrar saldo residual bancario como ganancia directa"
               >
                 <CheckCircle2 size={13}/> Sobrante
               </button>
               {/* Registrar operación */}
-              {!showForm && (
-                <button
-                  onClick={() => { setShowForm(true); setEditingOrder(null); setShowSobrante(false); }}
-                  className="flex items-center gap-[6px] px-[14px] py-[7px] rounded-[8px] bg-[var(--accent)] hover:brightness-110 text-white font-bold text-[12px] transition-all shadow-[0_2px_8px_rgba(37,99,235,0.2)]"
-                >
-                  <Plus size={13}/> Registrar operación
-                </button>
-              )}
+              <button
+                onClick={() => { setShowForm(true); setEditingOrder(null); }}
+                className="flex items-center gap-[6px] px-[14px] py-[7px] rounded-[8px] bg-[var(--accent)] hover:brightness-110 text-white font-bold text-[12px] transition-all shadow-[0_2px_8px_rgba(37,99,235,0.2)]"
+              >
+                <Plus size={13}/> Registrar operación
+              </button>
             </div>
           </div>
 
-          {/* Sobrante mini-form */}
-          {showSobrante && (
-            <div className="bg-[rgba(52,211,153,0.06)] border border-[#34d399]/30 rounded-[12px] p-[16px] flex flex-col gap-[12px] animate-fade-in-up">
-              <div className="flex items-center gap-[8px]">
-                <CheckCircle2 size={16} className="text-[#34d399]"/>
-                <span className="text-[13px] font-bold text-[var(--text-primary)]">Registrar sobrante bancario</span>
-              </div>
-              <p className="text-[11px] text-[var(--text-secondary)] -mt-[4px]">
-                Ingresa el monto en Bs. que te sobró en el banco. Se dividirá entre la tasa de recompra del ciclo ({fmt(activeCycle.tasa_compra_prom > 0 ? activeCycle.tasa_compra_prom : activeCycle.tasa_venta_prom)} Bs/USDT) para calcular el equivalente en USDT.
-              </p>
-              <div className="flex items-center gap-[10px] flex-wrap">
-                <div className="flex flex-col gap-[4px] flex-1 min-w-[160px]">
-                  <label className="text-[10px] font-bold text-[var(--text-tertiary)] uppercase tracking-wider">Monto sobrante (Bs.)</label>
-                  <input
-                    autoFocus
-                    type="number"
-                    step="0.01"
-                    min="0"
-                    value={sobraVes}
-                    onChange={e => setSobraVes(e.target.value)}
-                    onKeyDown={e => e.key === 'Enter' && handleSaveSobrante()}
-                    placeholder="Ej: 450.00"
-                    className="bg-[var(--bg-surface-2)] border border-[#34d399]/50 rounded-[8px] px-[12px] py-[8px] text-[13px] font-mono text-[var(--text-primary)] outline-none focus:border-[#34d399] transition-colors"
-                  />
-                </div>
-                {sobraVes && parseFloat(sobraVes.replace(',','.')) > 0 && (
-                  <div className="flex flex-col gap-[4px]">
-                    <label className="text-[10px] font-bold text-[var(--text-tertiary)] uppercase tracking-wider">Equivale a</label>
-                    <span className="text-[15px] font-mono font-bold text-[#34d399]">
-                      $ {fmt(parseFloat(sobraVes.replace(',','.')) / (activeCycle.tasa_compra_prom > 0 ? activeCycle.tasa_compra_prom : activeCycle.tasa_venta_prom > 0 ? activeCycle.tasa_venta_prom : 1), 4)} USDT
-                    </span>
-                  </div>
-                )}
-              </div>
-              <div className="flex items-center gap-[8px]">
-                <button
-                  onClick={handleSaveSobrante}
-                  disabled={sobraSaving || !sobraVes}
-                  className="flex items-center gap-[6px] px-[16px] py-[8px] rounded-[8px] bg-[#34d399] hover:brightness-110 text-white font-bold text-[12px] transition-all disabled:opacity-40"
-                >
-                  {sobraSaving ? <span className="w-[12px] h-[12px] border-2 border-white border-t-transparent rounded-full animate-spin"/> : <CheckCircle2 size={13}/>}
-                  Registrar sobrante
-                </button>
-                <button
-                  onClick={() => { setShowSobrante(false); setSobraVes(''); }}
-                  className="px-[12px] py-[8px] rounded-[8px] text-[var(--text-secondary)] text-[12px] hover:text-[var(--text-primary)] transition-colors"
-                >
-                  Cancelar
-                </button>
-              </div>
-            </div>
-          )}
+          {/* Sobrante and form modals are rendered as portals below */}
 
           <OpsTable
             orders={cycleOrders}
@@ -1361,22 +1309,8 @@ export const ActiveCyclePanel: React.FC = () => {
           />
         </div>
 
-        {/* ── Inline form ── */}
-        {showForm && (
-          <div className="bg-[var(--bg-surface-2)] rounded-[14px] border border-[var(--border)] border-l-2 border-l-[var(--accent)] p-[18px] animate-fade-in-up">
-            <UnifiedForm
-              cycleId={activeCycle.id}
-              userId={currentUser!.id}
-              opSeq={opSeq}
-              editingOrder={editingOrder}
-              onSaved={handleFormSaved}
-              onCancel={() => { setShowForm(false); setEditingOrder(null); }}
-            />
-          </div>
-        )}
-
-        {/* Quick-add row when no ops and form hidden */}
-        {!showForm && !hasOps && (
+        {/* Quick-add row when no ops */}
+        {!hasOps && (
           <button
             onClick={() => setShowForm(true)}
             className="w-full flex items-center justify-center gap-[8px] py-[12px] rounded-[12px] border-2 border-dashed border-[var(--border-strong)] text-[var(--text-tertiary)] text-[13px] font-semibold hover:border-[var(--accent)] hover:text-[var(--accent)] hover:bg-[var(--accent-muted)] transition-all"
@@ -1385,6 +1319,137 @@ export const ActiveCyclePanel: React.FC = () => {
           </button>
         )}
       </div>
+
+      {/* ── Sobrante Floating Modal ── */}
+      {showSobrante && createPortal(
+        <div
+          className="fixed inset-0 z-[9999] flex items-center justify-center p-[16px]"
+          style={{ background: 'rgba(10,20,35,0.55)', backdropFilter: 'blur(6px)', WebkitBackdropFilter: 'blur(6px)' }}
+          onClick={() => { setShowSobrante(false); setSobraVes(''); }}
+        >
+          <div
+            className="relative w-full max-w-[460px] rounded-[20px] border border-[#34d399]/30 shadow-2xl overflow-hidden animate-fade-in-up"
+            style={{ background: 'var(--bg-surface-2)', boxShadow: '0 0 0 1px rgba(52,211,153,0.1), 0 24px 48px rgba(0,0,0,0.55)' }}
+            onClick={e => e.stopPropagation()}
+          >
+            {/* Top accent line */}
+            <div className="absolute top-0 left-0 right-0 h-[2px]" style={{ background: 'linear-gradient(90deg, transparent, #34d399, transparent)' }}/>
+            {/* Close */}
+            <button
+              onClick={() => { setShowSobrante(false); setSobraVes(''); }}
+              className="absolute top-[14px] right-[14px] w-[28px] h-[28px] rounded-full flex items-center justify-center hover:bg-[var(--bg-surface-4)] text-[var(--text-tertiary)] hover:text-[var(--text-primary)] transition-colors"
+            >
+              <X size={14}/>
+            </button>
+            <div className="p-[28px] flex flex-col gap-[18px]">
+              <div className="flex items-center gap-[10px]">
+                <div className="w-[44px] h-[44px] rounded-[12px] flex items-center justify-center bg-[rgba(52,211,153,0.12)] border border-[#34d399]/25">
+                  <CheckCircle2 size={22} className="text-[#34d399]"/>
+                </div>
+                <div>
+                  <h3 className="text-[16px] font-bold text-[var(--text-primary)]">Registrar sobrante bancario</h3>
+                  <p className="text-[11px] text-[var(--text-tertiary)] mt-[2px]">Saldo residual → ganancia directa</p>
+                </div>
+              </div>
+              <p className="text-[12px] text-[var(--text-secondary)] leading-relaxed">
+                Ingresa el monto en Bs. que te sobró en el banco. Se dividirá entre la tasa de recompra del ciclo
+                ({' '}<span className="font-mono font-bold text-[var(--text-primary)]">{fmt(activeCycle.tasa_compra_prom > 0 ? activeCycle.tasa_compra_prom : activeCycle.tasa_venta_prom)}</span>{' '}Bs/USDT) para calcular el equivalente en USDT.
+              </p>
+              <div className="flex items-end gap-[12px] flex-wrap">
+                <div className="flex flex-col gap-[6px] flex-1 min-w-[160px]">
+                  <label className="text-[10px] font-bold text-[var(--text-tertiary)] uppercase tracking-wider">Monto sobrante (Bs.)</label>
+                  <input
+                    autoFocus
+                    type="number"
+                    step="0.01"
+                    min="0"
+                    value={sobraVes}
+                    onChange={e => setSobraVes(e.target.value)}
+                    onKeyDown={e => e.key === 'Enter' && handleSaveSobrante()}
+                    placeholder="Ej: 450.00"
+                    className="bg-[var(--bg-surface-3)] border border-[#34d399]/40 rounded-[10px] px-[14px] py-[10px] text-[14px] font-mono text-[var(--text-primary)] outline-none focus:border-[#34d399] transition-colors"
+                  />
+                </div>
+                {sobraVes && parseFloat(sobraVes.replace(',','.')) > 0 && (
+                  <div className="flex flex-col gap-[4px]">
+                    <label className="text-[10px] font-bold text-[var(--text-tertiary)] uppercase tracking-wider">Equivale a</label>
+                    <span className="text-[18px] font-mono font-bold text-[#34d399]">
+                      $ {fmt(parseFloat(sobraVes.replace(',','.')) / (activeCycle.tasa_compra_prom > 0 ? activeCycle.tasa_compra_prom : activeCycle.tasa_venta_prom > 0 ? activeCycle.tasa_venta_prom : 1), 4)} USDT
+                    </span>
+                  </div>
+                )}
+              </div>
+              <div className="flex items-center gap-[10px] pt-[4px] border-t border-[var(--border)]">
+                <button
+                  onClick={handleSaveSobrante}
+                  disabled={sobraSaving || !sobraVes}
+                  className="flex-1 flex items-center justify-center gap-[8px] py-[10px] rounded-[10px] bg-[#34d399] hover:brightness-110 text-white font-bold text-[13px] transition-all disabled:opacity-40"
+                >
+                  {sobraSaving ? <span className="w-[14px] h-[14px] border-2 border-white border-t-transparent rounded-full animate-spin"/> : <CheckCircle2 size={15}/>}
+                  Registrar sobrante
+                </button>
+                <button
+                  onClick={() => { setShowSobrante(false); setSobraVes(''); }}
+                  className="px-[16px] py-[10px] rounded-[10px] text-[var(--text-secondary)] text-[13px] border border-[var(--border-strong)] hover:bg-[var(--bg-surface-3)] transition-colors"
+                >
+                  Cancelar
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>,
+        document.body
+      )}
+
+      {/* ── Registrar Operación Floating Modal ── */}
+      {showForm && createPortal(
+        <div
+          className="fixed inset-0 z-[9999] flex items-center justify-center p-[16px]"
+          style={{ background: 'rgba(10,20,35,0.55)', backdropFilter: 'blur(6px)', WebkitBackdropFilter: 'blur(6px)' }}
+          onClick={() => { setShowForm(false); setEditingOrder(null); }}
+        >
+          <div
+            className="relative w-full max-w-[720px] max-h-[90vh] rounded-[20px] border border-[var(--accent-border)] shadow-2xl overflow-hidden flex flex-col animate-fade-in-up"
+            style={{ background: 'var(--bg-surface-2)', boxShadow: '0 0 0 1px rgba(37,99,235,0.1), 0 24px 48px rgba(0,0,0,0.55)' }}
+            onClick={e => e.stopPropagation()}
+          >
+            {/* Top accent line */}
+            <div className="absolute top-0 left-0 right-0 h-[2px]" style={{ background: 'linear-gradient(90deg, transparent, var(--accent), transparent)' }}/>
+            {/* Header */}
+            <div className="flex items-center justify-between px-[24px] pt-[22px] pb-[14px] border-b border-[var(--border)] flex-shrink-0">
+              <div className="flex items-center gap-[10px]">
+                <div className="w-[36px] h-[36px] rounded-[10px] flex items-center justify-center bg-[var(--accent-muted)] border border-[var(--accent-border)]">
+                  <PenLine size={16} className="text-[var(--accent)]"/>
+                </div>
+                <div>
+                  <h3 className="text-[15px] font-bold text-[var(--text-primary)]">
+                    {editingOrder ? 'Editar operación' : 'Registrar operación'}
+                  </h3>
+                  <p className="text-[11px] text-[var(--text-tertiary)]">Ciclo #{activeCycle.cycleNumber.toString().slice(-4)}</p>
+                </div>
+              </div>
+              <button
+                onClick={() => { setShowForm(false); setEditingOrder(null); }}
+                className="w-[28px] h-[28px] rounded-full flex items-center justify-center hover:bg-[var(--bg-surface-4)] text-[var(--text-tertiary)] hover:text-[var(--text-primary)] transition-colors"
+              >
+                <X size={14}/>
+              </button>
+            </div>
+            {/* Body — scrollable */}
+            <div className="flex-1 overflow-y-auto custom-scrollbar p-[24px]">
+              <UnifiedForm
+                cycleId={activeCycle.id}
+                userId={currentUser!.id}
+                opSeq={opSeq}
+                editingOrder={editingOrder}
+                onSaved={handleFormSaved}
+                onCancel={() => { setShowForm(false); setEditingOrder(null); }}
+              />
+            </div>
+          </div>
+        </div>,
+        document.body
+      )}
 
       {/* ── Emergency Quick-Sale Modal ── */}
       <Modal
