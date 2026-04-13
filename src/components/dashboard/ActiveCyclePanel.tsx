@@ -872,8 +872,10 @@ const MetricsBar: React.FC<{ activeCycle: Cycle; orders: Order[] }> = ({ activeC
 
   const sign = (n: number) => (n >= 0 ? '+' : '');
 
+  const liquidezDisponible = activeCycle.ves_recibido - activeCycle.ves_pagado;
+
   return (
-    <div className="grid grid-cols-2 lg:grid-cols-4 gap-[12px]">
+    <div className="grid grid-cols-2 lg:grid-cols-5 gap-[12px]">
       {/* Col 1 */}
       <div className="cycle-stat-group bg-[var(--bg-surface-3)] border border-[var(--border)] rounded-[12px] p-[14px] flex flex-col gap-[4px]">
         <span className="text-[10px] font-bold text-[var(--text-tertiary)] uppercase tracking-[1px]">{col1Label}</span>
@@ -886,6 +888,17 @@ const MetricsBar: React.FC<{ activeCycle: Cycle; orders: Order[] }> = ({ activeC
         <span className="text-[10px] font-bold text-[var(--text-tertiary)] uppercase tracking-[1px]">{col2Label}</span>
         <span className="font-mono font-bold text-[15px] text-[var(--profit)]">{col2Main}</span>
         <span className="font-mono text-[11px] text-[var(--text-secondary)] mt-[2px]">{col2Sub}</span>
+      </div>
+
+      {/* Liquidez Restante */}
+      <div className="cycle-stat-group bg-[var(--bg-surface-3)] border border-[var(--border)] rounded-[12px] p-[14px] flex flex-col gap-[4px] shadow-[inset_0_0_20px_rgba(52,211,153,0.02)]">
+        <span className="text-[10px] font-bold text-[var(--text-tertiary)] uppercase tracking-[1px]">Liquidez Restante</span>
+        <span className={`font-mono font-bold text-[15px] ${liquidezDisponible > 0 ? 'text-[#34d399]' : liquidezDisponible < 0 ? 'text-[var(--loss)]' : 'text-[var(--text-secondary)]'}`}>
+          Bs. {fmt(liquidezDisponible)}
+        </span>
+        <span className="font-mono text-[11px] text-[var(--text-secondary)] mt-[2px]">
+           Fondo disp. en banco
+        </span>
       </div>
 
       {/* Comisiones */}
