@@ -1,7 +1,5 @@
 import React, { useRef } from 'react';
 import { useAppStore } from '../../store/useAppStore';
-import { useGSAP } from '@gsap/react';
-import { gsap } from 'gsap';
 import { Badge } from '../ui/Badge';
 import { Link } from 'react-router-dom';
 
@@ -10,15 +8,6 @@ export const RecentCyclesTable: React.FC = () => {
   const recent = cycles.slice(0, 10); // show up to 10 recent cycles
 
   const tableRef = useRef<HTMLDivElement>(null);
-
-  useGSAP(() => {
-    if (recent.length > 0) {
-      gsap.fromTo('.recent-row', 
-        { opacity: 0, x: -15 },
-        { opacity: 1, x: 0, duration: 0.4, stagger: 0.05, ease: 'power2.out', delay: 0.8, clearProps: 'all' }
-      );
-    }
-  }, { scope: tableRef, dependencies: [recent] });
 
   if (recent.length === 0) {
     return (

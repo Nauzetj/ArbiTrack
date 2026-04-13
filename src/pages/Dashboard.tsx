@@ -1,7 +1,6 @@
 import React, { useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
-import { useGSAP } from '@gsap/react';
-import { gsap } from 'gsap';
+import { createPortal } from 'react-dom';
 import { AreaChart, Layers, DollarSign, Clock, BarChart3, ChevronRight, X } from 'lucide-react';
 import { useAppStore } from '../store/useAppStore';
 import { MetricCard } from '../components/ui/MetricCard';
@@ -14,18 +13,6 @@ export const Dashboard: React.FC = () => {
   const containerRef = useRef<HTMLDivElement>(null);
   const [showChart, setShowChart] = useState(false);
 
-  useGSAP(() => {
-    gsap.set('.metric-card', { opacity: 0, y: 20 });
-    gsap.set('.active-cycle-panel', { opacity: 0, y: 20 });
-    gsap.set('.dashboard-chart, .dashboard-security-notice', { opacity: 0, y: 20 });
-    gsap.set('.recent-cycles-table', { opacity: 0, y: 20 });
-
-    const tl = gsap.timeline({ defaults: { ease: 'power3.out' } });
-    tl.to('.metric-card', { y: 0, opacity: 1, duration: 0.6, stagger: 0.08 })
-      .to('.active-cycle-panel', { y: 0, opacity: 1, duration: 0.5 }, '-=0.3')
-      .to('.dashboard-chart, .dashboard-security-notice', { y: 0, opacity: 1, duration: 0.5, stagger: 0.1 }, '-=0.3')
-      .to('.recent-cycles-table', { y: 0, opacity: 1, duration: 0.5 }, '-=0.2');
-  }, { scope: containerRef, dependencies: [] });
 
 
   const todayStart = new Date();
@@ -127,7 +114,7 @@ export const Dashboard: React.FC = () => {
           onClick={() => setShowChart(false)}
         >
           <div 
-            className="w-full max-w-[600px] bg-[var(--bg-surface-1)] rounded-[20px] shadow-2xl overflow-hidden border border-[#34d399]/20 relative animate-fade-in-up"
+            className="w-full max-w-[600px] bg-[var(--bg-surface-1)] rounded-[20px] shadow-2xl overflow-hidden border border-[#34d399]/20 relative"
             onClick={e => e.stopPropagation()}
             style={{ boxShadow: '0 0 0 1px rgba(52,211,153,0.1), 0 24px 48px rgba(0,0,0,0.55)' }}
           >

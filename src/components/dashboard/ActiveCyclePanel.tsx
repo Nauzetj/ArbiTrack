@@ -1,7 +1,6 @@
 import React, { useRef, useState, useCallback, useMemo } from 'react';
 import { createPortal } from 'react-dom';
-import { useGSAP } from '@gsap/react';
-import { gsap } from 'gsap';
+import { createPortal } from 'react-dom';
 import { useAppStore } from '../../store/useAppStore';
 import {
   saveCycle, deleteCycle, saveOrder, deleteOrder,
@@ -962,19 +961,6 @@ export const ActiveCyclePanel: React.FC = () => {
   // Next operation sequence number
   const opSeq = cycleOrders.length + 1;
 
-  useGSAP(() => {
-    if (!activeCycle) {
-      gsap.to('.pulse-icon', {
-        scale: 1.05, boxShadow: '0 0 20px rgba(37,99,235,0.4)', y: -5,
-        duration: 1.5, repeat: -1, yoyo: true, ease: 'sine.inOut',
-      });
-    } else {
-      gsap.fromTo('.cycle-stat-group',
-        { y: 15, opacity: 0 },
-        { y: 0, opacity: 1, duration: 0.6, stagger: 0.08, ease: 'power3.out', clearProps: 'all' }
-      );
-    }
-  }, { dependencies: [activeCycle?.id], scope: panelRef });
 
   // ── Handlers ────────────────────────────────────────────────────────────────
 
