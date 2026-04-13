@@ -1228,9 +1228,7 @@ export const ActiveCyclePanel: React.FC = () => {
       <div ref={panelRef} className="flex flex-col gap-[16px]">
 
         {/* ── Header ── */}
-        <div className="bg-[var(--bg-surface-2)] rounded-[16px] border-t-2 border-[var(--accent)] border-x border-b border-x-[var(--border)] border-b-[var(--border)] p-[12px] md:p-[16px] flex flex-col gap-[10px] shadow-[0_0_20px_rgba(37,99,235,0.06)] relative overflow-hidden">
-          <div className="absolute top-0 right-0 w-[180px] h-[180px] bg-[var(--accent)]/5 rounded-full blur-[80px] pointer-events-none"/>
-
+        <div className="bg-[var(--bg-surface-2)] rounded-[16px] border-t-2 border-[var(--accent)] border-x border-b border-x-[var(--border)] border-b-[var(--border)] p-[12px] md:p-[16px] flex flex-col gap-[10px] relative overflow-hidden">
           {/* Top row */}
           <div className="flex items-center justify-between flex-wrap gap-[8px] relative z-10">
             <div className="flex items-center gap-[10px]">
@@ -1301,7 +1299,7 @@ export const ActiveCyclePanel: React.FC = () => {
           {/* Sobrante and form modals are rendered as portals below */}
 
           {/* Contenedor con scroll para la tabla de operaciones - Muy compacto y ESTÁTICO */}
-          <div className="h-[220px] overflow-y-auto pr-1 scrollbar-thin scrollbar-thumb-[var(--border-strong)] scrollbar-track-transparent rounded-[8px]">
+          <div className="h-[220px] overflow-y-scroll pr-1 scrollbar-thin scrollbar-thumb-[var(--border-strong)] scrollbar-track-transparent rounded-[8px]">
             <OpsTable
               orders={cycleOrders}
               cycleId={activeCycle.id}
