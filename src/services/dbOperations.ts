@@ -282,16 +282,16 @@ export const deleteCycle = async (cycleId: string, userId: string): Promise<void
 };
 
 export const recalculateCycleMetrics = async (cycleId: string, userId: string): Promise<void> => {
-  // Llama a la Stored Procedure en Postgres: 1 roundtrip (~80ms) en lugar de 4 seriales (~450ms)
+  // NOTA: Se deshabilita temporalmente la SP debido a un error crítico de cálculo en ciclos parciales.
+  // Se usará el cálculo local hasta que el usuario actualice la SP en Supabase.
+  /*
   const { error } = await supabase.rpc('recalculate_cycle_metrics', {
     p_cycle_id: cycleId,
     p_user_id:  userId,
   });
-  if (error) {
-    // Fallback: si la SP aún no existe en Supabase, ejecuta la lógica local
-    console.warn('[recalculate] SP no disponible, usando fallback local:', error.message);
-    await recalculateCycleMetrics_local(cycleId, userId);
-  }
+  */
+  
+  await recalculateCycleMetrics_local(cycleId, userId);
 };
 
 // ─── Fallback local (mientras no se haya ejecutado la SP en Supabase) ─────────
@@ -322,8 +322,9 @@ const recalculateCycleMetrics_local = async (cycleId: string, userId: string): P
   const tasa_compra_prom = usdt_recomprado > 0 ? ves_pagado   / usdt_recomprado : 0;
   const diferencial_tasa = tasa_venta_prom > 0 && tasa_compra_prom > 0 ? tasa_venta_prom - tasa_compra_prom : 0;
   const tasaRef          = tasa_compra_prom > 0 ? tasa_compra_prom : tasa_venta_prom > 0 ? tasa_venta_prom : 1;
-  const ganancia_ves     = (ves_recibido - ves_pagado) - (comision_total * tasaRef);
-  const ganancia_usdt    = ((ves_recibido - ves_pagado) / tasaRef) - comision_total;
+  const matched_vol      = Math.min(usdt_vendido, usdt_recomprado);
+  const ganancia_ves     = matched_vol * diferencial_tasa;
+  const ganancia_usdt    = tasa_compra_prom > 0 ? (ganancia_ves / tasa_compra_prom) - comision_total : -comision_total;
   const capitalBase      = usdt_vendido > 0 ? usdt_vendido * tasa_venta_prom : ves_pagado;
   const roi_percent      = capitalBase > 0 ? (ganancia_ves / capitalBase) * 100 : 0;
 
