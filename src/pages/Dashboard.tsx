@@ -43,9 +43,9 @@ export const Dashboard: React.FC = () => {
   const profitMonthUsdt = completedMonth.reduce((sum, c) => sum + c.ganancia_usdt, 0);
 
   return (
-    <div ref={containerRef} className="flex flex-col gap-[12px] md:gap-[20px] max-w-[1400px] mx-auto">
+    <div ref={containerRef} className="flex flex-col gap-[10px] md:gap-[14px] max-w-[1400px] mx-auto min-h-[calc(100vh-80px)]">
       {/* Metric cards: 2 columns on mobile, 4 on desktop */}
-      <div className="grid grid-cols-2 xl:grid-cols-4 gap-[10px] md:gap-[16px]">
+      <div className="grid grid-cols-2 xl:grid-cols-4 gap-[10px]">
         <MetricCard
           title="Ganancia Hoy"
           icon={<DollarSign size={14} />}
@@ -78,7 +78,7 @@ export const Dashboard: React.FC = () => {
 
       {/* Active Cycle Panel */}
       <div className="active-cycle-panel max-w-full">
-        <div className="flex flex-col xl:flex-row gap-[12px] md:gap-[20px]">
+        <div className="flex flex-col xl:flex-row gap-[10px] md:gap-[14px]">
           <div className="flex-1 min-w-[0]">
             <ActiveCyclePanel />
           </div>
@@ -89,12 +89,12 @@ export const Dashboard: React.FC = () => {
       </div>
 
       {/* Chart + Info: side by side on XL, stacked on mobile */}
-      <div className="grid grid-cols-1 xl:grid-cols-12 gap-[12px] md:gap-[20px]">
-        <div className="xl:col-span-7 dashboard-chart">
+      <div className="grid grid-cols-1 xl:grid-cols-12 gap-[10px] md:gap-[14px]">
+        <div className="xl:col-span-8 dashboard-chart">
           <MiniChart />
         </div>
-        <div className="xl:col-span-5 dashboard-security-notice bg-[var(--bg-surface-2)] rounded-[16px] border border-[var(--border)] p-[16px] md:p-[24px]">
-          <h3 className="font-semibold text-[13px] md:text-[14px]">Seguridad de datos</h3>
+        <div className="xl:col-span-4 dashboard-security-notice bg-[var(--bg-surface-2)] rounded-[16px] border border-[var(--border)] p-[12px] md:p-[16px]">
+          <h3 className="font-semibold text-[13px]">Seguridad de datos</h3>
           <p className="text-[12px] md:text-[13px] text-[var(--text-secondary)] mt-[8px]">
             Tus datos están sincronizados en la nube. Las credenciales de Binance se mantienen
             exclusivamente en memoria durante la sesión y nunca se almacenan en el servidor.

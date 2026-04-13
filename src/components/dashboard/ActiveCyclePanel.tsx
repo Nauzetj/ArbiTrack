@@ -1228,7 +1228,7 @@ export const ActiveCyclePanel: React.FC = () => {
       <div ref={panelRef} className="flex flex-col gap-[16px]">
 
         {/* ── Header ── */}
-        <div className="bg-[var(--bg-surface-2)] rounded-[16px] border-t-2 border-[var(--accent)] border-x border-b border-x-[var(--border)] border-b-[var(--border)] p-[20px] flex flex-col gap-[16px] shadow-[0_0_20px_rgba(37,99,235,0.06)] relative overflow-hidden">
+        <div className="bg-[var(--bg-surface-2)] rounded-[16px] border-t-2 border-[var(--accent)] border-x border-b border-x-[var(--border)] border-b-[var(--border)] p-[12px] md:p-[16px] flex flex-col gap-[10px] shadow-[0_0_20px_rgba(37,99,235,0.06)] relative overflow-hidden">
           <div className="absolute top-0 right-0 w-[180px] h-[180px] bg-[var(--accent)]/5 rounded-full blur-[80px] pointer-events-none"/>
 
           {/* Top row */}
@@ -1262,14 +1262,14 @@ export const ActiveCyclePanel: React.FC = () => {
           </div>
 
           {/* Opened at */}
-          <div className="flex items-center gap-[6px] text-[11px] text-[var(--text-secondary)] border-t border-[var(--border)] pt-[10px] relative z-10">
+          <div className="flex items-center gap-[6px] text-[11px] text-[var(--text-secondary)] border-t border-[var(--border)] pt-[8px] relative z-10">
             <Clock size={11}/>
             Abierto el {fmtDate(activeCycle.openedAt)}
           </div>
         </div>
 
         {/* ── Operations table ── */}
-        <div className="bg-[var(--bg-surface-2)] rounded-[14px] border border-[var(--border)] p-[16px] flex flex-col gap-[12px]">
+        <div className="bg-[var(--bg-surface-2)] rounded-[14px] border border-[var(--border)] p-[12px] flex flex-col gap-[10px]">
           <div className="flex items-center justify-between flex-wrap gap-[8px]">
             <div className="flex items-center gap-[8px]">
               <span className="text-[12px] font-bold text-[var(--text-primary)]">Operaciones</span>
@@ -1300,8 +1300,8 @@ export const ActiveCyclePanel: React.FC = () => {
 
           {/* Sobrante and form modals are rendered as portals below */}
 
-          {/* Contenedor con scroll para la tabla de operaciones */}
-          <div className="max-h-[350px] overflow-y-auto pr-1 scrollbar-thin scrollbar-thumb-[var(--border-strong)] scrollbar-track-transparent rounded-[8px]">
+          {/* Contenedor con scroll para la tabla de operaciones - Muy compacto */}
+          <div className="max-h-[220px] overflow-y-auto pr-1 scrollbar-thin scrollbar-thumb-[var(--border-strong)] scrollbar-track-transparent rounded-[8px]">
             <OpsTable
               orders={cycleOrders}
               cycleId={activeCycle.id}
