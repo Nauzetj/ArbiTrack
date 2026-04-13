@@ -1,6 +1,5 @@
 import React, { useRef, useState, useCallback, useMemo } from 'react';
 import { createPortal } from 'react-dom';
-import { createPortal } from 'react-dom';
 import { useAppStore } from '../../store/useAppStore';
 import {
   saveCycle, deleteCycle, saveOrder, deleteOrder,

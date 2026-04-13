@@ -1,6 +1,5 @@
 import React, { useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
-import { createPortal } from 'react-dom';
 import { AreaChart, Layers, DollarSign, Clock, BarChart3, ChevronRight, X } from 'lucide-react';
 import { useAppStore } from '../store/useAppStore';
 import { MetricCard } from '../components/ui/MetricCard';
