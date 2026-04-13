@@ -28,7 +28,7 @@ export const Topbar: React.FC = () => {
       // Explicitly fetch BUY and SELL to prevent Binance API returning partial/empty lists without tradeType
       const requests = [];
       const tradeTypes = ['BUY', 'SELL'];
-      const maxPages = 10; // Aumentado para traer más órdenes
+      const maxPages = 3; // 6 requests en lugar de 20 (las últimas páginas tienen órdenes recientes)
       for (const t of tradeTypes) {
         for (let page = 1; page <= maxPages; page++) {
           requests.push(fetchP2POrders(currentState.binanceKeys!.apiKey, currentState.binanceKeys!.secretKey, page, t));
@@ -189,15 +189,28 @@ export const Topbar: React.FC = () => {
   useEffect(() => {
     if (!currentUser || !binanceKeys) return;
 
-    // Sync inmediato al montar para no esperar 10 segundos
+    // Sync inmediato al montar
     handleSync(false);
 
-    // Auto-sync en background cada 10s
-    const interval = setInterval(() => {
-      handleSync(false);
-    }, 10_000);
+    // Auto-sync adaptativo:
+    //   - Con ciclo activo → cada 20s (tiempo real de operación)
+    //   - Sin ciclo activo → cada 60s (solo monitoreo)
+    //   - Tab oculta → no sincroniza (ahorra recursos y quota de Binance)
+    let timeoutId: ReturnType<typeof setTimeout>;
 
-    return () => clearInterval(interval);
+    const scheduleNext = () => {
+      const { activeCycle } = useAppStore.getState();
+      const delay = activeCycle ? 20_000 : 60_000;
+      timeoutId = setTimeout(() => {
+        if (!document.hidden) {
+          handleSync(false);
+        }
+        scheduleNext();
+      }, delay);
+    };
+
+    scheduleNext();
+    return () => clearTimeout(timeoutId);
   }, [currentUser?.id, binanceKeys?.apiKey]);
 
   return (
