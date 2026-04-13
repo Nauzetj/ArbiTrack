@@ -103,11 +103,10 @@ export const Dashboard: React.FC = () => {
       {/* Chart Trigger Button */}
       <button 
         onClick={() => setShowChart(true)}
-        className="dashboard-chart w-full bg-[var(--bg-surface-2)] rounded-[16px] border border-[var(--border)] p-[16px] flex items-center justify-between hover:bg-[var(--bg-surface-3)] transition-colors group overflow-hidden relative"
+        className="dashboard-chart w-full bg-[var(--bg-surface-2)] rounded-[16px] border border-[var(--border)] p-[16px] flex items-center justify-between hover:bg-[var(--bg-surface-3)] transition-colors group"
       >
-        <div className="absolute top-0 right-[20%] w-[180px] h-[180px] bg-[var(--accent)]/5 rounded-full blur-[50px] pointer-events-none group-hover:bg-[var(--accent)]/15 transition-colors duration-500"/>
         <div className="flex items-center gap-[12px] relative z-10">
-          <div className="w-[42px] h-[42px] rounded-[10px] bg-[rgba(37,99,235,0.1)] text-[var(--accent)] flex items-center justify-center border border-[var(--accent)]/20 group-hover:scale-110 transition-transform">
+          <div className="w-[42px] h-[42px] rounded-[10px] bg-[rgba(37,99,235,0.1)] text-[var(--accent)] flex items-center justify-center border border-[var(--accent)]/20">
             <BarChart3 size={20} />
           </div>
           <div className="flex flex-col items-start">
