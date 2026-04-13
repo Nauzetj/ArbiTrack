@@ -1105,12 +1105,19 @@ export const ActiveCyclePanel: React.FC = () => {
     if (!vesN || vesN <= 0) { toast.error('Ingresa un monto válido en Bs.'); return; }
     if (!currentUser || !activeCycle) return;
 
-    // Use avg buy rate (tasa_compra_prom). If not yet calculated, use venta rate.
-    const tasaRef = activeCycle.tasa_compra_prom > 0
-      ? activeCycle.tasa_compra_prom
-      : activeCycle.tasa_venta_prom > 0
-        ? activeCycle.tasa_venta_prom
-        : 1;
+    // Use the unit price of the LAST COMPRA/RECOMPRA order in the cycle.
+    // This is the actual rate charged, not the average.
+    const lastBuyOrder = [...cycleOrders]
+      .filter(o => ['COMPRA_USDT', 'COMPRA_USD', 'RECOMPRA'].includes(o.operationType ?? '') && o.unitPrice > 0)
+      .sort((a, b) => new Date(b.createTime_utc).getTime() - new Date(a.createTime_utc).getTime())[0];
+
+    const tasaRef = lastBuyOrder?.unitPrice ?? (
+      activeCycle.tasa_compra_prom > 0
+        ? activeCycle.tasa_compra_prom
+        : activeCycle.tasa_venta_prom > 0
+          ? activeCycle.tasa_venta_prom
+          : 1
+    );
 
     const usdtEquiv = vesN / tasaRef;
 
@@ -1351,10 +1358,20 @@ export const ActiveCyclePanel: React.FC = () => {
                   <p className="text-[11px] text-[var(--text-tertiary)] mt-[2px]">Saldo residual → ganancia directa</p>
                 </div>
               </div>
-              <p className="text-[12px] text-[var(--text-secondary)] leading-relaxed">
-                Ingresa el monto en Bs. que te sobró en el banco. Se dividirá entre la tasa de recompra del ciclo
-                ({' '}<span className="font-mono font-bold text-[var(--text-primary)]">{fmt(activeCycle.tasa_compra_prom > 0 ? activeCycle.tasa_compra_prom : activeCycle.tasa_venta_prom)}</span>{' '}Bs/USDT) para calcular el equivalente en USDT.
-              </p>
+              {(() => {
+                const lastBuy = [...cycleOrders]
+                  .filter(o => ['COMPRA_USDT', 'COMPRA_USD', 'RECOMPRA'].includes(o.operationType ?? '') && o.unitPrice > 0)
+                  .sort((a, b) => new Date(b.createTime_utc).getTime() - new Date(a.createTime_utc).getTime())[0];
+                const tasaDisplay = lastBuy?.unitPrice ?? (activeCycle.tasa_compra_prom > 0 ? activeCycle.tasa_compra_prom : activeCycle.tasa_venta_prom);
+                return (
+                  <p className="text-[12px] text-[var(--text-secondary)] leading-relaxed">
+                    Ingresa el monto en Bs. que te sobró en el banco. Se dividirá entre la
+                    {' '}<span className="text-[var(--text-primary)] font-semibold">tasa de la última recompra</span>:{' '}
+                    <span className="font-mono font-bold text-[#34d399]">{fmt(tasaDisplay)} Bs/USDT</span>
+                    {lastBuy && <span className="text-[var(--text-tertiary)]"> · {new Date(lastBuy.createTime_utc).toLocaleTimeString('es-VE', { hour: '2-digit', minute: '2-digit' })}</span>}
+                  </p>
+                );
+              })()}
               <div className="flex items-end gap-[12px] flex-wrap">
                 <div className="flex flex-col gap-[6px] flex-1 min-w-[160px]">
                   <label className="text-[10px] font-bold text-[var(--text-tertiary)] uppercase tracking-wider">Monto sobrante (Bs.)</label>
@@ -1370,14 +1387,20 @@ export const ActiveCyclePanel: React.FC = () => {
                     className="bg-[var(--bg-surface-3)] border border-[#34d399]/40 rounded-[10px] px-[14px] py-[10px] text-[14px] font-mono text-[var(--text-primary)] outline-none focus:border-[#34d399] transition-colors"
                   />
                 </div>
-                {sobraVes && parseFloat(sobraVes.replace(',','.')) > 0 && (
-                  <div className="flex flex-col gap-[4px]">
-                    <label className="text-[10px] font-bold text-[var(--text-tertiary)] uppercase tracking-wider">Equivale a</label>
-                    <span className="text-[18px] font-mono font-bold text-[#34d399]">
-                      $ {fmt(parseFloat(sobraVes.replace(',','.')) / (activeCycle.tasa_compra_prom > 0 ? activeCycle.tasa_compra_prom : activeCycle.tasa_venta_prom > 0 ? activeCycle.tasa_venta_prom : 1), 4)} USDT
-                    </span>
-                  </div>
-                )}
+                {sobraVes && parseFloat(sobraVes.replace(',','.')) > 0 && (() => {
+                  const lastBuy = [...cycleOrders]
+                    .filter(o => ['COMPRA_USDT', 'COMPRA_USD', 'RECOMPRA'].includes(o.operationType ?? '') && o.unitPrice > 0)
+                    .sort((a, b) => new Date(b.createTime_utc).getTime() - new Date(a.createTime_utc).getTime())[0];
+                  const tasaCalc = lastBuy?.unitPrice ?? (activeCycle.tasa_compra_prom > 0 ? activeCycle.tasa_compra_prom : activeCycle.tasa_venta_prom > 0 ? activeCycle.tasa_venta_prom : 1);
+                  return (
+                    <div className="flex flex-col gap-[4px]">
+                      <label className="text-[10px] font-bold text-[var(--text-tertiary)] uppercase tracking-wider">Equivale a</label>
+                      <span className="text-[18px] font-mono font-bold text-[#34d399]">
+                        $ {fmt(parseFloat(sobraVes.replace(',','.')) / tasaCalc, 4)} USDT
+                      </span>
+                    </div>
+                  );
+                })()}
               </div>
               <div className="flex items-center gap-[10px] pt-[4px] border-t border-[var(--border)]">
                 <button
