@@ -1300,8 +1300,8 @@ export const ActiveCyclePanel: React.FC = () => {
 
           {/* Sobrante and form modals are rendered as portals below */}
 
-          {/* Contenedor con scroll para la tabla de operaciones - Muy compacto */}
-          <div className="max-h-[220px] overflow-y-auto pr-1 scrollbar-thin scrollbar-thumb-[var(--border-strong)] scrollbar-track-transparent rounded-[8px]">
+          {/* Contenedor con scroll para la tabla de operaciones - Muy compacto y ESTÁTICO */}
+          <div className="h-[220px] overflow-y-auto pr-1 scrollbar-thin scrollbar-thumb-[var(--border-strong)] scrollbar-track-transparent rounded-[8px]">
             <OpsTable
               orders={cycleOrders}
               cycleId={activeCycle.id}
