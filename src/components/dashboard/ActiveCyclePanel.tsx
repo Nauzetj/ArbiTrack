@@ -623,8 +623,8 @@ const CycleSummary: React.FC<{
       {/* Financial summary cards */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-[10px]">
         {[
-          { label: 'Total invertido', val: totalInvertido, color: 'text-[var(--text-primary)]' },
-          { label: 'Total recuperado', val: totalRecuperado, color: 'text-[var(--profit)]' },
+          { label: 'Total Invertido (Liquidez)', val: totalRecuperado, color: 'text-[var(--text-primary)]' },
+          { label: 'Costo Recompra', val: totalInvertido, color: 'text-[var(--text-secondary)]' },
           { label: 'Total comisiones', val: totalComisiones, color: 'text-[var(--warning)]' },
           { label: 'Ganancia neta', val: gananciaNeta, color: isNeutral ? 'text-[var(--text-secondary)]' : isPositive ? 'text-[var(--profit)]' : 'text-[var(--loss)]' },
         ].map(({ label, val, color }) => (
@@ -848,32 +848,17 @@ const OpsTable: React.FC<{
 // ─── Metrics Bar ──────────────────────────────────────────────────────────────
 
 const MetricsBar: React.FC<{ activeCycle: Cycle; orders: Order[] }> = ({ activeCycle, orders }) => {
-  // Detect cycle direction by finding earliest completed op
-  const firstOp = [...orders]
-    .filter(o => o.orderStatus?.toUpperCase() === 'COMPLETED')
-    .sort((a, b) => new Date(a.createTime_utc).getTime() - new Date(b.createTime_utc).getTime())[0];
-  const firstOpType = firstOp
-    ? (firstOp.operationType ?? (firstOp.tradeType === 'SELL' ? 'VENTA_USDT' : 'COMPRA_USDT'))
-    : null;
-  const isVentaPrimero = firstOpType === 'VENTA_USDT' || firstOpType === 'RECOMPRA';
+  // Arbitrage Model (Venta-Primero estricto):
+  // Capital invertido = Liquidez obtenida al vender USDT (Bs ingresados)
+  // Recomprado = USDT recuperado con esa misma liquidez (Bs pagados)
+  
+  const col1Label = 'Capital / Liquidez (VES)';
+  const col1Main  = `Bs. ${fmt(activeCycle.ves_recibido)}`;
+  const col1Sub   = `$ ${fmt(activeCycle.usdt_vendido, 4)} USDT vendidos`;
 
-  // Venta-primero:  capital = USDT vendido → Bs ingresados; gasto = Bs recompra
-  // Compra-primero: capital = Bs invertidos → USDT comprado; ganancia = Bs venta
-  const col1Label = isVentaPrimero ? 'Capital (USDT vendido)' : 'Total Invertido (VES)';
-  const col1Main  = isVentaPrimero
-    ? `$ ${fmt(activeCycle.usdt_vendido, 4)} USDT`
-    : `Bs. ${fmt(activeCycle.ves_pagado)}`;
-  const col1Sub   = isVentaPrimero
-    ? `Bs. ${fmt(activeCycle.ves_recibido)}`
-    : `${fmt(activeCycle.usdt_recomprado, 4)} USDT`;
-
-  const col2Label = isVentaPrimero ? 'USDT recomprado' : 'Total Recuperado (VES)';
-  const col2Main  = isVentaPrimero
-    ? `$ ${fmt(activeCycle.usdt_recomprado, 4)} USDT`
-    : `Bs. ${fmt(activeCycle.ves_recibido)}`;
-  const col2Sub   = isVentaPrimero
-    ? `Bs. ${fmt(activeCycle.ves_pagado)}`
-    : `${fmt(activeCycle.usdt_vendido, 4)} USDT`;
+  const col2Label = 'USDT Recomprado';
+  const col2Main  = `$ ${fmt(activeCycle.usdt_recomprado, 4)} USDT`;
+  const col2Sub   = `Bs. ${fmt(activeCycle.ves_pagado)} costo recom.`;
 
   const ganVes   = activeCycle.ganancia_ves;
   const ganUsdt  = activeCycle.ganancia_usdt;

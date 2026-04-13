@@ -166,8 +166,8 @@ export const Cycles: React.FC = () => {
                 <th className="p-[16px] border-b border-[var(--border-strong)]"># Ciclo</th>
                 <th className="p-[16px] border-b border-[var(--border-strong)] min-w-[120px]">Apertura</th>
                 <th className="p-[16px] border-b border-[var(--border-strong)] min-w-[120px]">Cierre</th>
-                <th className="p-[16px] border-b border-[var(--border-strong)] text-right">Invertido</th>
-                <th className="p-[16px] border-b border-[var(--border-strong)] text-right">Recuperado</th>
+                <th className="p-[16px] border-b border-[var(--border-strong)] text-right">Liquidez (Inv.)</th>
+                <th className="p-[16px] border-b border-[var(--border-strong)] text-right">Costo Recomp.</th>
                 <th className="p-[16px] border-b border-[var(--border-strong)] text-right">Comisiones</th>
                 <th className="p-[16px] border-b border-[var(--border-strong)] text-right">Ganancia Neta</th>
                 <th className="p-[16px] border-b border-[var(--border-strong)] text-center">ROI</th>
@@ -219,12 +219,11 @@ export const Cycles: React.FC = () => {
                         {c.closedAt ? fmtDate(c.closedAt) : '—'}
                       </td>
 
-                      {/* Financials */}
                       <td className="p-[16px] mono text-[12px] text-right text-[var(--text-secondary)]">
-                        {c.status === 'En curso' ? '—' : `Bs. ${fmt(c.ves_pagado)}`}
+                        {c.status === 'En curso' ? '—' : `Bs. ${fmt(c.ves_recibido)}`}
                       </td>
                       <td className="p-[16px] mono text-[12px] text-right text-[var(--profit)]">
-                        {c.status === 'En curso' ? '—' : `Bs. ${fmt(c.ves_recibido)}`}
+                        {c.status === 'En curso' ? '—' : `Bs. ${fmt(c.ves_pagado)}`}
                       </td>
                       <td className="p-[16px] mono text-[12px] text-right text-[var(--warning)]">
                         {fmt(c.comision_total, 4)}
@@ -267,8 +266,8 @@ export const Cycles: React.FC = () => {
                             {/* Financial summary mini */}
                             <div className="grid grid-cols-2 md:grid-cols-4 gap-[8px]">
                               {[
-                                { label: 'Total invertido',  val: metrics.totalInvertido,   color: 'text-[var(--text-primary)]' },
-                                { label: 'Total recuperado', val: metrics.totalRecuperado,  color: 'text-[var(--profit)]' },
+                                { label: 'Total Invertido (Liquidez)',  val: metrics.totalRecuperado,  color: 'text-[var(--text-primary)]' },
+                                { label: 'Costo Recompra', val: metrics.totalInvertido,   color: 'text-[var(--text-secondary)]' },
                                 { label: 'Comisiones',       val: metrics.totalComisiones,  color: 'text-[var(--warning)]' },
                                 { label: 'Ganancia Neta',    val: metrics.gananciaNeta,     color: isNeutral ? 'text-[var(--text-secondary)]' : isPos ? 'text-[var(--profit)]' : 'text-[var(--loss)]' },
                               ].map(({ label, val, color }) => (
