@@ -1242,14 +1242,7 @@ export const ActiveCyclePanel: React.FC = () => {
               </span>
             </div>
             <div className="flex items-center gap-[8px]">
-              {/* Quick sale button — emergency modal */}
-              <button
-                onClick={() => { setShowQuickSale(true); setShowForm(false); setEditingOrder(null); }}
-                className="flex items-center gap-[5px] px-[12px] py-[7px] rounded-[8px] bg-[var(--warning-bg)] border border-[var(--warning)]/30 text-[var(--warning)] text-[12px] font-bold hover:brightness-110 transition-all"
-                title="Venta rápida de emergencia"
-              >
-                <Bolt size={12}/> Venta rápida
-              </button>
+
               <Button variant="danger" onClick={() => setShowDeleteModal(true)}>
                 Eliminar
               </Button>
@@ -1307,13 +1300,16 @@ export const ActiveCyclePanel: React.FC = () => {
 
           {/* Sobrante and form modals are rendered as portals below */}
 
-          <OpsTable
-            orders={cycleOrders}
-            cycleId={activeCycle.id}
-            userId={currentUser!.id}
-            onEdit={(order) => { setEditingOrder(order); setShowForm(true); setShowQuickSale(false); setShowSobrante(false); }}
-            onDeleted={() => {}}
-          />
+          {/* Contenedor con scroll para la tabla de operaciones */}
+          <div className="max-h-[350px] overflow-y-auto pr-1 scrollbar-thin scrollbar-thumb-[var(--border-strong)] scrollbar-track-transparent rounded-[8px]">
+            <OpsTable
+              orders={cycleOrders}
+              cycleId={activeCycle.id}
+              userId={currentUser!.id}
+              onEdit={(order) => { setEditingOrder(order); setShowForm(true); setShowQuickSale(false); setShowSobrante(false); }}
+              onDeleted={() => {}}
+            />
+          </div>
         </div>
 
         {/* Quick-add row when no ops */}

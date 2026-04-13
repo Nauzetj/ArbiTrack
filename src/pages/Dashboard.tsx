@@ -6,7 +6,6 @@ import { useAppStore } from '../store/useAppStore';
 import { MetricCard } from '../components/ui/MetricCard';
 import { ActiveCyclePanel } from '../components/dashboard/ActiveCyclePanel';
 import { MiniChart } from '../components/dashboard/MiniChart';
-import { RecentCyclesTable } from '../components/dashboard/RecentCyclesTable';
 import { UnassignedOrdersPool } from '../components/dashboard/UnassignedOrdersPool';
 
 export const Dashboard: React.FC = () => {
@@ -103,10 +102,6 @@ export const Dashboard: React.FC = () => {
         </div>
       </div>
 
-      {/* Recent cycles table */}
-      <div className="recent-cycles-table">
-        <RecentCyclesTable />
-      </div>
     </div>
   );
 };
