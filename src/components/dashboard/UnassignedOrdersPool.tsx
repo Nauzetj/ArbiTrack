@@ -83,7 +83,7 @@ export const UnassignedOrdersPool: React.FC = () => {
   }
 
   return (
-    <div className="bg-[var(--bg-surface-2)] rounded-[16px] border border-[var(--border)] flex flex-col h-full animate-fade-in-up overflow-hidden">
+    <div className="bg-[var(--bg-surface-2)] rounded-[16px] border border-[var(--border)] flex flex-col h-full animate-fade-in-up overflow-hidden max-h-[350px]">
       <div className="p-[16px] border-b border-[var(--border-strong)] bg-[var(--bg-surface-3)]">
         <h3 className="font-semibold text-[14px]">Órdenes sin asignar</h3>
       </div>
