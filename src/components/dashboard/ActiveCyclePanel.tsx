@@ -802,7 +802,7 @@ const OpsTable: React.FC<{
                 </td>
                 <td className="px-[12px] py-[9px] text-[var(--text-secondary)]">{o.exchange || '—'}</td>
                 <td className="px-[12px] py-[9px] font-mono">{o.unitPrice > 0 ? fmt(o.unitPrice) : '—'}</td>
-                <td className="px-[12px] py-[9px] font-mono">{fmt(o.amount, 4)}</td>
+                <td className="px-[12px] py-[9px] font-mono">$ {fmt(o.amount, 4)}</td>
                 <td className="px-[12px] py-[9px] font-mono font-medium">Bs. {fmt(o.totalPrice)}</td>
                 <td className="px-[12px] py-[9px] text-[var(--text-secondary)] max-w-[100px] truncate">{o.counterPartNickName || '—'}</td>
                 <td className="px-[12px] py-[9px] font-mono text-[var(--warning)] text-[10px]">{fmt(o.commission, 4)}</td>
@@ -945,6 +945,9 @@ export const ActiveCyclePanel: React.FC = () => {
   const [showForm, setShowForm]                 = useState(false);
   const [showQuickSale, setShowQuickSale]       = useState(false); // emergent modal
   const [showSummary, setShowSummary]           = useState(false);
+  const [showSobrante, setShowSobrante]         = useState(false);
+  const [sobraVes, setSobraVes]                 = useState('');
+  const [sobraSaving, setSobraSaving]           = useState(false);
   const [editingOrder, setEditingOrder]         = useState<Order | null>(null);
   const [isProcessing, setIsProcessing]         = useState(false);
   const [closedCycleOrders, setClosedCycleOrders] = useState<Order[]>([]);
@@ -1095,6 +1098,68 @@ export const ActiveCyclePanel: React.FC = () => {
     setShowQuickSale(false);
   };
 
+  // ── Sobrante handler ─────────────────────────────────────────────────────────
+  const handleSaveSobrante = async () => {
+    const vesN = parseFloat(sobraVes.replace(',', '.'));
+    if (!vesN || vesN <= 0) { toast.error('Ingresa un monto válido en Bs.'); return; }
+    if (!currentUser || !activeCycle) return;
+
+    // Use avg buy rate (tasa_compra_prom). If not yet calculated, use venta rate.
+    const tasaRef = activeCycle.tasa_compra_prom > 0
+      ? activeCycle.tasa_compra_prom
+      : activeCycle.tasa_venta_prom > 0
+        ? activeCycle.tasa_venta_prom
+        : 1;
+
+    const usdtEquiv = vesN / tasaRef;
+
+    const order: Order = {
+      id: generateUUID(),
+      orderNumber: `MAN-SOB-${Date.now()}`,
+      tradeType: 'SELL',
+      operationType: 'SOBRANTE',
+      commissionType: 'fixed',
+      originMode: 'manual',
+      asset: 'VES',
+      fiat: 'VES',
+      totalPrice: vesN,
+      unitPrice: tasaRef,
+      amount: usdtEquiv,
+      commission: 0,
+      commissionAsset: 'USDT',
+      counterPartNickName: 'Sobrante bancario',
+      orderStatus: 'COMPLETED',
+      createTime_utc: new Date().toISOString(),
+      createTime_local: new Date().toLocaleString(),
+      cycleId: activeCycle.id,
+      importedAt: new Date().toISOString(),
+      userId: currentUser.id,
+      notas: `Sobrante: Bs. ${vesN.toFixed(2)} ÷ tasa ${tasaRef.toFixed(2)} = ${usdtEquiv.toFixed(4)} USDT`,
+    };
+
+    setSobraSaving(true);
+    try {
+      await saveOrder(order);
+      await recalculateCycleMetrics(activeCycle.id, currentUser.id);
+      const { setOrders, setActiveCycle: sAC, setCycles } = useAppStore.getState();
+      const [freshOrders, freshActive, freshCycles] = await Promise.all([
+        getOrdersForUser(currentUser.id),
+        getActiveCycleForUser(currentUser.id),
+        getCyclesForUser(currentUser.id),
+      ]);
+      setOrders(freshOrders);
+      sAC(freshActive);
+      setCycles(freshCycles);
+      toast.success(`Sobrante registrado: Bs. ${vesN.toFixed(2)} ≈ ${usdtEquiv.toFixed(4)} USDT`);
+      setSobraVes('');
+      setShowSobrante(false);
+    } catch (err: any) {
+      toast.error('Error: ' + err.message);
+    } finally {
+      setSobraSaving(false);
+    }
+  };
+
   // ── Empty state ──────────────────────────────────────────────────────────────
   if (!activeCycle) {
     return (
@@ -1204,7 +1269,7 @@ export const ActiveCyclePanel: React.FC = () => {
 
         {/* ── Operations table ── */}
         <div className="bg-[var(--bg-surface-2)] rounded-[14px] border border-[var(--border)] p-[16px] flex flex-col gap-[12px]">
-          <div className="flex items-center justify-between">
+          <div className="flex items-center justify-between flex-wrap gap-[8px]">
             <div className="flex items-center gap-[8px]">
               <span className="text-[12px] font-bold text-[var(--text-primary)]">Operaciones</span>
               {cycleOrders.length > 0 && (
@@ -1213,22 +1278,85 @@ export const ActiveCyclePanel: React.FC = () => {
                 </span>
               )}
             </div>
-            {/* Add / toggle form */}
-            {!showForm && (
+            <div className="flex items-center gap-[8px]">
+              {/* Sobrante button */}
               <button
-                onClick={() => { setShowForm(true); setEditingOrder(null); }}
-                className="flex items-center gap-[6px] px-[14px] py-[7px] rounded-[8px] bg-[var(--accent)] hover:brightness-110 text-white font-bold text-[12px] transition-all shadow-[0_2px_8px_rgba(37,99,235,0.2)]"
+                onClick={() => { setShowSobrante(v => !v); setShowForm(false); }}
+                className={`flex items-center gap-[6px] px-[12px] py-[7px] rounded-[8px] font-bold text-[12px] transition-all border ${showSobrante ? 'bg-[rgba(52,211,153,0.15)] border-[#34d399] text-[#34d399]' : 'bg-[var(--bg-surface-3)] border-[var(--border)] text-[var(--text-secondary)] hover:border-[#34d399] hover:text-[#34d399]'}`}
+                title="Registrar saldo residual bancario como ganancia directa"
               >
-                <Plus size={13}/> Registrar operación
+                <CheckCircle2 size={13}/> Sobrante
               </button>
-            )}
+              {/* Registrar operación */}
+              {!showForm && (
+                <button
+                  onClick={() => { setShowForm(true); setEditingOrder(null); setShowSobrante(false); }}
+                  className="flex items-center gap-[6px] px-[14px] py-[7px] rounded-[8px] bg-[var(--accent)] hover:brightness-110 text-white font-bold text-[12px] transition-all shadow-[0_2px_8px_rgba(37,99,235,0.2)]"
+                >
+                  <Plus size={13}/> Registrar operación
+                </button>
+              )}
+            </div>
           </div>
+
+          {/* Sobrante mini-form */}
+          {showSobrante && (
+            <div className="bg-[rgba(52,211,153,0.06)] border border-[#34d399]/30 rounded-[12px] p-[16px] flex flex-col gap-[12px] animate-fade-in-up">
+              <div className="flex items-center gap-[8px]">
+                <CheckCircle2 size={16} className="text-[#34d399]"/>
+                <span className="text-[13px] font-bold text-[var(--text-primary)]">Registrar sobrante bancario</span>
+              </div>
+              <p className="text-[11px] text-[var(--text-secondary)] -mt-[4px]">
+                Ingresa el monto en Bs. que te sobró en el banco. Se dividirá entre la tasa de recompra del ciclo ({fmt(activeCycle.tasa_compra_prom > 0 ? activeCycle.tasa_compra_prom : activeCycle.tasa_venta_prom)} Bs/USDT) para calcular el equivalente en USDT.
+              </p>
+              <div className="flex items-center gap-[10px] flex-wrap">
+                <div className="flex flex-col gap-[4px] flex-1 min-w-[160px]">
+                  <label className="text-[10px] font-bold text-[var(--text-tertiary)] uppercase tracking-wider">Monto sobrante (Bs.)</label>
+                  <input
+                    autoFocus
+                    type="number"
+                    step="0.01"
+                    min="0"
+                    value={sobraVes}
+                    onChange={e => setSobraVes(e.target.value)}
+                    onKeyDown={e => e.key === 'Enter' && handleSaveSobrante()}
+                    placeholder="Ej: 450.00"
+                    className="bg-[var(--bg-surface-2)] border border-[#34d399]/50 rounded-[8px] px-[12px] py-[8px] text-[13px] font-mono text-[var(--text-primary)] outline-none focus:border-[#34d399] transition-colors"
+                  />
+                </div>
+                {sobraVes && parseFloat(sobraVes.replace(',','.')) > 0 && (
+                  <div className="flex flex-col gap-[4px]">
+                    <label className="text-[10px] font-bold text-[var(--text-tertiary)] uppercase tracking-wider">Equivale a</label>
+                    <span className="text-[15px] font-mono font-bold text-[#34d399]">
+                      $ {fmt(parseFloat(sobraVes.replace(',','.')) / (activeCycle.tasa_compra_prom > 0 ? activeCycle.tasa_compra_prom : activeCycle.tasa_venta_prom > 0 ? activeCycle.tasa_venta_prom : 1), 4)} USDT
+                    </span>
+                  </div>
+                )}
+              </div>
+              <div className="flex items-center gap-[8px]">
+                <button
+                  onClick={handleSaveSobrante}
+                  disabled={sobraSaving || !sobraVes}
+                  className="flex items-center gap-[6px] px-[16px] py-[8px] rounded-[8px] bg-[#34d399] hover:brightness-110 text-white font-bold text-[12px] transition-all disabled:opacity-40"
+                >
+                  {sobraSaving ? <span className="w-[12px] h-[12px] border-2 border-white border-t-transparent rounded-full animate-spin"/> : <CheckCircle2 size={13}/>}
+                  Registrar sobrante
+                </button>
+                <button
+                  onClick={() => { setShowSobrante(false); setSobraVes(''); }}
+                  className="px-[12px] py-[8px] rounded-[8px] text-[var(--text-secondary)] text-[12px] hover:text-[var(--text-primary)] transition-colors"
+                >
+                  Cancelar
+                </button>
+              </div>
+            </div>
+          )}
 
           <OpsTable
             orders={cycleOrders}
             cycleId={activeCycle.id}
             userId={currentUser!.id}
-            onEdit={(order) => { setEditingOrder(order); setShowForm(true); setShowQuickSale(false); }}
+            onEdit={(order) => { setEditingOrder(order); setShowForm(true); setShowQuickSale(false); setShowSobrante(false); }}
             onDeleted={() => {}}
           />
         </div>
