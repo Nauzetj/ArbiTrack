@@ -794,7 +794,7 @@ const OpsTable: React.FC<{
             const opMeta = getOpMeta(o.operationType ?? (o.tradeType === 'SELL' ? 'VENTA_USDT' : 'COMPRA_USDT'));
             const isDeleting = deletingId === o.id;
             return (
-              <tr key={o.id} className={`border-b border-[var(--border)] transition-colors ${isDeleting ? 'opacity-40' : 'hover:bg-[var(--bg-surface-2)]'}`}>
+              <tr key={o.id} className={`border-b border-[var(--border)] ${isDeleting ? 'opacity-40' : ''}`}>
                 <td className="px-[12px] py-[9px] font-mono text-[10px] text-[var(--text-tertiary)]">{i + 1}</td>
                 <td className="px-[12px] py-[9px]">
                   <span className="inline-flex items-center gap-[4px] font-bold text-[10px] whitespace-nowrap" style={{ color: opMeta.color }}>
