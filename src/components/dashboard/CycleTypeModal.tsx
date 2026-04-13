@@ -30,7 +30,7 @@ export const CycleTypeModal: React.FC<CycleTypeModalProps> = ({
     >
       {/* Panel */}
       <div
-        className="relative w-full sm:max-w-[520px] bg-[var(--bg-surface-1)] rounded-t-[24px] sm:rounded-[24px] border border-[var(--border)] shadow-[0_0_60px_rgba(0,0,0,0.6)] overflow-hidden animate-fade-in-up"
+        className="relative w-full sm:max-w-[520px] bg-[var(--bg-surface-1)] rounded-t-[24px] sm:rounded-[24px] border border-[var(--border)] shadow-[0_0_60px_rgba(0,0,0,0.6)] overflow-hidden"
         onClick={e => e.stopPropagation()}
       >
         {/* Glow top */}
@@ -57,7 +57,7 @@ export const CycleTypeModal: React.FC<CycleTypeModalProps> = ({
         {/* BCV pill */}
         {bcvTasa && (
           <div className="mx-[24px] mt-[12px] inline-flex items-center gap-[6px] bg-[var(--bg-surface-3)] border border-[var(--border-strong)] rounded-full px-[12px] py-[5px]">
-            <div className="w-[5px] h-[5px] rounded-full bg-[var(--accent)] animate-pulse-green" />
+            <div className="w-[5px] h-[5px] rounded-full bg-[var(--accent)]" />
             <span className="text-[11px] font-mono font-semibold text-[var(--text-secondary)]">
               Tasa BCV: <span className="text-[var(--text-primary)]">Bs. {bcvTasa.toFixed(2)}</span>
             </span>

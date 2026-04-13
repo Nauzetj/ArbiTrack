@@ -230,7 +230,7 @@ export const Topbar: React.FC = () => {
 
         {/* BCV on mobile — shown prominently next to logo */}
         <div className="md:hidden flex items-center gap-[5px] bg-[var(--bg-surface-3)] border border-[var(--border-strong)] rounded-full px-[10px] py-[4px]">
-          <div className="w-[5px] h-[5px] rounded-full bg-[var(--accent)] animate-pulse-green flex-shrink-0" />
+          <div className="w-[5px] h-[5px] rounded-full bg-[var(--accent)] flex-shrink-0" />
           <span className="font-mono text-[11px] font-semibold tracking-wide">
             {bcvRate ? `Bs. ${bcvRate.tasa_bcv.toFixed(2)}` : 'BCV ---'}
           </span>
@@ -240,7 +240,7 @@ export const Topbar: React.FC = () => {
       <div className="flex items-center gap-[12px] md:gap-[20px]">
         {/* BCV Pill - Desktop only */}
         <div className="hidden md:flex items-center gap-[8px] bg-[var(--bg-surface-3)] border border-[var(--border-strong)] rounded-full px-[16px] py-[6px]">
-          <div className="w-[6px] h-[6px] rounded-full bg-[var(--accent)] animate-pulse-green"></div>
+          <div className="w-[6px] h-[6px] rounded-full bg-[var(--accent)]"></div>
           <span className="font-mono text-[13px] font-medium tracking-wide">
             BCV: Bs. {bcvRate ? bcvRate.tasa_bcv.toFixed(2) : '---'}
           </span>

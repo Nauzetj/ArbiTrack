@@ -577,7 +577,7 @@ const CycleSummary: React.FC<{
   const isNeutral = Math.abs(gananciaNeta) < 0.01;
 
   return (
-    <div className="flex flex-col gap-[20px] animate-fade-in-up">
+    <div className="flex flex-col gap-[20px]">
       {/* Header */}
       <div className="flex items-center justify-between flex-wrap gap-[8px]">
         <div className="flex items-center gap-[10px]">
@@ -1329,7 +1329,7 @@ export const ActiveCyclePanel: React.FC = () => {
           onClick={() => { setShowSobrante(false); setSobraVes(''); }}
         >
           <div
-            className="relative w-full max-w-[460px] rounded-[20px] border border-[#34d399]/30 shadow-2xl overflow-hidden animate-fade-in-up"
+            className="relative w-full max-w-[460px] rounded-[20px] border border-[#34d399]/30 shadow-2xl overflow-hidden"
             style={{ background: 'var(--bg-surface-2)', boxShadow: '0 0 0 1px rgba(52,211,153,0.1), 0 24px 48px rgba(0,0,0,0.55)' }}
             onClick={e => e.stopPropagation()}
           >
@@ -1426,7 +1426,7 @@ export const ActiveCyclePanel: React.FC = () => {
           onClick={() => { setShowForm(false); setEditingOrder(null); }}
         >
           <div
-            className="relative w-full max-w-[720px] max-h-[90vh] rounded-[20px] border border-[var(--accent-border)] shadow-2xl overflow-hidden flex flex-col animate-fade-in-up"
+            className="relative w-full max-w-[720px] max-h-[90vh] rounded-[20px] border border-[var(--accent-border)] shadow-2xl overflow-hidden flex flex-col"
             style={{ background: 'var(--bg-surface-2)', boxShadow: '0 0 0 1px rgba(37,99,235,0.1), 0 24px 48px rgba(0,0,0,0.55)' }}
             onClick={e => e.stopPropagation()}
           >

@@ -74,7 +74,7 @@ export const UnassignedOrdersPool: React.FC = () => {
 
   if (unassigned.length === 0) {
     return (
-      <div className="bg-[var(--bg-surface-2)] rounded-[16px] border border-[var(--border)] p-[24px] h-full flex flex-col items-center justify-center animate-fade-in-up">
+      <div className="bg-[var(--bg-surface-2)] rounded-[16px] border border-[var(--border)] p-[24px] h-full flex flex-col items-center justify-center">
         <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="var(--text-tertiary)" strokeWidth="1.5"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
         <p className="text-[var(--text-secondary)] text-[13px] mt-[12px]">No hay órdenes sin asignar.</p>
         <p className="text-[var(--text-tertiary)] text-[12px] text-center mt-[4px]">Haz click en "Sincronizar" para buscar nuevas órdenes en Binance.</p>
@@ -83,7 +83,7 @@ export const UnassignedOrdersPool: React.FC = () => {
   }
 
   return (
-    <div className="bg-[var(--bg-surface-2)] rounded-[16px] border border-[var(--border)] flex flex-col h-full animate-fade-in-up overflow-hidden max-h-[350px]">
+    <div className="bg-[var(--bg-surface-2)] rounded-[16px] border border-[var(--border)] flex flex-col h-full overflow-hidden max-h-[350px]">
       <div className="p-[16px] border-b border-[var(--border-strong)] bg-[var(--bg-surface-3)]">
         <h3 className="font-semibold text-[14px]">Órdenes sin asignar</h3>
       </div>

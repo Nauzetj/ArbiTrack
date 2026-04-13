@@ -210,7 +210,7 @@ export const Sidebar: React.FC = () => {
                 {isAdmin && (
                   <span className="text-[9px] font-bold text-white bg-[var(--accent)] px-[5px] py-[1px] rounded-full uppercase">ADM</span>
                 )}
-                <div className="w-[7px] h-[7px] rounded-full bg-[var(--profit)] animate-pulse-green" title="Online" />
+                <div className="w-[7px] h-[7px] rounded-full bg-[var(--profit)]" title="Online" />
               </div>
             </div>
             <div className="flex items-center justify-between">
