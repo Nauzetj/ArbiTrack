@@ -1,7 +1,8 @@
-import React, { useRef } from 'react';
+import React, { useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { useGSAP } from '@gsap/react';
 import { gsap } from 'gsap';
-import { AreaChart, Layers, DollarSign, Clock } from 'lucide-react';
+import { AreaChart, Layers, DollarSign, Clock, BarChart3, ChevronRight, X } from 'lucide-react';
 import { useAppStore } from '../store/useAppStore';
 import { MetricCard } from '../components/ui/MetricCard';
 import { ActiveCyclePanel } from '../components/dashboard/ActiveCyclePanel';
@@ -11,6 +12,7 @@ import { UnassignedOrdersPool } from '../components/dashboard/UnassignedOrdersPo
 export const Dashboard: React.FC = () => {
   const { orders, cycles } = useAppStore();
   const containerRef = useRef<HTMLDivElement>(null);
+  const [showChart, setShowChart] = useState(false);
 
   useGSAP(() => {
     gsap.set('.metric-card', { opacity: 0, y: 20 });
@@ -82,25 +84,76 @@ export const Dashboard: React.FC = () => {
           <div className="flex-1 min-w-[0]">
             <ActiveCyclePanel />
           </div>
-          <div className="xl:w-[320px] shrink-0 h-full">
-            <UnassignedOrdersPool />
+          <div className="xl:w-[320px] shrink-0 flex flex-col gap-[10px] md:gap-[14px] h-full">
+            <div className="flex-1 min-h-[0]">
+              <UnassignedOrdersPool />
+            </div>
+            
+            <div className="dashboard-security-notice bg-[var(--bg-surface-2)] rounded-[16px] border border-[var(--border)] p-[12px] md:p-[16px] shrink-0">
+              <h3 className="font-semibold text-[13px]">Seguridad de datos</h3>
+              <p className="text-[12px] md:text-[13px] text-[var(--text-secondary)] mt-[8px]">
+                Tus datos están sincronizados en la nube. Las credenciales de Binance se mantienen
+                exclusivamente en memoria.
+              </p>
+            </div>
           </div>
         </div>
       </div>
 
-      {/* Chart + Info: side by side on XL, stacked on mobile */}
-      <div className="grid grid-cols-1 xl:grid-cols-12 gap-[10px] md:gap-[14px]">
-        <div className="xl:col-span-8 dashboard-chart">
-          <MiniChart />
+      {/* Chart Trigger Button */}
+      <button 
+        onClick={() => setShowChart(true)}
+        className="dashboard-chart w-full bg-[var(--bg-surface-2)] rounded-[16px] border border-[var(--border)] p-[16px] flex items-center justify-between hover:bg-[var(--bg-surface-3)] transition-colors group overflow-hidden relative"
+      >
+        <div className="absolute top-0 right-[20%] w-[180px] h-[180px] bg-[var(--accent)]/5 rounded-full blur-[50px] pointer-events-none group-hover:bg-[var(--accent)]/15 transition-colors duration-500"/>
+        <div className="flex items-center gap-[12px] relative z-10">
+          <div className="w-[42px] h-[42px] rounded-[10px] bg-[rgba(37,99,235,0.1)] text-[var(--accent)] flex items-center justify-center border border-[var(--accent)]/20 group-hover:scale-110 transition-transform">
+            <BarChart3 size={20} />
+          </div>
+          <div className="flex flex-col items-start">
+            <h3 className="font-bold text-[14px] text-[var(--text-primary)]">Rendimiento</h3>
+            <p className="text-[12px] text-[var(--text-secondary)]">Visualizar gráfico de ganancias acumuladas (7 días)</p>
+          </div>
         </div>
-        <div className="xl:col-span-4 dashboard-security-notice bg-[var(--bg-surface-2)] rounded-[16px] border border-[var(--border)] p-[12px] md:p-[16px]">
-          <h3 className="font-semibold text-[13px]">Seguridad de datos</h3>
-          <p className="text-[12px] md:text-[13px] text-[var(--text-secondary)] mt-[8px]">
-            Tus datos están sincronizados en la nube. Las credenciales de Binance se mantienen
-            exclusivamente en memoria durante la sesión y nunca se almacenan en el servidor.
-          </p>
+        <div className="relative z-10 w-[30px] h-[30px] rounded-full bg-[var(--bg-surface-4)] flex items-center justify-center group-hover:bg-[var(--accent)] group-hover:text-white text-[var(--text-tertiary)] transition-colors">
+          <ChevronRight size={16} />
         </div>
-      </div>
+      </button>
+
+      {/* Modal / Caja Flotante de la Gráfica */}
+      {showChart && createPortal(
+        <div 
+          className="fixed inset-0 z-[9999] flex items-center justify-center p-[16px]"
+          style={{ background: 'rgba(10,20,35,0.6)', backdropFilter: 'blur(8px)', WebkitBackdropFilter: 'blur(8px)' }}
+          onClick={() => setShowChart(false)}
+        >
+          <div 
+            className="w-full max-w-[600px] bg-[var(--bg-surface-1)] rounded-[20px] shadow-2xl overflow-hidden border border-[#34d399]/20 relative animate-fade-in-up"
+            onClick={e => e.stopPropagation()}
+            style={{ boxShadow: '0 0 0 1px rgba(52,211,153,0.1), 0 24px 48px rgba(0,0,0,0.55)' }}
+          >
+            <div className="absolute top-0 left-0 right-0 h-[2px]" style={{ background: 'linear-gradient(90deg, transparent, #34d399, transparent)' }}/>
+            <div className="flex items-center justify-between p-[20px] border-b border-[var(--border)]">
+              <div className="flex items-center gap-[10px]">
+                <div className="w-[32px] h-[32px] rounded-[8px] flex items-center justify-center bg-[rgba(52,211,153,0.12)] border border-[#34d399]/25 text-[#34d399]">
+                  <BarChart3 size={16}/>
+                </div>
+                <h2 className="font-bold text-[16px]">Gráfica de Rendimiento</h2>
+              </div>
+              <button 
+                onClick={() => setShowChart(false)}
+                className="w-[30px] h-[30px] rounded-full flex items-center justify-center hover:bg-[var(--bg-surface-3)] text-[var(--text-tertiary)] hover:text-[var(--text-primary)] transition-colors"
+              >
+                <X size={16}/>
+              </button>
+            </div>
+            <div className="p-[20px]">
+              <MiniChart />
+            </div>
+          </div>
+        </div>,
+        document.body
+      )}
 
     </div>
   );
