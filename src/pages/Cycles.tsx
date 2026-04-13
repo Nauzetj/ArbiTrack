@@ -58,7 +58,7 @@ export const Cycles: React.FC = () => {
 
   const getCycleOrders = (cycleId: string) =>
     orders
-      .filter(o => o.cycleId === cycleId)
+      .filter(o => o.cycleId === cycleId && o.orderStatus?.toUpperCase() === 'COMPLETED')
       .sort((a, b) => new Date(a.createTime_utc).getTime() - new Date(b.createTime_utc).getTime());
 
   // Compute extended metrics for a cycle's orders

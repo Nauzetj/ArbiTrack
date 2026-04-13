@@ -953,7 +953,7 @@ export const ActiveCyclePanel: React.FC = () => {
 
   // Orders for active cycle
   const cycleOrders = useMemo(
-    () => orders.filter(o => o.cycleId === activeCycle?.id),
+    () => orders.filter(o => o.cycleId === activeCycle?.id && o.orderStatus?.toUpperCase() === 'COMPLETED'),
     [orders, activeCycle?.id]
   );
 

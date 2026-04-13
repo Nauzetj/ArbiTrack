@@ -15,7 +15,11 @@ export const Dashboard: React.FC = () => {
 
 
   const todayStart = new Date();
-  todayStart.setHours(0, 0, 0, 0);
+  // El "Día" P2P suele extenderse por la madrugada. Restablecemos a las 6:00 AM.
+  if (todayStart.getHours() < 6) {
+    todayStart.setDate(todayStart.getDate() - 1);
+  }
+  todayStart.setHours(6, 0, 0, 0);
 
   const completedToday = cycles.filter(c => c.status === 'Completado' && c.closedAt && new Date(c.closedAt) >= todayStart);
   const profitTodayUsdt = completedToday.reduce((sum, c) => sum + c.ganancia_usdt, 0);
