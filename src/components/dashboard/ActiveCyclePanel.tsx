@@ -904,7 +904,7 @@ const MetricsBar: React.FC<{ activeCycle: Cycle; orders?: Order[] }> = ({ active
       {/* Comisiones */}
       <div className="cycle-stat-group bg-[var(--bg-surface-3)] border border-[var(--border)] rounded-[12px] p-[14px] flex flex-col gap-[4px]">
         <span className="text-[10px] font-bold text-[var(--text-tertiary)] uppercase tracking-[1px]">Total Comisiones</span>
-        <span className="font-mono font-bold text-[15px] text-[var(--warning)]">{fmt(comUsdt, 4)} USDT</span>
+        <span className="font-mono font-bold text-[15px] text-[var(--warning)]">{fmt(comUsdt, 2)} USDT</span>
         <span className="font-mono text-[11px] text-[var(--text-secondary)] mt-[2px]">
           ≈ Bs. {fmt(comUsdt * (activeCycle.tasa_compra_prom || activeCycle.tasa_venta_prom || 1))}
         </span>
@@ -912,17 +912,29 @@ const MetricsBar: React.FC<{ activeCycle: Cycle; orders?: Order[] }> = ({ active
 
       {/* Ganancia Neta */}
       <div className="cycle-stat-group bg-[var(--bg-surface-3)] border border-[var(--border)] rounded-[12px] p-[14px] flex flex-col gap-[4px] relative overflow-hidden">
-        {!isNeutral && (
+        {!isNeutral && activeCycle.usdt_recomprado > 0 && (
           <div className={`absolute top-0 right-0 w-[40px] h-[40px] opacity-10 rounded-bl-full ${isPos ? 'bg-[var(--profit)]' : 'bg-[var(--loss)]'}`} />
         )}
-        <span className="text-[10px] font-bold text-[var(--text-tertiary)] uppercase tracking-[1px]">Ganancia Neta</span>
-        <span className={`font-mono font-bold text-[15px] ${ganColor} flex items-center gap-[6px]`}>
-          {sign(ganVes)}Bs. {fmt(Math.abs(ganVes))}
-          {!isNeutral && <span className="text-[11px]">{isPos ? '▲' : '▼'}</span>}
+        <span className="text-[10px] font-bold text-[var(--text-tertiary)] uppercase tracking-[1px] flex gap-1 items-center">
+          Ganancia Neta 
+          {activeCycle.usdt_recomprado > 0 && activeCycle.usdt_recomprado < activeCycle.usdt_vendido && (
+             <span className="text-[9px] bg-[var(--bg-surface-1)] px-1 rounded normal-case tracking-normal">(Parcial)</span>
+          )}
         </span>
-        <span className={`font-mono text-[11px] mt-[2px] ${ganColor}`}>
-          {sign(ganUsdt)}{fmt(Math.abs(ganUsdt), 4)} USDT
-        </span>
+        
+        {activeCycle.usdt_recomprado === 0 ? (
+          <span className="font-mono font-bold text-[13px] text-[var(--text-tertiary)] mt-[4px]">Esperando compras...</span>
+        ) : (
+          <>
+            <span className={`font-mono font-bold text-[15px] ${ganColor} flex items-center gap-[6px]`}>
+              {sign(ganUsdt)}{fmt(Math.abs(ganUsdt), 2)} USDT
+              {!isNeutral && <span className="text-[11px]">{isPos ? '▲' : '▼'}</span>}
+            </span>
+            <span className={`font-mono text-[11px] mt-[2px] opacity-80 ${ganColor}`}>
+              ≈ {sign(ganVes)}Bs. {fmt(Math.abs(ganVes))}
+            </span>
+          </>
+        )}
       </div>
     </div>
   );
