@@ -3,7 +3,7 @@ import { RefreshCw, User, CheckCircle2 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { useAppStore } from '../../store/useAppStore';
 import { fetchP2POrders } from '../../services/binance';
-import { saveOrder, saveOrdersBulk, getOrdersForUser, getCyclesForUser, getActiveCycleForUser, recalculateCycleMetrics } from '../../services/dbOperations';
+import { saveOrdersBulk, getOrdersForUser, getCyclesForUser, getActiveCycleForUser, recalculateCycleMetrics } from '../../services/dbOperations';
 import { generateUUID } from '../../crypto/auth';
 import type { Order } from '../../types';
 
