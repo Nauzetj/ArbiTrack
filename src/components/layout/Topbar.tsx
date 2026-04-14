@@ -3,7 +3,7 @@ import { RefreshCw, User, CheckCircle2 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { useAppStore } from '../../store/useAppStore';
 import { fetchP2POrders } from '../../services/binance';
-import { saveOrder, getOrdersForUser, getCyclesForUser, getActiveCycleForUser, recalculateCycleMetrics } from '../../services/dbOperations';
+import { saveOrder, saveOrdersBulk, getOrdersForUser, getCyclesForUser, getActiveCycleForUser, recalculateCycleMetrics } from '../../services/dbOperations';
 import { generateUUID } from '../../crypto/auth';
 import type { Order } from '../../types';
 
@@ -66,6 +66,7 @@ export const Topbar: React.FC = () => {
         const cycleOpenedAt = activeCycle ? new Date(activeCycle.openedAt).getTime() : null;
         
         let addedCount = 0;
+        const ordersToUpsert: Order[] = [];
         
         console.log('[SYNC] existingOrders:', existingOrders.length);
         console.log('[SYNC] uniqueBinanceOrders:', uniqueBinanceOrders.length);
@@ -100,7 +101,7 @@ export const Topbar: React.FC = () => {
               }
 
               if (isUpdated) {
-                await saveOrder(updatedOrder);
+                ordersToUpsert.push(updatedOrder);
                 addedCount++;
               }
               continue;
@@ -136,11 +137,20 @@ export const Topbar: React.FC = () => {
               importedAt: new Date().toISOString(),
               userId: user.id
             };
-            await saveOrder(importedOrder);
+            ordersToUpsert.push(importedOrder);
             addedCount++;
           } catch (rowError: any) {
-             console.error('Error insertando orden:', o.orderNumber, rowError);
+             console.error('Error calculando orden en memoria:', o.orderNumber, rowError);
              throw new Error(`Error en orden ${o.orderNumber}: ${rowError.message}`);
+          }
+        }
+
+        if (ordersToUpsert.length > 0) {
+          try {
+            await saveOrdersBulk(ordersToUpsert);
+          } catch (bulkErr: any) {
+            console.error('Error en saveOrdersBulk:', bulkErr);
+            throw new Error(`Error guardando en BD: ${bulkErr.message}`);
           }
         }
 

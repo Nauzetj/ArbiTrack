@@ -27,7 +27,7 @@ DECLARE
   v_ganancia_ves    NUMERIC := 0;
   v_ganancia_usdt   NUMERIC := 0;
   v_roi             NUMERIC := 0;
-  v_tasa_ref        NUMERIC := 1;
+  v_matched_vol     NUMERIC := 0;
   v_capital_base    NUMERIC := 0;
 BEGIN
   -- Un solo SELECT que acumula todos los totales
@@ -71,16 +71,17 @@ BEGIN
     v_diferencial := v_tasa_venta - v_tasa_compra;
   END IF;
 
-  -- Tasa de referencia para convertir VES ↔ USDT
-  v_tasa_ref := CASE
-    WHEN v_tasa_compra > 0 THEN v_tasa_compra
-    WHEN v_tasa_venta  > 0 THEN v_tasa_venta
-    ELSE 1
-  END;
+  -- Matched Volume para ganancias precisas en ciclos parciales
+  v_matched_vol := LEAST(v_usdt_vendido, v_usdt_recomprado);
 
   -- Ganancias
-  v_ganancia_ves  := (v_ves_recibido - v_ves_pagado) - (v_comision_total * v_tasa_ref);
-  v_ganancia_usdt := ((v_ves_recibido - v_ves_pagado) / v_tasa_ref) - v_comision_total;
+  v_ganancia_ves := v_matched_vol * v_diferencial;
+  
+  IF v_tasa_compra > 0 THEN
+    v_ganancia_usdt := (v_ganancia_ves / v_tasa_compra) - v_comision_total;
+  ELSE
+    v_ganancia_usdt := -v_comision_total;
+  END IF;
 
   -- ROI (base = capital USDT valorado, o VES invertidas)
   v_capital_base := CASE
@@ -116,7 +117,7 @@ $$;
 -- Query más usada: WHERE cycle_id=? AND user_id=? AND order_status='COMPLETED'
 -- El índice parcial hace que sea ~2-3x más rápido.
 
-CREATE INDEX CONCURRENTLY IF NOT EXISTS idx_orders_cycle_user_completed
+CREATE INDEX IF NOT EXISTS idx_orders_cycle_user_completed
   ON orders(cycle_id, user_id)
   WHERE order_status = 'COMPLETED';
 

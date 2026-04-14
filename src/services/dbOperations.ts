@@ -219,6 +219,36 @@ export const saveOrder = async (order: Order) => {
   if (error) throw error;
 };
 
+export const saveOrdersBulk = async (orders: Order[]) => {
+  if (orders.length === 0) return;
+  const payload = orders.map(order => ({
+    id: order.id,
+    order_number: order.orderNumber,
+    trade_type: order.tradeType,
+    asset: order.asset,
+    fiat: order.fiat,
+    total_price: order.totalPrice,
+    unit_price: order.unitPrice,
+    amount: order.amount,
+    commission: order.commission,
+    commission_asset: order.commissionAsset,
+    counterpart_nickname: order.counterPartNickName,
+    order_status: order.orderStatus,
+    create_time_utc: order.createTime_utc,
+    create_time_local: order.createTime_local,
+    cycle_id: order.cycleId,
+    imported_at: order.importedAt,
+    user_id: order.userId,
+    operation_type: order.operationType ?? null,
+    commission_type: order.commissionType ?? null,
+    origin_mode: order.originMode ?? null,
+    exchange: order.exchange ?? null,
+    notas: order.notas ?? null,
+  }));
+  const { error } = await supabase.from('orders').upsert(payload);
+  if (error) throw error;
+};
+
 export const deleteOrder = async (orderId: string, userId: string): Promise<void> => {
   const { error } = await supabase
     .from('orders')
@@ -282,16 +312,17 @@ export const deleteCycle = async (cycleId: string, userId: string): Promise<void
 };
 
 export const recalculateCycleMetrics = async (cycleId: string, userId: string): Promise<void> => {
-  // NOTA: Se deshabilita temporalmente la SP debido a un error crítico de cálculo en ciclos parciales.
-  // Se usará el cálculo local hasta que el usuario actualice la SP en Supabase.
-  /*
+  // Intentaremos usar el Stored Procedure para máxima velocidad de sincronización.
+  // Si el usuario aún no ha actualizado el SQL en Supabase y falla, usamos el fallback.
   const { error } = await supabase.rpc('recalculate_cycle_metrics', {
     p_cycle_id: cycleId,
     p_user_id:  userId,
   });
-  */
   
-  await recalculateCycleMetrics_local(cycleId, userId);
+  if (error) {
+    console.warn("RPC recalculate_cycle_metrics falló. Usando cálculo local (fallback):", error);
+    await recalculateCycleMetrics_local(cycleId, userId);
+  }
 };
 
 // ─── Fallback local (mientras no se haya ejecutado la SP en Supabase) ─────────
