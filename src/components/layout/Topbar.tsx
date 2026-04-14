@@ -216,9 +216,7 @@ export const Topbar: React.FC = () => {
       const { activeCycle } = useAppStore.getState();
       const delay = activeCycle ? 20_000 : 60_000;
       timeoutId = setTimeout(() => {
-        if (!document.hidden) {
-          handleSync(false);
-        }
+        handleSync(false);
         scheduleNext();
       }, delay);
     };
