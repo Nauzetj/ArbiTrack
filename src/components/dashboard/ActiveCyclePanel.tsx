@@ -862,7 +862,7 @@ const MetricsBar: React.FC<{ activeCycle?: Cycle; orders: Order[] }> = ({ orders
       case 'COMPRA_USDT': usdt_recomprado += o.amount;     ves_pagado   += o.totalPrice; break;
       case 'RECOMPRA':    usdt_recomprado += o.amount;     ves_pagado   += o.totalPrice; ves_recibido += o.totalPrice; break;
       case 'COMPRA_USD':  ves_pagado      += o.totalPrice; break;
-      case 'SOBRANTE':    ves_recibido    += o.totalPrice; break;
+      case 'SOBRANTE':    usdt_recomprado += o.amount;     ves_pagado   += o.totalPrice; break;
     }
   });
   const tasa_venta_prom  = usdt_vendido    > 0 ? ves_recibido / usdt_vendido    : 0;

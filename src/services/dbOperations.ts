@@ -345,7 +345,7 @@ const recalculateCycleMetrics_local = async (cycleId: string, userId: string): P
       case 'RECOMPRA':    usdt_recomprado += o.amount; ves_pagado += o.totalPrice; ves_recibido += o.totalPrice; break;
       case 'VENTA_USDT':  usdt_vendido    += o.amount; ves_recibido += o.totalPrice; break;
       case 'COMPRA_USD':  ves_pagado      += o.totalPrice; break;
-      case 'SOBRANTE':    ves_recibido    += o.totalPrice; break;
+      case 'SOBRANTE':    usdt_recomprado += o.amount; ves_pagado += o.totalPrice; break;
     }
   });
 
