@@ -983,7 +983,7 @@ const MetricsBar: React.FC<{ activeCycle?: Cycle; orders: Order[] }> = ({ orders
 // ─── Main Component ───────────────────────────────────────────────────────────
 
 export const ActiveCyclePanel: React.FC = () => {
-  const { activeCycle, setActiveCycle, currentUser, bcvRate, cycles, setCycles, orders } = useAppStore();
+  const { activeCycle, setActiveCycle, setOrders, currentUser, bcvRate, cycles, setCycles, orders } = useAppStore();
   const panelRef = useRef<HTMLDivElement>(null);
 
   // UI state
@@ -1014,6 +1014,7 @@ export const ActiveCyclePanel: React.FC = () => {
 
   const handleOpenCycle = async (cycleType: 'p2p' | 'manual') => {
     if (!currentUser) return;
+    setIsProcessing(true);
     const safeCycleNumber = Number(Date.now().toString().slice(-9));
     const newCycle: Cycle = {
       id: generateUUID(),
@@ -1033,14 +1034,28 @@ export const ActiveCyclePanel: React.FC = () => {
       userId: currentUser.id,
     };
     setShowTypeModal(false);
-    setActiveCycle(newCycle);
-    setCycles([newCycle, ...cycles]);
-    toast.success(`Ciclo ${cycleType === 'p2p' ? 'P2P' : 'Multi-Exchange'} iniciado.`);
-    saveCycle(newCycle).catch(err => {
-      toast.error(`Error al guardar: ${err.message}`);
-      setActiveCycle(null);
-      setCycles(cycles);
-    });
+    try {
+      // IMPORTANTE: Esperar confirmación de la DB ANTES de actualizar el store local.
+      // Esto evita el race condition donde el ciclo aparecía y luego desaparecía
+      // si saveCycle fallaba después de setActiveCycle(newCycle).
+      await saveCycle(newCycle);
+
+      // Fetch fresco para garantizar que lo que está en el store == lo que está en DB
+      const [freshOrders, freshActiveCycle, freshCycles] = await Promise.all([
+        getOrdersForUser(currentUser.id),
+        getActiveCycleForUser(currentUser.id),
+        getCyclesForUser(currentUser.id),
+      ]);
+      setOrders(freshOrders);
+      setActiveCycle(freshActiveCycle ?? newCycle); // fallback al objeto local si la query falla
+      setCycles(freshCycles.length > 0 ? freshCycles : [newCycle, ...cycles]);
+      toast.success(`Ciclo ${cycleType === 'p2p' ? 'P2P' : 'Multi-Exchange'} iniciado.`);
+    } catch (err: any) {
+      toast.error(`Error al crear ciclo: ${err.message}`);
+      // No actualizamos el store local si la DB falló → el estado queda limpio
+    } finally {
+      setIsProcessing(false);
+    }
   };
 
   const handleCloseCycle = async () => {

@@ -77,6 +77,10 @@ export const Topbar: React.FC = () => {
             const existingOrder = existingOrders.find(ex => ex.orderNumber === o.orderNumber);
 
             if (existingOrder) {
+              if (existingOrder.orderStatus === 'DELETED') {
+                continue;
+              }
+
               let isUpdated = false;
               let updatedOrder = { ...existingOrder };
 

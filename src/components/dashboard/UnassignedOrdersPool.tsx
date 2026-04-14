@@ -3,10 +3,10 @@ import { useAppStore } from '../../store/useAppStore';
 import type { Order } from '../../types';
 import { Badge } from '../ui/Badge';
 import toast from 'react-hot-toast';
-import { saveOrder, saveCycle, recalculateCycleMetrics, getOrdersForUser, getCyclesForUser, getActiveCycleForUser } from '../../services/dbOperations';
+import { saveOrder, recalculateCycleMetrics, getOrdersForUser, getCyclesForUser, getActiveCycleForUser } from '../../services/dbOperations';
 
 export const UnassignedOrdersPool: React.FC = () => {
-  const { orders, cycles, activeCycle, setActiveCycle, setOrders, setCycles, currentUser } = useAppStore();
+  const { orders, activeCycle, setActiveCycle, setOrders, setCycles, currentUser } = useAppStore();
 
   const unassigned = orders.filter(o => !o.cycleId && o.orderStatus === 'COMPLETED');
 

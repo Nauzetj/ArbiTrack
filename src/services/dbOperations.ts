@@ -222,7 +222,7 @@ export const saveOrder = async (order: Order) => {
 export const deleteOrder = async (orderId: string, userId: string): Promise<void> => {
   const { error } = await supabase
     .from('orders')
-    .delete()
+    .update({ order_status: 'DELETED', cycle_id: null })
     .eq('id', orderId)
     .eq('user_id', userId);
   if (error) throw error;

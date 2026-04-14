@@ -118,7 +118,13 @@ export const AppLayout: React.FC = () => {
           ]);
           setOrders(orders);
           setCycles(cycles);
-          setActiveCycle(activeCycle);
+          // CORRECCIÓN: Solo actualizamos activeCycle desde la DB si el store
+          // aún no tiene uno. Esto evita que un fetch lento pise un ciclo recién
+          // creado que ya fue confirmado localmente en handleOpenCycle.
+          const currentActiveCycle = useAppStore.getState().activeCycle;
+          if (!currentActiveCycle) {
+            setActiveCycle(activeCycle);
+          }
         } catch (err: any) {
           console.error('Error cargando históricos de Supabase:', err);
           toast.error('Error al sincronizar historial con la nube.', { id: 'hydration-err' });
