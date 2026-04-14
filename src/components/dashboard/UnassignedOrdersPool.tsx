@@ -2,73 +2,39 @@ import React from 'react';
 import { useAppStore } from '../../store/useAppStore';
 import type { Order } from '../../types';
 import { Badge } from '../ui/Badge';
-import { saveOrder, saveCycle } from '../../services/dbOperations';
 import toast from 'react-hot-toast';
+import { saveOrder, saveCycle, recalculateCycleMetrics, getOrdersForUser, getCyclesForUser, getActiveCycleForUser } from '../../services/dbOperations';
 
 export const UnassignedOrdersPool: React.FC = () => {
-  const { orders, cycles, activeCycle, setActiveCycle, setOrders, setCycles } = useAppStore();
+  const { orders, cycles, activeCycle, setActiveCycle, setOrders, setCycles, currentUser } = useAppStore();
 
   const unassigned = orders.filter(o => !o.cycleId && o.orderStatus === 'COMPLETED');
 
   const handleAssign = async (order: Order) => {
-    if (!activeCycle) return;
+    if (!activeCycle || !currentUser) return;
     
     try {
       const updatedOrder = { ...order, cycleId: activeCycle.id };
       await saveOrder(updatedOrder);
       
-      const updatedOrders = orders.map(o => o.id === order.id ? updatedOrder : o);
-      setOrders(updatedOrders);
+      // Recalculate metrics on backend/local fallback
+      await recalculateCycleMetrics(activeCycle.id, currentUser.id);
 
-      // Update raw totals
-      const newCycle = { ...activeCycle };
-      if (order.tradeType === 'SELL') {
-         newCycle.usdt_vendido += order.amount;
-         newCycle.ves_recibido += order.totalPrice;
-      } else {
-         newCycle.usdt_recomprado += order.amount;
-         newCycle.ves_pagado += order.totalPrice;
-      }
-      newCycle.comision_total += order.commission;
+      // Fetch fresh state to guarantee strict consistency
+      const [freshOrders, freshActiveCycle, freshCycles] = await Promise.all([
+        getOrdersForUser(currentUser.id),
+        getActiveCycleForUser(currentUser.id),
+        getCyclesForUser(currentUser.id),
+      ]);
 
-      // --- Recalculate all derived metrics ---
-      const tasa_venta_prom = newCycle.usdt_vendido > 0
-        ? newCycle.ves_recibido / newCycle.usdt_vendido
-        : 0;
-      const tasa_compra_prom = newCycle.usdt_recomprado > 0
-        ? newCycle.ves_pagado / newCycle.usdt_recomprado
-        : 0;
-      const diferencial_tasa =
-        tasa_venta_prom > 0 && tasa_compra_prom > 0
-          ? tasa_venta_prom - tasa_compra_prom
-          : 0;
-      const matchedVolume = Math.min(newCycle.usdt_vendido, newCycle.usdt_recomprado);
-      const ganancia_ves = matchedVolume * diferencial_tasa;
-      const ganancia_usdt =
-        tasa_compra_prom > 0
-          ? ganancia_ves / tasa_compra_prom - newCycle.comision_total
-          : -newCycle.comision_total;
-      const roi_percent =
-        newCycle.usdt_vendido > 0
-          ? (ganancia_usdt / newCycle.usdt_vendido) * 100
-          : 0;
+      setOrders(freshOrders);
+      setActiveCycle(freshActiveCycle);
+      setCycles(freshCycles);
 
-      newCycle.tasa_venta_prom  = tasa_venta_prom;
-      newCycle.tasa_compra_prom = tasa_compra_prom;
-      newCycle.diferencial_tasa = diferencial_tasa;
-      newCycle.ganancia_ves     = ganancia_ves;
-      newCycle.ganancia_usdt    = ganancia_usdt;
-      newCycle.roi_percent      = roi_percent;
-      // ----------------------------------------
-
-      await saveCycle(newCycle);
-      setActiveCycle(newCycle);
-      // Sync the cycles[] array in the store so all consumers see fresh data
-      setCycles(cycles.map(c => c.id === newCycle.id ? newCycle : c));
-      toast.success('Orden asignada con éxito');
+      toast.success('Orden asignada al ciclo correctamente');
     } catch (e: any) {
-      console.error(e);
-      toast.error('Error de red al asignar: ' + e.message);
+      console.error('Error al asignar:', e);
+      toast.error('Error al asignar: ' + e.message);
     }
   };
 
