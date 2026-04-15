@@ -54,14 +54,21 @@ export const Topbar: React.FC = () => {
         }
       }
       
+      // Fecha de apertura del ciclo
       const cycleOpenedAtVal = activeCycle ? new Date(activeCycle.openedAt).getTime() : null;
       console.log('[SYNC] Ciclo activo:', activeCycle ? 'sí' : 'no');
       console.log('[SYNC] cycleOpenedAtVal:', cycleOpenedAtVal ? new Date(cycleOpenedAtVal).toISOString() : 'sin ciclo');
       
+      // FILTRO: Buscar desde 30 min ANTES de abrir el ciclo
+      const filterStartMs = cycleOpenedAtVal 
+        ? cycleOpenedAtVal - (30 * 60 * 1000)  // 30 minutos antes
+        : null;
+      console.log('[SYNC] Buscar desde:', filterStartMs ? new Date(filterStartMs).toISOString() : 'sin filtro');
+      
       // Obtener órdenes de Binance
       const requests = [];
       const tradeTypes = ['BUY', 'SELL'];
-      const maxPages = 2; // Reducido a 2 porque solo necesitamos las más recientes
+      const maxPages = 2;
       for (const t of tradeTypes) {
         for (let page = 1; page <= maxPages; page++) {
           requests.push(fetchP2POrders(currentState.binanceKeys!.apiKey, currentState.binanceKeys!.secretKey, page, t));
@@ -85,15 +92,13 @@ export const Topbar: React.FC = () => {
       });
       let uniqueBinanceOrders = Array.from(uniqueOrdersMap.values());
       
-      // FILTRO CLAVE: Solo órdenes DESPUÉS de la última orden ya procesada del ciclo
-      // Si no hay última orden, usar la fecha de apertura del ciclo
-      const filterTimeMs = lastOrderTimeMs || cycleOpenedAtVal;
-      if (filterTimeMs) {
+      // FILTRO: Solo órdenes DESPUÉS de 30 min antes de abrir el ciclo
+      if (filterStartMs) {
         uniqueBinanceOrders = uniqueBinanceOrders.filter(o => {
           const orderTime = new Date(o.createTime).getTime();
-          return orderTime > filterTimeMs; // > (mayor que) no >= (mayor o igual)
+          return orderTime >= filterStartMs;
         });
-        console.log('[SYNC] Órdenes nuevas después de:', new Date(filterTimeMs).toISOString(), '→ count:', uniqueBinanceOrders.length);
+        console.log('[SYNC] Órdenes desde 30min antes del ciclo:', uniqueBinanceOrders.length);
       }
       
       // Debug: contar tipos de órdenes
@@ -159,11 +164,13 @@ export const Topbar: React.FC = () => {
               continue;
             }
 
-            // Nueva orden - asignar al ciclo activo
+            // Nueva orden - asignar al ciclo activo si está dentro del rango (30min antes hasta ahora)
             existingOrders.push({ ...o, id: generateUUID() } as any);
 
             let autoAssignedCycleId: string | null = null;
-            if (activeCycle && cycleOpenedAtVal) {
+            const orderTimeMs = new Date(o.createTime).getTime();
+            // Asignar si la orden es desde 30min antes del ciclo
+            if (activeCycle && filterStartMs && orderTimeMs >= filterStartMs) {
               autoAssignedCycleId = activeCycle.id;
             }
 
