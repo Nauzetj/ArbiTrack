@@ -207,20 +207,24 @@ export const Topbar: React.FC = () => {
             await recalculateCycleMetrics(activeCycle.id, user.id);
             console.log('[SYNC] Recálculo completado, actualizando UI...');
             
-            // FORZAR refresh con delay pequeño para asegurar render
+            // Obtener datos frescos
             const [freshActiveCycle, freshCycles, freshOrders] = await Promise.all([
               getActiveCycleForUser(user.id),
               getCyclesForUser(user.id),
               getOrdersForUser(user.id),
             ]);
             
-            // Forzar update inmediato
+            // Limpiar y luego setear con pequeño delay para forzar re-render
+            setCycles([]);
+            setOrders([]);
             setActiveCycle(null);
+            
             setTimeout(() => {
               setActiveCycle(freshActiveCycle);
               setCycles(freshCycles);
               setOrders(freshOrders);
-            }, 100);
+              console.log('[SYNC] UI actualizada');
+            }, 200);
           } else {
             const freshOrders = await getOrdersForUser(user.id);
             setOrders(freshOrders);
