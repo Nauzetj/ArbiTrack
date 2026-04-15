@@ -85,15 +85,14 @@ export const Topbar: React.FC = () => {
       });
       let uniqueBinanceOrders = Array.from(uniqueOrdersMap.values());
       
-      // FILTRO CLAVE: Solo órdenes DESPUÉS de la última orden ya procesada del ciclo
-      // Si no hay última orden, usar la fecha de apertura del ciclo
-      const filterTimeMs = lastOrderTimeMs || cycleOpenedAtVal;
-      if (filterTimeMs) {
+      // Buscar TODAS las órdenes desde 30min antes de abrir el ciclo (no solo las nuevas)
+      const filterStartMs = cycleOpenedAtVal ? cycleOpenedAtVal - (30 * 60 * 1000) : null;
+      if (filterStartMs) {
         uniqueBinanceOrders = uniqueBinanceOrders.filter(o => {
           const orderTime = new Date(o.createTime).getTime();
-          return orderTime > filterTimeMs; // > (mayor que) no >= (mayor o igual)
+          return orderTime >= filterStartMs;
         });
-        console.log('[SYNC] Órdenes nuevas después de:', new Date(filterTimeMs).toISOString(), '→ count:', uniqueBinanceOrders.length);
+        console.log('[SYNC] Órdenes desde 30min antes:', uniqueBinanceOrders.length);
       }
       
       // Debug: contar tipos de órdenes
