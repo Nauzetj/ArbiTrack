@@ -1196,8 +1196,13 @@ export const ActiveCyclePanel: React.FC = () => {
 
     setSobraSaving(true);
     try {
-      await saveOrder(order);
-      await recalculateCycleMetrics(activeCycle.id, currentUser.id);
+      // Guardar y recalcular en paralelo
+      await Promise.all([
+        saveOrder(order),
+        recalculateCycleMetrics(activeCycle.id, currentUser.id).catch(() => {})
+      ]);
+      
+      // Solo actualizar store, no hace falta recalcular de nuevo
       const { setOrders, setActiveCycle: sAC, setCycles } = useAppStore.getState();
       const [freshOrders, freshActive, freshCycles] = await Promise.all([
         getOrdersForUser(currentUser.id),
@@ -1207,6 +1212,7 @@ export const ActiveCyclePanel: React.FC = () => {
       setOrders(freshOrders);
       sAC(freshActive);
       setCycles(freshCycles);
+      
       toast.success(`Sobrante registrado: Bs. ${vesN.toFixed(2)} ≈ ${usdtEquiv.toFixed(4)} USDT`);
       setSobraVes('');
       setShowSobrante(false);
