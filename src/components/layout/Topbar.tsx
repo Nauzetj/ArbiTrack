@@ -33,10 +33,10 @@ export const Topbar: React.FC = () => {
     setSyncStatus('syncing');
 
     try {
-      // OPTIMIZACIÓN FASE 1: Reducir páginas de 3 a 2 (más órdenes sin saturar)
+      // Optimización: páginas ajustables para obtener más órdenes históricas
       const requests = [];
       const tradeTypes = ['BUY', 'SELL'];
-      const maxPages = 2;
+      const maxPages = 3;
       for (const t of tradeTypes) {
         for (let page = 1; page <= maxPages; page++) {
           requests.push(fetchP2POrders(currentState.binanceKeys!.apiKey, currentState.binanceKeys!.secretKey, page, t));
