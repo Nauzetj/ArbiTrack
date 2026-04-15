@@ -169,7 +169,7 @@ export const Cycles: React.FC = () => {
                 <th className="p-[16px] border-b border-[var(--border-strong)] text-right">Liquidez (Inv.)</th>
                 <th className="p-[16px] border-b border-[var(--border-strong)] text-right">Costo Recomp.</th>
                 <th className="p-[16px] border-b border-[var(--border-strong)] text-right">Comisiones</th>
-                <th className="p-[16px] border-b border-[var(--border-strong)] text-right">Ganancia USDT</th>
+                <th className="p-[16px] border-b border-[var(--border-strong)] text-right">Ganancia (USDT)</th>
                 <th className="p-[16px] border-b border-[var(--border-strong)] text-center">ROI</th>
                 <th className="p-[16px] border-b border-[var(--border-strong)] text-center">Estado</th>
               </tr>
