@@ -65,6 +65,19 @@ export const Topbar: React.FC = () => {
       const buyCount = uniqueBinanceOrders.filter(o => o.tradeType === 'BUY').length;
       console.log('[SYNC] SELL:', sellCount, 'BUY:', buyCount);
       
+      // Debug: mostrar las 3 órdenes más recientes
+      const sortedByTime = [...uniqueBinanceOrders].sort((a, b) => 
+        new Date(b.createTime).getTime() - new Date(a.createTime).getTime()
+      );
+      console.log('[SYNC] Órdenes más recientes:', sortedByTime.slice(0, 3).map(o => ({
+        orderNumber: o.orderNumber,
+        createTime: new Date(o.createTime).toISOString(),
+        createTimeMs: new Date(o.createTime).getTime(),
+        tradeType: o.tradeType,
+        orderStatus: o.orderStatus,
+        amount: o.amount,
+      })));
+      
       // Debug: mostrar primeras 5 órdenes para verificar estructura
       console.log('[SYNC] Primeras órdenessample:', uniqueBinanceOrders.slice(0, 5).map(o => ({
         orderNumber: o.orderNumber,
@@ -81,6 +94,21 @@ export const Topbar: React.FC = () => {
         const existingOrders = await getOrdersForUser(user.id);
         const activeCycle = await getActiveCycleForUser(user.id);
         const cycleOpenedAt = activeCycle ? new Date(activeCycle.openedAt).getTime() : null;
+        
+        console.log('[SYNC] cycleOpenedAt:', cycleOpenedAt ? new Date(cycleOpenedAt).toISOString() : 'null');
+        
+        // Debug: mostrar las 3 órdenes más recientes
+        const sortedByTime = [...uniqueBinanceOrders].sort((a, b) => 
+          new Date(b.createTime).getTime() - new Date(a.createTime).getTime()
+        );
+        console.log('[SYNC] Órdenes más recientes:', sortedByTime.slice(0, 3).map(o => ({
+          orderNumber: o.orderNumber,
+          createTimeMs: new Date(o.createTime).getTime(),
+          createTime: new Date(o.createTime).toISOString(),
+          tradeType: o.tradeType,
+          orderStatus: o.orderStatus,
+          amount: o.amount,
+        })));
         
         let addedCount = 0;
         const ordersToUpsert: Order[] = [];
