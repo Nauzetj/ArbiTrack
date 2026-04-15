@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { RefreshCw, User, CheckCircle2 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { useAppStore } from '../../store/useAppStore';
@@ -10,25 +10,33 @@ import type { Order } from '../../types';
 export const Topbar: React.FC = () => {
   const { bcvRate, isSyncing, setIsSyncing, setLastSyncTime, binanceKeys, currentUser, setOrders, setActiveCycle, setCycles } = useAppStore();
   const [syncStatus, setSyncStatus] = useState<'idle' | 'syncing' | 'success' | 'error'>('idle');
+  const syncInProgress = useRef(false);
 
   const handleSync = async (isManual: boolean = false) => {
+    if (syncInProgress.current) return;
+    syncInProgress.current = true;
+    
     const currentState = useAppStore.getState();
     const user = currentState.currentUser;
     if (!currentState.binanceKeys || !user) {
       if (isManual) toast.error('Sesión de Binance expirada. Por favor cierra sesión y vuelve a entrar.');
+      syncInProgress.current = false;
       return;
     }
 
-    if (currentState.isSyncing) return;
+    if (currentState.isSyncing) {
+      syncInProgress.current = false;
+      return;
+    }
 
     setIsSyncing(true);
     setSyncStatus('syncing');
 
     try {
-      // Explicitly fetch BUY and SELL to prevent Binance API returning partial/empty lists without tradeType
+      // OPTIMIZACIÓN FASE 1: Reducir páginas de 3 a 1 (solo las más recientes tienen órdenes nuevas)
       const requests = [];
       const tradeTypes = ['BUY', 'SELL'];
-      const maxPages = 3; // 6 requests en lugar de 20 (las últimas páginas tienen órdenes recientes)
+      const maxPages = 1;
       for (const t of tradeTypes) {
         for (let page = 1; page <= maxPages; page++) {
           requests.push(fetchP2POrders(currentState.binanceKeys!.apiKey, currentState.binanceKeys!.secretKey, page, t));
@@ -197,6 +205,8 @@ export const Topbar: React.FC = () => {
         toast.error(`ERROR CRÍTICO: ${e.message}`, { duration: 6000 });
       }
       setTimeout(() => setSyncStatus('idle'), 3000);
+    } finally {
+      syncInProgress.current = false;
     }
   };
 
@@ -206,17 +216,16 @@ export const Topbar: React.FC = () => {
     // Sync inmediato al montar
     handleSync(false);
 
-    // Auto-sync adaptativo:
-    //   - Con ciclo activo → cada 20s (tiempo real de operación)
-    //   - Sin ciclo activo → cada 60s (solo monitoreo)
-    //   - Tab oculta → no sincroniza (ahorra recursos y quota de Binance)
+    // OPTIMIZACIÓN FASE 1: Intervalo reducido de 20s a 15s
+    // Con ciclo activo → cada 15s (más rápido sin saturar la API)
+    // Sin ciclo activo → cada 45s (monitoreo más espaciado)
     let timeoutId: ReturnType<typeof setTimeout>;
 
-    const scheduleNext = () => {
+    const scheduleNext = async () => {
       const { activeCycle } = useAppStore.getState();
-      const delay = activeCycle ? 20_000 : 60_000;
-      timeoutId = setTimeout(() => {
-        handleSync(false);
+      const delay = activeCycle ? 15_000 : 45_000;
+      timeoutId = setTimeout(async () => {
+        await handleSync(false);
         scheduleNext();
       }, delay);
     };

@@ -6,6 +6,7 @@ import { Sidebar } from './Sidebar';
 import { Topbar } from './Topbar';
 import { BottomNav } from './BottomNav';
 import { useAppStore } from '../../store/useAppStore';
+import { supabase } from '../../lib/supabase';
 import { getOrdersForUser, getCyclesForUser, getActiveCycleForUser } from '../../services/dbOperations';
 import { fetchBCVRate } from '../../services/bcv';
 import { AlertTriangle, Clock, ArrowRight } from 'lucide-react';
@@ -143,6 +144,74 @@ export const AppLayout: React.FC = () => {
     const bcvInterval = setInterval(updateBcv, 5 * 60 * 1000); // 5 minutos
     return () => clearInterval(bcvInterval);
   }, [currentUser, navigate, setOrders, setCycles, setActiveCycle, setBcvRate]);
+
+  // ── Supabase Realtime: actualización instantánea cuando la DB cambia ─────────
+  // Cuando saveOrder / saveCycle / recalculateCycleMetrics escriben a la DB,
+  // Supabase emite un evento y refrescamos el store sin necesidad de queries
+  // manuales adicionales en cada operación.
+  useEffect(() => {
+    if (!currentUser) return;
+    if (isPlanExpired(currentUser.planExpiresAt, currentUser.role)) return;
+
+    let debounceTimer: ReturnType<typeof setTimeout>;
+    let isRefreshing = false;
+
+    const refreshAll = () => {
+      // Debounce: si llegan varios eventos seguidos (ej: bulk save),
+      // esperamos 400ms desde el último antes de hacer el fetch.
+      clearTimeout(debounceTimer);
+      debounceTimer = setTimeout(async () => {
+        if (isRefreshing) return;
+        isRefreshing = true;
+        try {
+          const [freshOrders, freshCycles, freshActiveCycle] = await Promise.all([
+            getOrdersForUser(currentUser.id),
+            getCyclesForUser(currentUser.id),
+            getActiveCycleForUser(currentUser.id),
+          ]);
+          setOrders(freshOrders);
+          setCycles(freshCycles);
+          // Guard: no sobreescribir un ciclo activo confirmado localmente con null
+          // si hay un pequeño lag de consistencia en la DB.
+          const storeActive = useAppStore.getState().activeCycle;
+          if (storeActive && !freshActiveCycle) return;
+          setActiveCycle(freshActiveCycle);
+        } catch (err) {
+          console.error('[Realtime] Error al refrescar datos:', err);
+        } finally {
+          isRefreshing = false;
+        }
+      }, 400);
+    };
+
+    const channel = supabase
+      .channel(`arbitrack-${currentUser.id}`)
+      .on('postgres_changes', {
+        event: '*',
+        schema: 'public',
+        table: 'orders',
+        filter: `user_id=eq.${currentUser.id}`,
+      }, refreshAll)
+      .on('postgres_changes', {
+        event: '*',
+        schema: 'public',
+        table: 'cycles',
+        filter: `user_id=eq.${currentUser.id}`,
+      }, refreshAll)
+      .subscribe((status) => {
+        if (status === 'SUBSCRIBED') {
+          console.log('[Realtime] ✅ Canal conectado — actualizaciones instantáneas activas.');
+        }
+        if (status === 'CHANNEL_ERROR') {
+          console.warn('[Realtime] ⚠️ Error de canal. El polling de 15s sigue activo como fallback.');
+        }
+      });
+
+    return () => {
+      clearTimeout(debounceTimer);
+      supabase.removeChannel(channel);
+    };
+  }, [currentUser?.id]);
 
   if (!currentUser) return null;
 
