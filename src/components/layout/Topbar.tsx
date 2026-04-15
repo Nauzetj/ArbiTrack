@@ -39,13 +39,29 @@ export const Topbar: React.FC = () => {
         getActiveCycleForUser(user.id),
       ]);
       
+      // CLAVE: Usar la orden más reciente del ciclo como punto de partida
+      // Esto evita procesar órdenes antiguas en cada sync
+      let lastOrderTimeMs: number | null = null;
+      if (activeCycle) {
+        const cycleOrders = existingOrders.filter(o => o.cycleId === activeCycle.id);
+        if (cycleOrders.length > 0) {
+          const latestCycleOrder = cycleOrders.reduce((latest, o) => {
+            const oTime = new Date(o.createTime_utc).getTime();
+            return oTime > latest ? oTime : latest;
+          }, 0);
+          lastOrderTimeMs = latestCycleOrder;
+          console.log('[SYNC] Última orden del ciclo:', new Date(lastOrderTimeMs).toISOString());
+        }
+      }
+      
       const cycleOpenedAtVal = activeCycle ? new Date(activeCycle.openedAt).getTime() : null;
+      console.log('[SYNC] Ciclo activo:', activeCycle ? 'sí' : 'no');
       console.log('[SYNC] cycleOpenedAtVal:', cycleOpenedAtVal ? new Date(cycleOpenedAtVal).toISOString() : 'sin ciclo');
       
-      // Obtener más páginas para capturar órdenes históricas completas
+      // Obtener órdenes de Binance
       const requests = [];
       const tradeTypes = ['BUY', 'SELL'];
-      const maxPages = 3;
+      const maxPages = 2; // Reducido a 2 porque solo necesitamos las más recientes
       for (const t of tradeTypes) {
         for (let page = 1; page <= maxPages; page++) {
           requests.push(fetchP2POrders(currentState.binanceKeys!.apiKey, currentState.binanceKeys!.secretKey, page, t));
@@ -69,13 +85,15 @@ export const Topbar: React.FC = () => {
       });
       let uniqueBinanceOrders = Array.from(uniqueOrdersMap.values());
       
-      // FILTRO CLAVE: Solo órdenes DESPUÉS de abrir el ciclo (si existe ciclo activo)
-      if (cycleOpenedAtVal) {
+      // FILTRO CLAVE: Solo órdenes DESPUÉS de la última orden ya procesada del ciclo
+      // Si no hay última orden, usar la fecha de apertura del ciclo
+      const filterTimeMs = lastOrderTimeMs || cycleOpenedAtVal;
+      if (filterTimeMs) {
         uniqueBinanceOrders = uniqueBinanceOrders.filter(o => {
           const orderTime = new Date(o.createTime).getTime();
-          return orderTime >= cycleOpenedAtVal;
+          return orderTime > filterTimeMs; // > (mayor que) no >= (mayor o igual)
         });
-        console.log('[SYNC] Órdenes filtradas por fecha (después de abrir ciclo):', uniqueBinanceOrders.length);
+        console.log('[SYNC] Órdenes nuevas después de:', new Date(filterTimeMs).toISOString(), '→ count:', uniqueBinanceOrders.length);
       }
       
       // Debug: contar tipos de órdenes
@@ -109,28 +127,12 @@ export const Topbar: React.FC = () => {
       console.log('[SYNC] Órdenes únicas después deduplicar:', uniqueBinanceOrders.length);
       
       if (uniqueBinanceOrders.length > 0) {
-        // cycleOpenedAtVal ya viene del inicio (línea 42)
-        
-        // Debug: mostrar las 3 órdenes más recientes
-        const sortedByTime = [...uniqueBinanceOrders].sort((a, b) => 
-          new Date(b.createTime).getTime() - new Date(a.createTime).getTime()
-        );
-        console.log('[SYNC] Órdenes más recientes:', sortedByTime.slice(0, 3).map(o => ({
-          orderNumber: o.orderNumber,
-          createTimeMs: new Date(o.createTime).getTime(),
-          createTime: new Date(o.createTime).toISOString(),
-          tradeType: o.tradeType,
-          orderStatus: o.orderStatus,
-          amount: o.amount,
-        })));
-        
         let addedCount = 0;
         const ordersToUpsert: Order[] = [];
         
         console.log('[SYNC] existingOrders:', existingOrders.length);
-        console.log('[SYNC] uniqueBinanceOrders:', uniqueBinanceOrders.length);
+        console.log('[SYNC] uniqueBinanceOrders filtradas:', uniqueBinanceOrders.length);
         console.log('[SYNC] activeCycle:', activeCycle ? activeCycle.id : 'null');
-        console.log('[SYNC] cycleOpenedAtVal:', cycleOpenedAtVal);
 
         for (const o of uniqueBinanceOrders) {
           try {
@@ -138,7 +140,6 @@ export const Topbar: React.FC = () => {
 
             if (existingOrder) {
               if (existingOrder.orderStatus === 'DELETED') {
-                console.log('[SYNC] Orden saltada (DELETED):', o.orderNumber);
                 continue;
               }
 
@@ -147,19 +148,8 @@ export const Topbar: React.FC = () => {
 
               // Check if status changed (e.g., from TRADING to COMPLETED)
               if (existingOrder.orderStatus !== o.orderStatus) {
-                console.log('[SYNC] Status actualizado:', o.orderNumber, 'de', existingOrder.orderStatus, 'a', o.orderStatus);
                 updatedOrder.orderStatus = o.orderStatus;
                 isUpdated = true;
-              }
-
-              // Retroactive assignment: Si la orden existe, pero estaba huérfana, y ocurrió después de abrir el ciclo actual, la anexamos.
-              if (!updatedOrder.cycleId && activeCycle && cycleOpenedAtVal) {
-                const orderTime = new Date(o.createTime).getTime();
-                console.log('[SYNC] Orden huérfana - cycleId existente:', updatedOrder.cycleId, 'orderTime:', orderTime, 'cycleOpenedAtVal:', cycleOpenedAtVal, 'asignar?', orderTime >= cycleOpenedAtVal);
-                if (orderTime >= cycleOpenedAtVal) {
-                  updatedOrder.cycleId = activeCycle.id;
-                  isUpdated = true;
-                }
               }
 
               if (isUpdated) {
@@ -169,14 +159,11 @@ export const Topbar: React.FC = () => {
               continue;
             }
 
-            // Also update the existingOrders array locally so subsequent duplicates (if any bypassed map) are caught
+            // Nueva orden - asignar al ciclo activo
             existingOrders.push({ ...o, id: generateUUID() } as any);
 
-            let autoAssignedCycleId = null;
-            const orderTime = new Date(o.createTime).getTime();
-
-            // Auto-assign: If cycle is active and order occurred at or after cycle was opened
-            if (activeCycle && cycleOpenedAtVal && orderTime >= cycleOpenedAtVal) {
+            let autoAssignedCycleId: string | null = null;
+            if (activeCycle && cycleOpenedAtVal) {
               autoAssignedCycleId = activeCycle.id;
             }
 
