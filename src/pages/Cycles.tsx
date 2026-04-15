@@ -169,7 +169,7 @@ export const Cycles: React.FC = () => {
                 <th className="p-[16px] border-b border-[var(--border-strong)] text-right">Liquidez (Inv.)</th>
                 <th className="p-[16px] border-b border-[var(--border-strong)] text-right">Costo Recomp.</th>
                 <th className="p-[16px] border-b border-[var(--border-strong)] text-right">Comisiones</th>
-                <th className="p-[16px] border-b border-[var(--border-strong)] text-right">Ganancia Neta</th>
+                <th className="p-[16px] border-b border-[var(--border-strong)] text-right">Ganancia USDT</th>
                 <th className="p-[16px] border-b border-[var(--border-strong)] text-center">ROI</th>
                 <th className="p-[16px] border-b border-[var(--border-strong)] text-center">Estado</th>
               </tr>
@@ -185,9 +185,6 @@ export const Cycles: React.FC = () => {
                 </tr>
               ) : filteredCycles.map(c => {
                 const isExpanded = expandedId === c.id;
-                const metrics = getCycleMetrics(c.id);
-                const isPos = metrics.gananciaNeta > 0;
-                const isNeutral = Math.abs(metrics.gananciaNeta) < 0.01;
                 const cycleOrders = isExpanded ? getCycleOrders(c.id) : [];
 
                 return (
@@ -231,17 +228,18 @@ export const Cycles: React.FC = () => {
                       <td className={`p-[16px] mono text-[13px] text-right font-medium ${
                         c.status === 'En curso'
                           ? 'text-[var(--text-tertiary)]'
-                          : isNeutral ? 'text-[var(--text-secondary)]'
-                          : isPos ? 'text-[var(--profit)]' : 'text-[var(--loss)]'
+                          : c.ganancia_usdt > 0 ? 'text-[var(--profit)]'
+                          : c.ganancia_usdt < 0 ? 'text-[var(--loss)]'
+                          : 'text-[var(--text-secondary)]'
                       }`}>
                         {c.status === 'En curso' ? 'Pendiente' : (
                           <>
-                            {isNeutral
-                              ? <Minus size={10} className="inline mr-[2px]"/>
-                              : isPos
+                            {c.ganancia_usdt > 0
                               ? <TrendingUp size={10} className="inline mr-[2px]"/>
-                              : <TrendingDown size={10} className="inline mr-[2px]"/>}
-                            Bs. {fmt(Math.abs(metrics.gananciaNeta))}
+                              : c.ganancia_usdt < 0
+                              ? <TrendingDown size={10} className="inline mr-[2px]"/>
+                              : <Minus size={10} className="inline mr-[2px]"/>}
+                            {c.ganancia_usdt > 0 ? '+' : ''}{c.ganancia_usdt.toFixed(2)} USDT
                           </>
                         )}
                       </td>
@@ -266,15 +264,17 @@ export const Cycles: React.FC = () => {
                             {/* Financial summary mini */}
                             <div className="grid grid-cols-2 md:grid-cols-4 gap-[8px]">
                               {[
-                                { label: 'Total Invertido (Liquidez)',  val: metrics.totalRecuperado,  color: 'text-[var(--text-primary)]' },
-                                { label: 'Costo Recompra', val: metrics.totalInvertido,   color: 'text-[var(--text-secondary)]' },
-                                { label: 'Comisiones',       val: metrics.totalComisiones,  color: 'text-[var(--warning)]' },
-                                { label: 'Ganancia Neta',    val: metrics.gananciaNeta,     color: isNeutral ? 'text-[var(--text-secondary)]' : isPos ? 'text-[var(--profit)]' : 'text-[var(--loss)]' },
+                                { label: 'Total Invertido (Liquidez)',  val: c.ves_pagado,  color: 'text-[var(--text-primary)]' },
+                                { label: 'Costo Recompra', val: c.ves_recibido,   color: 'text-[var(--text-secondary)]' },
+                                { label: 'Comisiones',       val: c.comision_total,  color: 'text-[var(--warning)]' },
+                                { label: 'Ganancia USDT',    val: c.ganancia_usdt,     color: c.ganancia_usdt > 0 ? 'text-[var(--profit)]' : c.ganancia_usdt < 0 ? 'text-[var(--loss)]' : 'text-[var(--text-secondary)]' },
                               ].map(({ label, val, color }) => (
                                 <div key={label} className="bg-[var(--bg-surface-2)] border border-[var(--border)] rounded-[8px] px-[12px] py-[8px]">
                                   <span className="text-[9px] text-[var(--text-tertiary)] uppercase tracking-wider block">{label}</span>
                                   <span className={`font-mono font-bold text-[13px] ${color}`}>
-                                    Bs. {fmt(Math.abs(val))}
+                                    {label.includes('USD') 
+                                      ? (val > 0 ? '+' : '') + val.toFixed(4) + ' USDT'
+                                      : 'Bs. ' + fmt(val, 2)}
                                   </span>
                                 </div>
                               ))}
