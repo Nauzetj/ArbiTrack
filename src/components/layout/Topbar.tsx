@@ -239,11 +239,11 @@ export const Topbar: React.FC = () => {
         toast.success(`Sincronización exitosa. Cero órdenes retornadas usando tus llaves API: revisa si están activas o si tienen permisos.`);
       }
     } catch (e: any) {
-      console.error('Excepción global en Sync:', e);
+      console.error('Excepción global en Sync:', e.message || e);
       setSyncStatus('error');
       setIsSyncing(false);
       if (isManual) {
-        toast.error(`ERROR CRÍTICO: ${e.message}`, { duration: 6000 });
+        toast.error(`ERROR: ${e.message || 'Error desconocido'}`, { duration: 6000 });
       }
       setTimeout(() => setSyncStatus('idle'), 3000);
     } finally {
@@ -253,6 +253,8 @@ export const Topbar: React.FC = () => {
 
   useEffect(() => {
     if (!currentUser || !binanceKeys) return;
+
+    let timeoutId: ReturnType<typeof setTimeout>;
 
     // Sync inmediato al montar
     handleSync(false);
