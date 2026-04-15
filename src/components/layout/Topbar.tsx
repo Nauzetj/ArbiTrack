@@ -33,10 +33,10 @@ export const Topbar: React.FC = () => {
     setSyncStatus('syncing');
 
     try {
-      // Optimización: páginas ajustables para obtener más órdenes históricas
+      // Obtener más páginas para capturar órdenes históricas completas
       const requests = [];
       const tradeTypes = ['BUY', 'SELL'];
-      const maxPages = 3;
+      const maxPages = 5;
       for (const t of tradeTypes) {
         for (let page = 1; page <= maxPages; page++) {
           requests.push(fetchP2POrders(currentState.binanceKeys!.apiKey, currentState.binanceKeys!.secretKey, page, t));
@@ -65,6 +65,15 @@ export const Topbar: React.FC = () => {
       const buyCount = uniqueBinanceOrders.filter(o => o.tradeType === 'BUY').length;
       console.log('[SYNC] SELL:', sellCount, 'BUY:', buyCount);
       
+      // Debug: mostrar primeras 5 órdenes para verificar estructura
+      console.log('[SYNC] Primeras órdenessample:', uniqueBinanceOrders.slice(0, 5).map(o => ({
+        orderNumber: o.orderNumber,
+        createTime: o.createTime,
+        tradeType: o.tradeType,
+        orderStatus: o.orderStatus,
+        amount: o.amount,
+      })));
+      
       console.log('[SYNC] Total órdenes de Binance:', allBinanceOrders.length);
       console.log('[SYNC] Órdenes únicas después deduplicar:', uniqueBinanceOrders.length);
       
@@ -87,6 +96,7 @@ export const Topbar: React.FC = () => {
 
             if (existingOrder) {
               if (existingOrder.orderStatus === 'DELETED') {
+                console.log('[SYNC] Orden saltada (DELETED):', o.orderNumber);
                 continue;
               }
 
@@ -95,6 +105,7 @@ export const Topbar: React.FC = () => {
 
               // Check if status changed (e.g., from TRADING to COMPLETED)
               if (existingOrder.orderStatus !== o.orderStatus) {
+                console.log('[SYNC] Status actualizado:', o.orderNumber, 'de', existingOrder.orderStatus, 'a', o.orderStatus);
                 updatedOrder.orderStatus = o.orderStatus;
                 isUpdated = true;
               }
@@ -102,6 +113,7 @@ export const Topbar: React.FC = () => {
               // Retroactive assignment: Si la orden existe, pero estaba huérfana, y ocurrió después de abrir el ciclo actual, la anexamos.
               if (!updatedOrder.cycleId && activeCycle && cycleOpenedAt) {
                 const orderTime = new Date(o.createTime).getTime();
+                console.log('[SYNC] Orden huérfana - cycleId existente:', updatedOrder.cycleId, 'orderTime:', orderTime, 'cycleOpenedAt:', cycleOpenedAt, 'asignar?', orderTime >= cycleOpenedAt);
                 if (orderTime >= cycleOpenedAt) {
                   updatedOrder.cycleId = activeCycle.id;
                   isUpdated = true;
