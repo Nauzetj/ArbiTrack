@@ -54,21 +54,14 @@ export const Topbar: React.FC = () => {
         }
       }
       
-      // Fecha de apertura del ciclo
       const cycleOpenedAtVal = activeCycle ? new Date(activeCycle.openedAt).getTime() : null;
       console.log('[SYNC] Ciclo activo:', activeCycle ? 'sí' : 'no');
       console.log('[SYNC] cycleOpenedAtVal:', cycleOpenedAtVal ? new Date(cycleOpenedAtVal).toISOString() : 'sin ciclo');
       
-      // FILTRO: Buscar desde 30 min ANTES de abrir el ciclo
-      const filterStartMs = cycleOpenedAtVal 
-        ? cycleOpenedAtVal - (30 * 60 * 1000)  // 30 minutos antes
-        : null;
-      console.log('[SYNC] Buscar desde:', filterStartMs ? new Date(filterStartMs).toISOString() : 'sin filtro');
-      
       // Obtener órdenes de Binance
       const requests = [];
       const tradeTypes = ['BUY', 'SELL'];
-      const maxPages = 2;
+      const maxPages = 2; // Reducido a 2 porque solo necesitamos las más recientes
       for (const t of tradeTypes) {
         for (let page = 1; page <= maxPages; page++) {
           requests.push(fetchP2POrders(currentState.binanceKeys!.apiKey, currentState.binanceKeys!.secretKey, page, t));
@@ -92,13 +85,15 @@ export const Topbar: React.FC = () => {
       });
       let uniqueBinanceOrders = Array.from(uniqueOrdersMap.values());
       
-      // FILTRO: Solo órdenes DESPUÉS de 30 min antes de abrir el ciclo
-      if (filterStartMs) {
+      // FILTRO CLAVE: Solo órdenes DESPUÉS de la última orden ya procesada del ciclo
+      // Si no hay última orden, usar la fecha de apertura del ciclo
+      const filterTimeMs = lastOrderTimeMs || cycleOpenedAtVal;
+      if (filterTimeMs) {
         uniqueBinanceOrders = uniqueBinanceOrders.filter(o => {
           const orderTime = new Date(o.createTime).getTime();
-          return orderTime >= filterStartMs;
+          return orderTime > filterTimeMs; // > (mayor que) no >= (mayor o igual)
         });
-        console.log('[SYNC] Órdenes desde 30min antes del ciclo:', uniqueBinanceOrders.length);
+        console.log('[SYNC] Órdenes nuevas después de:', new Date(filterTimeMs).toISOString(), '→ count:', uniqueBinanceOrders.length);
       }
       
       // Debug: contar tipos de órdenes
@@ -151,19 +146,10 @@ export const Topbar: React.FC = () => {
               let isUpdated = false;
               let updatedOrder = { ...existingOrder };
 
-              // 1. Si status cambió → actualizar
+              // Check if status changed (e.g., from TRADING to COMPLETED)
               if (existingOrder.orderStatus !== o.orderStatus) {
                 updatedOrder.orderStatus = o.orderStatus;
                 isUpdated = true;
-              }
-
-              // 2. Si NO tiene cycleId Y está en rango → ASIGNAR
-              if (!updatedOrder.cycleId && activeCycle && filterStartMs) {
-                const orderTimeMs = new Date(o.createTime).getTime();
-                if (orderTimeMs >= filterStartMs) {
-                  updatedOrder.cycleId = activeCycle.id;
-                  isUpdated = true;
-                }
               }
 
               if (isUpdated) {
@@ -173,8 +159,14 @@ export const Topbar: React.FC = () => {
               continue;
             }
 
-            // Nueva orden → asignar directamente al ciclo activo
-            const orderTimeMs = new Date(o.createTime).getTime();
+            // Nueva orden - asignar al ciclo activo
+            existingOrders.push({ ...o, id: generateUUID() } as any);
+
+            let autoAssignedCycleId: string | null = null;
+            if (activeCycle && cycleOpenedAtVal) {
+              autoAssignedCycleId = activeCycle.id;
+            }
+
             const importedOrder: Order = {
               id: generateUUID(),
               orderNumber: String(o.orderNumber || ''),
@@ -190,7 +182,7 @@ export const Topbar: React.FC = () => {
               orderStatus: String(o.orderStatus || ''),
               createTime_utc: new Date(o.createTime).toISOString(),
               createTime_local: new Date(o.createTime).toLocaleString(),
-              cycleId: activeCycle && filterStartMs && orderTimeMs >= filterStartMs ? activeCycle.id : null,
+              cycleId: autoAssignedCycleId,
               importedAt: new Date().toISOString(),
               userId: user.id
             };
@@ -214,9 +206,8 @@ export const Topbar: React.FC = () => {
         if (addedCount > 0 || (activeCycle && existingOrders.some(o => o.cycleId === activeCycle.id))) {
           if (activeCycle) {
             await recalculateCycleMetrics(activeCycle.id, user.id);
-            console.log('[SYNC] Recálculo completado, actualizando store...');
-            
-            // FORZAR refresh inmediato del store
+            console.log('[SYNC] Recálculo completado, obteniendo datos frescos...');
+            // Refresh both activeCycle AND the full cycles array so all views stay in sync
             const [freshActiveCycle, freshCycles, freshOrders] = await Promise.all([
               getActiveCycleForUser(user.id),
               getCyclesForUser(user.id),
@@ -226,14 +217,8 @@ export const Topbar: React.FC = () => {
             setActiveCycle(freshActiveCycle);
             setCycles(freshCycles);
             setOrders(freshOrders);
-            
-            // Forzar update de la UI
-            window.dispatchEvent(new CustomEvent('cycle-updated'));
           } else {
-            const freshOrders = await getOrdersForUser(user.id);
-            setOrders(freshOrders);
-          }
-        }
+            setOrders(await getOrdersForUser(user.id));
           }
         }
       }
@@ -254,11 +239,11 @@ export const Topbar: React.FC = () => {
         toast.success(`Sincronización exitosa. Cero órdenes retornadas usando tus llaves API: revisa si están activas o si tienen permisos.`);
       }
     } catch (e: any) {
-      console.error('Excepción global en Sync:', e.message || e);
+      console.error('Excepción global en Sync:', e);
       setSyncStatus('error');
       setIsSyncing(false);
       if (isManual) {
-        toast.error(`ERROR: ${e.message || 'Error desconocido'}`, { duration: 6000 });
+        toast.error(`ERROR CRÍTICO: ${e.message}`, { duration: 6000 });
       }
       setTimeout(() => setSyncStatus('idle'), 3000);
     } finally {
@@ -269,15 +254,17 @@ export const Topbar: React.FC = () => {
   useEffect(() => {
     if (!currentUser || !binanceKeys) return;
 
-    let timeoutId: ReturnType<typeof setTimeout>;
-
     // Sync inmediato al montar
     handleSync(false);
 
-    // Sync automático cada 60s cuando hay ciclo activo
+    // OPTIMIZACIÓN FASE 1: Intervalo reducido de 20s a 15s
+    // Con ciclo activo → cada 15s (más rápido sin saturar la API)
+    // Sin ciclo activo → cada 45s (monitoreo más espaciado)
+    let timeoutId: ReturnType<typeof setTimeout>;
+
     const scheduleNext = async () => {
       const { activeCycle } = useAppStore.getState();
-      const delay = activeCycle ? 60_000 : 120_000;
+      const delay = activeCycle ? 15_000 : 45_000;
       timeoutId = setTimeout(async () => {
         await handleSync(false);
         scheduleNext();
