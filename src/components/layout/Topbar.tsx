@@ -257,14 +257,10 @@ export const Topbar: React.FC = () => {
     // Sync inmediato al montar
     handleSync(false);
 
-    // OPTIMIZACIÓN FASE 1: Intervalo reducido de 20s a 15s
-    // Con ciclo activo → cada 15s (más rápido sin saturar la API)
-    // Sin ciclo activo → cada 45s (monitoreo más espaciado)
-    let timeoutId: ReturnType<typeof setTimeout>;
-
+    // Sync automático cada 60s cuando hay ciclo activo
     const scheduleNext = async () => {
       const { activeCycle } = useAppStore.getState();
-      const delay = activeCycle ? 15_000 : 45_000;
+      const delay = activeCycle ? 60_000 : 120_000;
       timeoutId = setTimeout(async () => {
         await handleSync(false);
         scheduleNext();
