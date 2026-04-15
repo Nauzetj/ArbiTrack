@@ -151,10 +151,19 @@ export const Topbar: React.FC = () => {
               let isUpdated = false;
               let updatedOrder = { ...existingOrder };
 
-              // Check if status changed (e.g., from TRADING to COMPLETED)
+              // 1. Si status cambió → actualizar
               if (existingOrder.orderStatus !== o.orderStatus) {
                 updatedOrder.orderStatus = o.orderStatus;
                 isUpdated = true;
+              }
+
+              // 2. Si NO tiene cycleId Y está en rango → ASIGNAR
+              if (!updatedOrder.cycleId && activeCycle && filterStartMs) {
+                const orderTimeMs = new Date(o.createTime).getTime();
+                if (orderTimeMs >= filterStartMs) {
+                  updatedOrder.cycleId = activeCycle.id;
+                  isUpdated = true;
+                }
               }
 
               if (isUpdated) {
@@ -164,16 +173,8 @@ export const Topbar: React.FC = () => {
               continue;
             }
 
-            // Nueva orden - asignar al ciclo activo si está dentro del rango (30min antes hasta ahora)
-            existingOrders.push({ ...o, id: generateUUID() } as any);
-
-            let autoAssignedCycleId: string | null = null;
+            // Nueva orden → asignar directamente al ciclo activo
             const orderTimeMs = new Date(o.createTime).getTime();
-            // Asignar si la orden es desde 30min antes del ciclo
-            if (activeCycle && filterStartMs && orderTimeMs >= filterStartMs) {
-              autoAssignedCycleId = activeCycle.id;
-            }
-
             const importedOrder: Order = {
               id: generateUUID(),
               orderNumber: String(o.orderNumber || ''),
@@ -189,7 +190,7 @@ export const Topbar: React.FC = () => {
               orderStatus: String(o.orderStatus || ''),
               createTime_utc: new Date(o.createTime).toISOString(),
               createTime_local: new Date(o.createTime).toLocaleString(),
-              cycleId: autoAssignedCycleId,
+              cycleId: activeCycle && filterStartMs && orderTimeMs >= filterStartMs ? activeCycle.id : null,
               importedAt: new Date().toISOString(),
               userId: user.id
             };
