@@ -58,16 +58,23 @@ export const Topbar: React.FC = () => {
       console.log('[SYNC] Ciclo activo:', activeCycle ? 'sí' : 'no');
       console.log('[SYNC] cycleOpenedAtVal:', cycleOpenedAtVal ? new Date(cycleOpenedAtVal).toISOString() : 'sin ciclo');
       
-      // Obtener órdenes de Binance
+      // Obtener órdenes de Binance EN PARALELO (más rápido)
+      const maxPages = 1; // Solo 1 página = 20 órdenes máx
       const requests = [];
-      const tradeTypes = ['BUY', 'SELL'];
-      const maxPages = 2; // Reducido a 2 porque solo necesitamos las más recientes
-      for (const t of tradeTypes) {
-        for (let page = 1; page <= maxPages; page++) {
-          requests.push(fetchP2POrders(currentState.binanceKeys!.apiKey, currentState.binanceKeys!.secretKey, page, t));
+      
+      // Fetch paralelo: BUY página1 + SELL página1 al mismo tiempo
+      requests.push(fetchP2POrders(currentState.binanceKeys!.apiKey, currentState.binanceKeys!.secretKey, 1, 'BUY'));
+      requests.push(fetchP2POrders(currentState.binanceKeys!.apiKey, currentState.binanceKeys!.secretKey, 1, 'SELL'));
+      
+      // página 2 solo si hay ciclo activo (buscar más órdenes históricas)
+      if (activeCycle) {
+        if (maxPages >= 2) {
+          requests.push(fetchP2POrders(currentState.binanceKeys!.apiKey, currentState.binanceKeys!.secretKey, 2, 'BUY'));
+          requests.push(fetchP2POrders(currentState.binanceKeys!.apiKey, currentState.binanceKeys!.secretKey, 2, 'SELL'));
         }
       }
       
+      // Ejecutar TODAS las requests en paralelo
       const responses = await Promise.all(requests);
       let allBinanceOrders: any[] = [];
       responses.forEach(res => {
