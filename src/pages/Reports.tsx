@@ -5,6 +5,7 @@ import { Download, Folder, FolderOpen, FileCheck, ChevronRight, ChevronDown } fr
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import type { Cycle } from '../types';
+import { toLocalDateOnly } from '../lib/datetime';
 
 type TreeNode = {
   name: string;
@@ -27,8 +28,8 @@ export const Reports: React.FC = () => {
     const monthNames = ["Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio", "Julio", "Agosto", "Septiembre", "Octubre", "Noviembre", "Diciembre"];
 
     completedCycles.forEach(c => {
-      // Usar closedAt (fecha de cierre) - mantener como estaba
-      const dateStr = c.closedAt!.split('T')[0];
+      // Convertir a hora de Venezuela (UTC-4) para mostrar correctamente
+      const dateStr = toLocalDateOnly(c.closedAt);
       const [y, m, d] = dateStr.split('-');
       const monthLabel = monthNames[parseInt(m) - 1];
 
@@ -134,7 +135,7 @@ export const Reports: React.FC = () => {
     doc.text(`Tasa BCV del Periodo (Referencial): Bs. ${avgBcvRate.toFixed(2)} VES/USD`, 14, 60);
 
     const tableData = periodCycles.map(c => [
-      `${new Date(c.closedAt!).toLocaleDateString()} (#${c.cycleNumber.toString().slice(-4)})`,
+      `${toLocalDateOnly(c.closedAt)} (#${c.cycleNumber.toString().slice(-4)})`,
       `${c.usdt_vendido.toFixed(2)} USDT`,
       `${c.tasa_venta_prom.toFixed(2)} Bs`,
       `${c.tasa_compra_prom.toFixed(2)} Bs`,
