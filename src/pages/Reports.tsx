@@ -5,7 +5,6 @@ import { Download, Folder, FolderOpen, FileCheck, ChevronRight, ChevronDown } fr
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import type { Cycle } from '../types';
-import { toLocalDateOnly } from '../lib/datetime';
 
 type TreeNode = {
   name: string;
@@ -28,20 +27,25 @@ export const Reports: React.FC = () => {
     const monthNames = ["Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio", "Julio", "Agosto", "Septiembre", "Octubre", "Noviembre", "Diciembre"];
 
     completedCycles.forEach(c => {
-      // Convertir a hora de Venezuela (UTC-4)
+      // Skip si no tiene closedAt válido
+      if (!c.closedAt || typeof c.closedAt !== 'string') return;
+      
+      // Clean date string
+      const rawDate = c.closedAt.trim();
+      if (!rawDate || !rawDate.includes('T')) return;
+      
       let dateStr = '';
       try {
-        dateStr = c.closedAt ? toLocalDateOnly(c.closedAt) : '';
-        // Fallback si toLocalDateOnly retorna vazio
-        if (!dateStr || dateStr === '' || dateStr.includes('NaN')) {
-          dateStr = c.closedAt?.split('T')[0] || '';
-        }
+        // Usar solo la parte da data, ignorando timezone
+        dateStr = rawDate.split('T')[0];
+        if (!dateStr || dateStr.length < 10) return;
       } catch {
-        dateStr = c.closedAt?.split('T')[0] || '';
+        return;
       }
       
-      if (!dateStr) return;
       const [y, m, d] = dateStr.split('-');
+      if (!y || !m || !d) return;
+      
       const monthLabel = monthNames[parseInt(m) - 1];
 
       if (!root[y]) root[y] = { name: y, type: 'YEAR', label: `Año ${y}`, cycles: [], children: {} };
@@ -145,16 +149,17 @@ export const Reports: React.FC = () => {
     doc.text(`Ganancia Equivalente en USD: ${profitUsdt.toFixed(2)} USDT`, 100, 50);
     doc.text(`Tasa BCV del Periodo (Referencial): Bs. ${avgBcvRate.toFixed(2)} VES/USD`, 14, 60);
 
-    // Safe conversion with fallback
+    // Safe date extraction
     const getDateStr = (c: Cycle) => {
+      if (!c.closedAt || typeof c.closedAt !== 'string') return '—';
+      
       try {
-        const dateStr = c.closedAt ? toLocalDateOnly(c.closedAt) : '';
-        if (!dateStr || dateStr.includes('NaN')) {
-          return c.closedAt?.split('T')[0] || '';
-        }
-        return dateStr;
+        const rawDate = c.closedAt.trim();
+        if (!rawDate || !rawDate.includes('T')) return '—';
+        
+        return rawDate.split('T')[0];
       } catch {
-        return c.closedAt?.split('T')[0] || '';
+        return '—';
       }
     };
     
