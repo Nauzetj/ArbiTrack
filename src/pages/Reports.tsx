@@ -36,8 +36,11 @@ export const Reports: React.FC = () => {
       
       let dateStr = '';
       try {
-        // Usar solo la parte da data, ignorando timezone
-        dateStr = rawDate.split('T')[0];
+        // Convertir de UTC a hora de Venezuela (RESTAR 4 horas)
+        const utcDate = new Date(rawDate);
+        const venTime = new Date(utcDate.getTime() - (4 * 60 * 60 * 1000));
+        const venDateStr = venTime.toISOString().split('T')[0];
+        dateStr = venDateStr;
         if (!dateStr || dateStr.length < 10) return;
       } catch {
         return;
@@ -149,7 +152,7 @@ export const Reports: React.FC = () => {
     doc.text(`Ganancia Equivalente en USD: ${profitUsdt.toFixed(2)} USDT`, 100, 50);
     doc.text(`Tasa BCV del Periodo (Referencial): Bs. ${avgBcvRate.toFixed(2)} VES/USD`, 14, 60);
 
-    // Safe date extraction
+    // Safe date extraction with Venezuela timezone
     const getDateStr = (c: Cycle) => {
       if (!c.closedAt || typeof c.closedAt !== 'string') return '—';
       
@@ -157,7 +160,10 @@ export const Reports: React.FC = () => {
         const rawDate = c.closedAt.trim();
         if (!rawDate || !rawDate.includes('T')) return '—';
         
-        return rawDate.split('T')[0];
+        // Convertir de UTC a Venezuela (RESTAR 4 horas)
+        const utcDate = new Date(rawDate);
+        const venTime = new Date(utcDate.getTime() - (4 * 60 * 60 * 1000));
+        return venTime.toISOString().split('T')[0];
       } catch {
         return '—';
       }
