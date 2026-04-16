@@ -14,34 +14,29 @@ export const Dashboard: React.FC = () => {
 
 
 
-  // todayStart: usar hora de Venezuela (UTC-4)
-  // 6 AM Venezuela = 10 AM UTC
-  const now = new Date();
-  const nowVenezuela = new Date(now.getTime() - (4 * 60 * 60 * 1000));
+  // FIX: "Hoy" empieza a las 6 AM Venezuela = 10 AM UTC
+  const now = new Date(); // UTC now
+  const todayStart = new Date(now); 
   
-  const todayStart = new Date(nowVenezuela);
-  // El "día" P2P empieza a las 6:00 AM hora de Venezuela
-  if (todayStart.getHours() < 6) {
+  // Si son menos de las 10 AM UTC (6 AM Venezuela), usar día anterior
+  if (todayStart.getHours() < 10) {
     todayStart.setDate(todayStart.getDate() - 1);
   }
-  todayStart.setHours(6, 0, 0, 0);
-  
-  // Convertir de vuelta a UTC para comparar
-  const todayStartUTC = new Date(todayStart.getTime() + (4 * 60 * 60 * 1000));
+  todayStart.setHours(10, 0, 0, 0); // 10 AM UTC = 6 AM Venezuela
 
-  const completedToday = cycles.filter(c => c.status === 'Completado' && c.closedAt && new Date(c.closedAt) >= todayStartUTC);
+  // todayStart ya está en UTC correcto
+  const completedToday = cycles.filter(c => c.status === 'Completado' && c.closedAt && new Date(c.closedAt) >= todayStart);
   const profitTodayUsdt = completedToday.reduce((sum, c) => sum + c.ganancia_usdt, 0);
   const profitTodayVes = completedToday.reduce((sum, c) => sum + c.ganancia_ves, 0);
 
-  const ordersToday = orders.filter(o => new Date(o.createTime_utc) >= todayStartUTC && o.orderStatus === 'COMPLETED');
+  const ordersToday = orders.filter(o => new Date(o.createTime_utc) >= todayStart && o.orderStatus === 'COMPLETED');
   const usdtTotalOperated = ordersToday.filter(o => o.tradeType === 'SELL').reduce((sum, o) => sum + o.amount, 0);
 
-  const monthStart = new Date(nowVenezuela);
+  const monthStart = new Date(now);
   monthStart.setDate(1);
-  monthStart.setHours(6, 0, 0, 0);
-  const monthStartUTC = new Date(monthStart.getTime() + (4 * 60 * 60 * 1000));
+  monthStart.setHours(10, 0, 0, 0); // 10 AM UTC = 6 AM Venezuela
   
-  const completedMonth = cycles.filter(c => c.status === 'Completado' && c.closedAt && new Date(c.closedAt) >= monthStartUTC);
+  const completedMonth = cycles.filter(c => c.status === 'Completado' && c.closedAt && new Date(c.closedAt) >= monthStart);
   const profitMonthUsdt = completedMonth.reduce((sum, c) => sum + c.ganancia_usdt, 0);
 
   return (
