@@ -28,8 +28,19 @@ export const Reports: React.FC = () => {
     const monthNames = ["Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio", "Julio", "Agosto", "Septiembre", "Octubre", "Noviembre", "Diciembre"];
 
     completedCycles.forEach(c => {
-      // Convertir a hora de Venezuela (UTC-4) para mostrar correctamente
-      const dateStr = toLocalDateOnly(c.closedAt);
+      // Convertir a hora de Venezuela (UTC-4)
+      let dateStr = '';
+      try {
+        dateStr = c.closedAt ? toLocalDateOnly(c.closedAt) : '';
+        // Fallback si toLocalDateOnly retorna vazio
+        if (!dateStr || dateStr === '' || dateStr.includes('NaN')) {
+          dateStr = c.closedAt?.split('T')[0] || '';
+        }
+      } catch {
+        dateStr = c.closedAt?.split('T')[0] || '';
+      }
+      
+      if (!dateStr) return;
       const [y, m, d] = dateStr.split('-');
       const monthLabel = monthNames[parseInt(m) - 1];
 
@@ -134,8 +145,21 @@ export const Reports: React.FC = () => {
     doc.text(`Ganancia Equivalente en USD: ${profitUsdt.toFixed(2)} USDT`, 100, 50);
     doc.text(`Tasa BCV del Periodo (Referencial): Bs. ${avgBcvRate.toFixed(2)} VES/USD`, 14, 60);
 
+    // Safe conversion with fallback
+    const getDateStr = (c: Cycle) => {
+      try {
+        const dateStr = c.closedAt ? toLocalDateOnly(c.closedAt) : '';
+        if (!dateStr || dateStr.includes('NaN')) {
+          return c.closedAt?.split('T')[0] || '';
+        }
+        return dateStr;
+      } catch {
+        return c.closedAt?.split('T')[0] || '';
+      }
+    };
+    
     const tableData = periodCycles.map(c => [
-      `${toLocalDateOnly(c.closedAt)} (#${c.cycleNumber.toString().slice(-4)})`,
+      `${getDateStr(c)} (#${c.cycleNumber.toString().slice(-4)})`,
       `${c.usdt_vendido.toFixed(2)} USDT`,
       `${c.tasa_venta_prom.toFixed(2)} Bs`,
       `${c.tasa_compra_prom.toFixed(2)} Bs`,
