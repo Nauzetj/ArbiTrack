@@ -14,24 +14,34 @@ export const Dashboard: React.FC = () => {
 
 
 
-  const todayStart = new Date();
-  // El "Día" P2P suele extenderse por la madrugada. Restablecemos a las 6:00 AM.
+  // todayStart: usar hora de Venezuela (UTC-4)
+  // 6 AM Venezuela = 10 AM UTC
+  const now = new Date();
+  const nowVenezuela = new Date(now.getTime() - (4 * 60 * 60 * 1000));
+  
+  const todayStart = new Date(nowVenezuela);
+  // El "día" P2P empieza a las 6:00 AM hora de Venezuela
   if (todayStart.getHours() < 6) {
     todayStart.setDate(todayStart.getDate() - 1);
   }
   todayStart.setHours(6, 0, 0, 0);
+  
+  // Convertir de vuelta a UTC para comparar
+  const todayStartUTC = new Date(todayStart.getTime() + (4 * 60 * 60 * 1000));
 
-  const completedToday = cycles.filter(c => c.status === 'Completado' && c.closedAt && new Date(c.closedAt) >= todayStart);
+  const completedToday = cycles.filter(c => c.status === 'Completado' && c.closedAt && new Date(c.closedAt) >= todayStartUTC);
   const profitTodayUsdt = completedToday.reduce((sum, c) => sum + c.ganancia_usdt, 0);
   const profitTodayVes = completedToday.reduce((sum, c) => sum + c.ganancia_ves, 0);
 
-  const ordersToday = orders.filter(o => new Date(o.createTime_utc) >= todayStart && o.orderStatus === 'COMPLETED');
+  const ordersToday = orders.filter(o => new Date(o.createTime_utc) >= todayStartUTC && o.orderStatus === 'COMPLETED');
   const usdtTotalOperated = ordersToday.filter(o => o.tradeType === 'SELL').reduce((sum, o) => sum + o.amount, 0);
 
-  const monthStart = new Date();
+  const monthStart = new Date(nowVenezuela);
   monthStart.setDate(1);
-  monthStart.setHours(0, 0, 0, 0);
-  const completedMonth = cycles.filter(c => c.status === 'Completado' && c.closedAt && new Date(c.closedAt) >= monthStart);
+  monthStart.setHours(6, 0, 0, 0);
+  const monthStartUTC = new Date(monthStart.getTime() + (4 * 60 * 60 * 1000));
+  
+  const completedMonth = cycles.filter(c => c.status === 'Completado' && c.closedAt && new Date(c.closedAt) >= monthStartUTC);
   const profitMonthUsdt = completedMonth.reduce((sum, c) => sum + c.ganancia_usdt, 0);
 
   return (
