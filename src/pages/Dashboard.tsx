@@ -14,31 +14,28 @@ export const Dashboard: React.FC = () => {
 
 
 
-  // FIX: "Hoy" empieza a las 12 AM Venezuela = 4 AM UTC
+// FIX: "Hoy" empieza a las 12 AM Venezuela = 4 AM UTC
   const now = new Date(); 
-  const horaUTC = now.getHours();
-  console.log('[Dashboard] Hora UTC actual:', horaUTC);
+  const horaUTC = now.getUTCHours(); // Usar getUTCHours() para evitar problemas de timezone
+  console.log('[Dashboard] Hora UTC:', horaUTC, 'now:', now.toISOString());
   
   // Calcular inicio del día en UTC (4 AM = 12 AM Venezuela)
-  let todayStart = new Date(now);
-  todayStart.setMinutes(0, 0, 0);
+  let todayStart = new Date(now.getTime());
   
   // Si son las 00-03 UTC (8 PM - 11:59 PM Venezuela del día anterior)
   if (horaUTC < 4) {
-    // Yesterday desde las 4 AM UTC
-    todayStart = new Date(now);
-    todayStart.setDate(todayStart.getDate() - 1);
-    todayStart.setHours(4, 0, 0, 0);
+    todayStart.setUTCDate(todayStart.getUTCDate() - 1);
+    todayStart.setUTCHours(4, 0, 0, 0);
   } else {
-    // Hoy desde las 4 AM UTC
-    todayStart.setHours(4, 0, 0, 0);
+    todayStart.setUTCHours(4, 0, 0, 0);
   }
   
   console.log('[Dashboard] todayStart UTC:', todayStart.toISOString());
   
   // Filtrar ciclos de hoy
   const completedToday = cycles.filter(c => c.status === 'Completado' && c.closedAt && new Date(c.closedAt) >= todayStart);
-  console.log('[Dashboard] Ciclos completados hoy:', completedToday.length, 'from:', completedToday.map(c => c.cycleNumber));
+  console.log('[Dashboard] Ciclos completados hoy:', completedToday.length);
+  console.log('[Dashboard] closedAt samples:', completedToday.slice(0,2).map(c => c.closedAt));
   
   const profitTodayUsdt = completedToday.reduce((sum, c) => sum + c.ganancia_usdt, 0);
   const profitTodayVes = completedToday.reduce((sum, c) => sum + c.ganancia_ves, 0);
@@ -46,9 +43,9 @@ export const Dashboard: React.FC = () => {
   const ordersToday = orders.filter(o => new Date(o.createTime_utc) >= todayStart && o.orderStatus === 'COMPLETED');
   const usdtTotalOperated = ordersToday.filter(o => o.tradeType === 'SELL').reduce((sum, o) => sum + o.amount, 0);
 
-  const monthStart = new Date(now);
-  monthStart.setDate(1);
-  monthStart.setHours(4, 0, 0, 0); // 4 AM UTC = 12 AM Venezuela
+  const monthStart = new Date(now.getTime());
+  monthStart.setUTCDate(1);
+  monthStart.setUTCHours(4, 0, 0, 0); // 4 AM UTC = 12 AM Venezuela
   
   const completedMonth = cycles.filter(c => c.status === 'Completado' && c.closedAt && new Date(c.closedAt) >= monthStart);
   const profitMonthUsdt = completedMonth.reduce((sum, c) => sum + c.ganancia_usdt, 0);
