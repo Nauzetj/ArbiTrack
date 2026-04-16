@@ -14,15 +14,15 @@ export const Dashboard: React.FC = () => {
 
 
 
-  // FIX: "Hoy" empieza a las 6 AM Venezuela = 10 AM UTC
-  const now = new Date(); // UTC now
-  const todayStart = new Date(now); 
+  // FIX: "Hoy" empieza a las 12 AM Venezuela = 4 AM UTC
+  const now = new Date(); 
+  const todayStart = new Date(now);
   
-  // Si son menos de las 10 AM UTC (6 AM Venezuela), usar día anterior
-  if (todayStart.getHours() < 10) {
+  // Si son menos de las 4 AM UTC (12 AM Venezuela), usar día anterior
+  if (todayStart.getHours() < 4) {
     todayStart.setDate(todayStart.getDate() - 1);
   }
-  todayStart.setHours(10, 0, 0, 0); // 10 AM UTC = 6 AM Venezuela
+  todayStart.setHours(4, 0, 0, 0); // 4 AM UTC = 12 AM Venezuela
 
   // todayStart ya está en UTC correcto
   const completedToday = cycles.filter(c => c.status === 'Completado' && c.closedAt && new Date(c.closedAt) >= todayStart);
@@ -34,7 +34,7 @@ export const Dashboard: React.FC = () => {
 
   const monthStart = new Date(now);
   monthStart.setDate(1);
-  monthStart.setHours(10, 0, 0, 0); // 10 AM UTC = 6 AM Venezuela
+  monthStart.setHours(4, 0, 0, 0); // 4 AM UTC = 12 AM Venezuela
   
   const completedMonth = cycles.filter(c => c.status === 'Completado' && c.closedAt && new Date(c.closedAt) >= monthStart);
   const profitMonthUsdt = completedMonth.reduce((sum, c) => sum + c.ganancia_usdt, 0);
