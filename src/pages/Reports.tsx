@@ -27,7 +27,8 @@ export const Reports: React.FC = () => {
     const monthNames = ["Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio", "Julio", "Agosto", "Septiembre", "Octubre", "Noviembre", "Diciembre"];
 
     completedCycles.forEach(c => {
-      const dateStr = c.closedAt!.split('T')[0];
+      // Usar openedAt en vez de closedAt para mostrar fecha de apertura
+      const dateStr = c.openedAt.split('T')[0];
       const [y, m, d] = dateStr.split('-');
       const monthLabel = monthNames[parseInt(m) - 1];
 
@@ -133,7 +134,7 @@ export const Reports: React.FC = () => {
     doc.text(`Tasa BCV del Periodo (Referencial): Bs. ${avgBcvRate.toFixed(2)} VES/USD`, 14, 60);
 
     const tableData = periodCycles.map(c => [
-      `${new Date(c.closedAt!).toLocaleDateString()} (#${c.cycleNumber.toString().slice(-4)})`,
+      `${new Date(c.openedAt).toLocaleDateString()} (#${c.cycleNumber.toString().slice(-4)})`,
       `${c.usdt_vendido.toFixed(2)} USDT`,
       `${c.tasa_venta_prom.toFixed(2)} Bs`,
       `${c.tasa_compra_prom.toFixed(2)} Bs`,
