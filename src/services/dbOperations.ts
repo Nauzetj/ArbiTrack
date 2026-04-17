@@ -353,8 +353,12 @@ const recalculateCycleMetrics_local = async (cycleId: string, userId: string): P
   const tasa_compra_prom = usdt_recomprado > 0 ? ves_pagado   / usdt_recomprado : 0;
   const diferencial_tasa = tasa_venta_prom > 0 && tasa_compra_prom > 0 ? tasa_venta_prom - tasa_compra_prom : 0;
   const matched_vol      = Math.min(usdt_vendido, usdt_recomprado);
-  const ganancia_ves     = matched_vol * diferencial_tasa;
-  const ganancia_usdt    = tasa_compra_prom > 0 ? (ganancia_ves / tasa_compra_prom) - comision_total : -comision_total;
+  
+  // Ganancia correcta: diferencia real en Bs del matched volume
+  // (USDT matching × tasa_venta) - (USDT matching × tasa_compra) - comisiones
+  const ganancia_ves = (matched_vol * tasa_venta_prom) - (matched_vol * tasa_compra_prom) - comision_total;
+  const ganancia_usdt = matched_vol > 0 ? ganancia_ves / tasa_compra_prom : -comision_total;
+  
   const capitalBase      = usdt_vendido > 0 ? usdt_vendido * tasa_venta_prom : ves_pagado;
   const roi_percent      = capitalBase > 0 ? (ganancia_ves / capitalBase) * 100 : 0;
 
