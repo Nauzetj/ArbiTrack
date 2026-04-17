@@ -35,10 +35,18 @@ export const Dashboard: React.FC = () => {
   // Filtrar ciclos de hoy
   const completedToday = cycles.filter(c => c.status === 'Completado' && c.closedAt && new Date(c.closedAt) >= todayStart);
   console.log('[Dashboard] Ciclos completados hoy:', completedToday.length);
-  console.log('[Dashboard] closedAt samples:', completedToday.slice(0,2).map(c => c.closedAt));
+  console.log('[Dashboard] Detalles ciclos:', completedToday.map(c => ({
+    num: c.cycleNumber,
+    closedAt: c.closedAt,
+    ganancia_usdt: c.ganancia_usdt,
+    ganancia_ves: c.ganancia_ves,
+    tasa_venta: c.tasa_venta_prom,
+    tasa_compra: c.tasa_compra_prom
+  })));
   
   const profitTodayUsdt = completedToday.reduce((sum, c) => sum + c.ganancia_usdt, 0);
   const profitTodayVes = completedToday.reduce((sum, c) => sum + c.ganancia_ves, 0);
+  console.log('[Dashboard] profitTodayUsdt:', profitTodayUsdt, 'profitTodayVes:', profitTodayVes);
 
   const ordersToday = orders.filter(o => new Date(o.createTime_utc) >= todayStart && o.orderStatus === 'COMPLETED');
   const usdtTotalOperated = ordersToday.filter(o => o.tradeType === 'SELL').reduce((sum, o) => sum + o.amount, 0);
