@@ -561,18 +561,15 @@ const CycleSummary: React.FC<{
     (a, b) => new Date(a.createTime_utc).getTime() - new Date(b.createTime_utc).getTime()
   );
 
-  // Compute totals
-  let totalInvertido = 0, totalRecuperado = 0, totalComisiones = 0;
-  sortedOrders.forEach(o => {
-    const opType = o.operationType ?? (o.tradeType === 'SELL' ? 'VENTA_USDT' : 'COMPRA_USDT');
-    totalComisiones += o.commission ?? 0;
-    if (opType === 'COMPRA_USDT' || opType === 'COMPRA_USD') totalInvertido += o.totalPrice;
-    if (opType === 'VENTA_USDT' || opType === 'RECOMPRA') totalRecuperado += o.totalPrice;
-  });
-  const gananciaBruta = totalRecuperado - totalInvertido;
-  const gananciaNeta = gananciaBruta - totalComisiones;
-  const isPositive = gananciaNeta > 0;
-  const isNeutral = Math.abs(gananciaNeta) < 0.01;
+  // ✅ Usamos los datos ya calculados correctamente por la DB (recalculateCycleMetrics)
+  // NUNCA recalculamos localmente aquí para evitar mezcla de unidades (VES vs USDT)
+  const gananciaUsdt = cycle.ganancia_usdt;       // USDT real (neto comisiones)
+  const gananciaVes  = cycle.ganancia_ves;        // VES real
+  const vesRecibido  = cycle.ves_recibido;        // Bs. de ventas
+  const vesPagado    = cycle.ves_pagado;          // Bs. de compras
+  const comisiones   = cycle.comision_total;      // USDT comisiones totales
+  const isPositive   = gananciaUsdt > 0;
+  const isNeutral    = Math.abs(gananciaUsdt) < 0.001;
 
   return (
     <div className="flex flex-col gap-[20px]">
@@ -620,21 +617,29 @@ const CycleSummary: React.FC<{
         )}
       </div>
 
-      {/* Financial summary cards */}
+      {/* Financial summary cards — usamos datos de DB, no recalculamos aquí */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-[10px]">
-        {[
-          { label: 'Total Invertido (Liquidez)', val: totalRecuperado, color: 'text-[var(--text-primary)]' },
-          { label: 'Costo Recompra', val: totalInvertido, color: 'text-[var(--text-secondary)]' },
-          { label: 'Total comisiones', val: totalComisiones, color: 'text-[var(--warning)]' },
-          { label: 'Ganancia neta', val: gananciaNeta, color: isNeutral ? 'text-[var(--text-secondary)]' : isPositive ? 'text-[var(--profit)]' : 'text-[var(--loss)]' },
-        ].map(({ label, val, color }) => (
-          <div key={label} className="bg-[var(--bg-surface-3)] border border-[var(--border)] rounded-[10px] p-[12px] flex flex-col gap-[3px]">
-            <span className="text-[10px] text-[var(--text-tertiary)] uppercase tracking-wider">{label}</span>
-            <span className={`font-mono font-bold text-[15px] ${color}`}>
-              {val >= 0 ? '' : '-'}Bs. {fmt(Math.abs(val))}
-            </span>
-          </div>
-        ))}
+        <div className="bg-[var(--bg-surface-3)] border border-[var(--border)] rounded-[10px] p-[12px] flex flex-col gap-[3px]">
+          <span className="text-[10px] text-[var(--text-tertiary)] uppercase tracking-wider">Bs. Recibidos (Ventas)</span>
+          <span className="font-mono font-bold text-[15px] text-[var(--text-primary)]">Bs. {fmt(vesRecibido)}</span>
+        </div>
+        <div className="bg-[var(--bg-surface-3)] border border-[var(--border)] rounded-[10px] p-[12px] flex flex-col gap-[3px]">
+          <span className="text-[10px] text-[var(--text-tertiary)] uppercase tracking-wider">Bs. Pagados (Compras)</span>
+          <span className="font-mono font-bold text-[15px] text-[var(--text-secondary)]">Bs. {fmt(vesPagado)}</span>
+        </div>
+        <div className="bg-[var(--bg-surface-3)] border border-[var(--border)] rounded-[10px] p-[12px] flex flex-col gap-[3px]">
+          <span className="text-[10px] text-[var(--text-tertiary)] uppercase tracking-wider">Comisiones Totales</span>
+          <span className="font-mono font-bold text-[15px] text-[var(--warning)]">{fmt(comisiones, 4)} USDT</span>
+        </div>
+        <div className="bg-[var(--bg-surface-3)] border border-[var(--border)] rounded-[10px] p-[12px] flex flex-col gap-[3px]">
+          <span className="text-[10px] text-[var(--text-tertiary)] uppercase tracking-wider">Ganancia Neta</span>
+          <span className={`font-mono font-bold text-[15px] ${isNeutral ? 'text-[var(--text-secondary)]' : isPositive ? 'text-[var(--profit)]' : 'text-[var(--loss)]'}`}>
+            {gananciaUsdt >= 0 ? '+' : ''}{gananciaUsdt.toFixed(4)} USDT
+          </span>
+          <span className="text-[10px] text-[var(--text-tertiary)] font-mono">
+            Bs. {fmt(Math.abs(gananciaVes))}
+          </span>
+        </div>
       </div>
 
       {/* Orders table */}

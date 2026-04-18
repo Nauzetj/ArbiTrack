@@ -49,7 +49,8 @@ export const Dashboard: React.FC = () => {
   console.log('[Dashboard] profitTodayUsdt:', profitTodayUsdt, 'profitTodayVes:', profitTodayVes);
 
   const ordersToday = orders.filter(o => new Date(o.createTime_utc) >= todayStart && o.orderStatus === 'COMPLETED');
-  const usdtTotalOperated = ordersToday.filter(o => o.tradeType === 'SELL').reduce((sum, o) => sum + o.amount, 0);
+  // ✅ USDT neto real = amount - commission (lo que realmente se entregó/recibió)
+  const usdtTotalOperated = ordersToday.filter(o => o.tradeType === 'SELL').reduce((sum, o) => sum + Math.max(o.amount - (o.commission ?? 0), 0), 0);
 
   const monthStart = new Date(now.getTime());
   monthStart.setUTCDate(1);
