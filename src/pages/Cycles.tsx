@@ -2,7 +2,9 @@ import React, { useMemo, useState } from 'react';
 import { useAppStore } from '../store/useAppStore';
 import { Badge } from '../components/ui/Badge';
 import { CycleCalendar } from '../components/dashboard/CycleCalendar';
-import { CalendarDays, TableProperties, Zap, PenLine, TrendingUp, TrendingDown, Minus } from 'lucide-react';
+import { CalendarDays, TableProperties, Zap, PenLine, TrendingUp, TrendingDown, Minus, RefreshCw } from 'lucide-react';
+import { recalculateCycleMetrics } from '../services/dbOperations';
+import toast from 'react-hot-toast';
 import type { OperationType } from '../types';
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -36,7 +38,7 @@ const OP_LABELS: Record<OperationType | string, { label: string; color: string }
 // ─── Component ────────────────────────────────────────────────────────────────
 
 export const Cycles: React.FC = () => {
-  const { cycles, orders } = useAppStore();
+  const { cycles, orders, currentUser } = useAppStore();
   const [filter, setFilter] = useState<'Todo' | 'En curso' | 'Completado' | 'Con pérdida'>('Todo');
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [view, setView] = useState<'table' | 'calendar'>('table');
@@ -90,6 +92,25 @@ export const Cycles: React.FC = () => {
         </div>
 
         <div className="flex flex-wrap items-center gap-[8px]">
+          <button
+            onClick={async () => {
+              if (!currentUser) return;
+              if (!confirm('¿Recalcular TODOS los ciclos? Esto corregirá las ganancias.')) return;
+              toast.loading('Recalculando ciclos...', { id: 'recalc' });
+              try {
+                for (const c of cycles) {
+                  await recalculateCycleMetrics(c.id, currentUser.id);
+                }
+                toast.success('Ciclos recalculados', { id: 'recalc' });
+              } catch (e: any) {
+                toast.error('Error: ' + e.message, { id: 'recalc' });
+              }
+            }}
+            className="flex items-center gap-[6px] px-[12px] py-[6px] rounded-[8px] bg-[var(--bg-surface-3)] border border-[var(--border-strong)] text-[var(--text-secondary)] text-[12px] font-medium hover:bg-[var(--bg-surface-2)] transition-all"
+          >
+            <RefreshCw size={14}/> Recalcular
+          </button>
+          
           {/* View toggle */}
           <div className="flex bg-[var(--bg-surface-3)] p-[4px] rounded-[10px] border border-[var(--border-strong)]">
             {(['table', 'calendar'] as const).map(v => (
