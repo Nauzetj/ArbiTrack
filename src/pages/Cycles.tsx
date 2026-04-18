@@ -299,21 +299,28 @@ export const Cycles: React.FC = () => {
 
                             {/* Financial summary mini */}
                             <div className="grid grid-cols-2 md:grid-cols-4 gap-[8px]">
-                              {[
-                                { label: 'Total Invertido (Liquidez)',  val: c.ves_pagado,  color: 'text-[var(--text-primary)]' },
-                                { label: 'Costo Recompra', val: c.ves_recibido,   color: 'text-[var(--text-secondary)]' },
-                                { label: 'Comisiones',       val: c.comision_total,  color: 'text-[var(--warning)]' },
-                                { label: 'Ganancia USDT',    val: c.ganancia_usdt,     color: c.ganancia_usdt > 0 ? 'text-[var(--profit)]' : c.ganancia_usdt < 0 ? 'text-[var(--loss)]' : 'text-[var(--text-secondary)]' },
-                              ].map(({ label, val, color }) => (
-                                <div key={label} className="bg-[var(--bg-surface-2)] border border-[var(--border)] rounded-[8px] px-[12px] py-[8px]">
-                                  <span className="text-[9px] text-[var(--text-tertiary)] uppercase tracking-wider block">{label}</span>
-                                  <span className={`font-mono font-bold text-[13px] ${color}`}>
-                                    {label.includes('USD') 
-                                      ? (val > 0 ? '+' : '') + val.toFixed(4) + ' USDT'
-                                      : 'Bs. ' + fmt(val, 2)}
-                                  </span>
-                                </div>
-                              ))}
+                              {/* Bs. Recibido (ventas VES) */}
+                              <div className="bg-[var(--bg-surface-2)] border border-[var(--border)] rounded-[8px] px-[12px] py-[8px]">
+                                <span className="text-[9px] text-[var(--text-tertiary)] uppercase tracking-wider block">Bs. Recibidos (Ventas)</span>
+                                <span className="font-mono font-bold text-[13px] text-[var(--text-primary)]">Bs. {fmt(c.ves_recibido)}</span>
+                              </div>
+                              {/* Bs. Pagado (compras VES) */}
+                              <div className="bg-[var(--bg-surface-2)] border border-[var(--border)] rounded-[8px] px-[12px] py-[8px]">
+                                <span className="text-[9px] text-[var(--text-tertiary)] uppercase tracking-wider block">Bs. Pagados (Compras)</span>
+                                <span className="font-mono font-bold text-[13px] text-[var(--text-secondary)]">Bs. {fmt(c.ves_pagado)}</span>
+                              </div>
+                              {/* Comisiones en USDT */}
+                              <div className="bg-[var(--bg-surface-2)] border border-[var(--border)] rounded-[8px] px-[12px] py-[8px]">
+                                <span className="text-[9px] text-[var(--text-tertiary)] uppercase tracking-wider block">Comisiones</span>
+                                <span className="font-mono font-bold text-[13px] text-[var(--warning)]">{fmt(c.comision_total, 4)} USDT</span>
+                              </div>
+                              {/* Ganancia neta en USDT */}
+                              <div className="bg-[var(--bg-surface-2)] border border-[var(--border)] rounded-[8px] px-[12px] py-[8px]">
+                                <span className="text-[9px] text-[var(--text-tertiary)] uppercase tracking-wider block">Ganancia Neta</span>
+                                <span className={`font-mono font-bold text-[13px] ${c.ganancia_usdt > 0 ? 'text-[var(--profit)]' : c.ganancia_usdt < 0 ? 'text-[var(--loss)]' : 'text-[var(--text-secondary)]'}`}>
+                                  {c.ganancia_usdt > 0 ? '+' : ''}{c.ganancia_usdt.toFixed(4)} USDT
+                                </span>
+                              </div>
                             </div>
 
                             {/* Orders list */}
