@@ -564,7 +564,6 @@ const CycleSummary: React.FC<{
   // ✅ Usamos los datos ya calculados correctamente por la DB (recalculateCycleMetrics)
   // NUNCA recalculamos localmente aquí para evitar mezcla de unidades (VES vs USDT)
   const gananciaUsdt = cycle.ganancia_usdt;       // USDT real (neto comisiones)
-  const gananciaVes  = cycle.ganancia_ves;        // VES real
   const vesRecibido  = cycle.ves_recibido;        // Bs. de ventas
   const vesPagado    = cycle.ves_pagado;          // Bs. de compras
   const comisiones   = cycle.comision_total;      // USDT comisiones totales
