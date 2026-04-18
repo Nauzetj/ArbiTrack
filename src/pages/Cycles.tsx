@@ -3,7 +3,12 @@ import { useAppStore } from '../store/useAppStore';
 import { Badge } from '../components/ui/Badge';
 import { CycleCalendar } from '../components/dashboard/CycleCalendar';
 import { CalendarDays, TableProperties, Zap, PenLine, TrendingUp, TrendingDown, Minus, RefreshCw } from 'lucide-react';
-import { recalculateCycleMetrics } from '../services/dbOperations';
+import { 
+  recalculateCycleMetrics, 
+  getCyclesForUser, 
+  getOrdersForUser, 
+  getActiveCycleForUser 
+} from '../services/dbOperations';
 import toast from 'react-hot-toast';
 import type { OperationType } from '../types';
 
@@ -101,6 +106,16 @@ export const Cycles: React.FC = () => {
                 for (const c of cycles) {
                   await recalculateCycleMetrics(c.id, currentUser.id);
                 }
+                // Refresh data after recalculate
+                const { setCycles, setOrders, setActiveCycle } = useAppStore.getState();
+                const [fc, fo, fa] = await Promise.all([
+                  getCyclesForUser(currentUser.id),
+                  getOrdersForUser(currentUser.id),
+                  getActiveCycleForUser(currentUser.id)
+                ]);
+                setCycles(fc);
+                setOrders(fo);
+                setActiveCycle(fa);
                 toast.success('Ciclos recalculados', { id: 'recalc' });
               } catch (e: any) {
                 toast.error('Error: ' + e.message, { id: 'recalc' });
