@@ -637,7 +637,7 @@ const CycleSummary: React.FC<{
             {gananciaUsdt >= 0 ? '+' : ''}{gananciaUsdt.toFixed(4)} USDT
           </span>
           <span className="text-[10px] text-[var(--text-tertiary)] font-mono">
-            Bs. {fmt(Math.abs(gananciaVes))}
+            Bs. {fmt(Math.abs(gananciaUsdt * (cycle.tasa_compra_prom || 1)))}
           </span>
         </div>
       </div>
