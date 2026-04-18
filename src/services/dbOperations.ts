@@ -339,14 +339,24 @@ const recalculateCycleMetrics_local = async (cycleId: string, userId: string): P
   orders.forEach(o => {
     if (o.orderStatus?.toUpperCase() !== 'COMPLETED') return;
     const opType = o.operationType ?? (o.tradeType === 'SELL' ? 'VENTA_USDT' : 'COMPRA_USDT');
-    comision_total += o.commission ?? 0;
-    switch (opType) {
-      case 'COMPRA_USDT': usdt_recomprado += o.amount; ves_pagado += o.totalPrice; break;
-      case 'RECOMPRA':    usdt_recomprado += o.amount; ves_pagado += o.totalPrice; ves_recibido += o.totalPrice; break;
-      case 'VENTA_USDT':  usdt_vendido    += o.amount; ves_recibido += o.totalPrice; break;
-      case 'COMPRA_USD':  ves_pagado      += o.totalPrice; break;
-      case 'SOBRANTE':    usdt_recomprado += o.amount; ves_pagado += o.totalPrice; break;
+    // Restar comisiones del monto
+    const amountNeto = o.amount - (o.commission ?? 0);
+    const isCompra = ['COMPRA_USDT', 'RECOMPRA'].includes(opType);
+    const isVenta = opType === 'VENTA_USDT';
+    
+    if (isCompra) {
+      usdt_recomprado += amountNeto;
+      ves_pagado += o.totalPrice;
     }
+    if (isVenta) {
+      usdt_vendido += amountNeto;
+      ves_recibido += o.totalPrice;
+    }
+    if (opType === 'SOBRANTE') {
+      usdt_recomprado += amountNeto;
+      ves_pagado += o.totalPrice;
+    }
+    comision_total += o.commission ?? 0;
   });
 
   const tasa_venta_prom  = usdt_vendido    > 0 ? ves_recibido / usdt_vendido    : 0;
