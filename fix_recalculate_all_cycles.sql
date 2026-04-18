@@ -1,10 +1,11 @@
 -- ============================================================
--- FIX DEFINITIVO: recalculate_cycle_metrics  (v2 - corregido)
+-- FIX DEFINITIVO: recalculate_cycle_metrics
 -- USDT_real = amount - commission  (neto recibido/pagado real)
 -- Ganancia = diferencial de tasas × volumen emparejado
 -- Ejecutar en: Supabase Dashboard → SQL Editor → Run
 -- ============================================================
 
+-- PASO 1: Actualizar la función con la matemática correcta
 CREATE OR REPLACE FUNCTION recalculate_cycle_metrics(
   p_cycle_id UUID,
   p_user_id  UUID
@@ -32,12 +33,11 @@ BEGIN
   -- ─────────────────────────────────────────────────────────
   -- CORRECCIÓN CRÍTICA:
   --   USDT_real = amount - commission
-  --   El campo 'amount' de Binance incluye la comisión.
-  --   Lo que el usuario REALMENTE recibió/pagó en USDT es el neto.
-  --   total_price (VES) es exacto y no necesita corrección.
+  --   Esto es lo que el usuario REALMENTE recibió/pagó en USDT.
+  --   total_price (VES) no se modifica, es exacto.
   -- ─────────────────────────────────────────────────────────
   SELECT
-    -- USDT vendido neto (lo que el usuario realmente entregó)
+    -- USDT vendido neto (lo que el usuario realmente entregó al comprador)
     COALESCE(SUM(CASE
       WHEN operation_type = 'VENTA_USDT'
       THEN GREATEST(amount - COALESCE(commission, 0), 0)
@@ -51,14 +51,14 @@ BEGIN
       ELSE 0
     END), 0),
 
-    -- VES recibido (exacto)
+    -- VES recibido (exacto, sin cambios)
     COALESCE(SUM(CASE
       WHEN operation_type IN ('VENTA_USDT', 'RECOMPRA')
       THEN total_price
       ELSE 0
     END), 0),
 
-    -- VES pagado (exacto)
+    -- VES pagado (exacto, sin cambios)
     COALESCE(SUM(CASE
       WHEN operation_type IN ('COMPRA_USDT', 'COMPRA_USD', 'RECOMPRA', 'SOBRANTE')
       THEN total_price
@@ -81,7 +81,7 @@ BEGIN
     AND order_status = 'COMPLETED';
 
   -- ── Tasas promedio ───────────────────────────────────────
-  -- Usamos los USDT netos para las tasas promedio
+  -- Usamos los USDT netos (ya con comisión descontada) para las tasas
   IF v_usdt_vendido > 0 THEN
     v_tasa_venta := v_ves_recibido / v_usdt_vendido;
   END IF;
@@ -94,7 +94,7 @@ BEGIN
     v_diferencial := v_tasa_venta - v_tasa_compra;
   END IF;
 
-  -- Tasa de referencia para la conversión VES ↔ USDT
+  -- Tasa de referencia para convertir VES ↔ USDT
   v_tasa_ref := CASE
     WHEN v_tasa_compra > 0 THEN v_tasa_compra
     WHEN v_tasa_venta  > 0 THEN v_tasa_venta
@@ -102,13 +102,14 @@ BEGIN
   END;
 
   -- ── Ganancia ─────────────────────────────────────────────
-  -- Volumen emparejado real (mínimo entre vendido y recomprado)
+  -- Volumen realmente cruzado (mínimo entre lo vendido y lo recomprado)
   v_matched_vol := LEAST(v_usdt_vendido, v_usdt_recomprado);
 
   -- Ganancia en VES = diferencial de tasas × volumen emparejado
   v_ganancia_ves := v_matched_vol * v_diferencial;
 
-  -- Ganancia en USDT (comisiones ya están en el amount neto, no se restan de nuevo)
+  -- Ganancia en USDT = ganancia_ves / tasa_compra (ambas en misma moneda)
+  -- Las comisiones ya están descontadas del amount, así que NO se restan aquí
   v_ganancia_usdt := CASE
     WHEN v_tasa_ref > 0 THEN v_ganancia_ves / v_tasa_ref
     ELSE 0
@@ -140,5 +141,28 @@ BEGIN
   WHERE id      = p_cycle_id
     AND user_id = p_user_id;
 
+END;
+$$;
+
+-- ============================================================
+-- PASO 2: Recalcular TODOS los ciclos existentes
+-- Este bloque invoca la función para cada ciclo en la base de datos.
+-- ============================================================
+DO $$
+DECLARE
+  r RECORD;
+  total_updated INT := 0;
+BEGIN
+  FOR r IN
+    SELECT id, user_id, cycle_number
+    FROM cycles
+    ORDER BY opened_at ASC
+  LOOP
+    PERFORM recalculate_cycle_metrics(r.id, r.user_id);
+    total_updated := total_updated + 1;
+    RAISE NOTICE 'Ciclo #% actualizado (id: %)', r.cycle_number, r.id;
+  END LOOP;
+
+  RAISE NOTICE '✅ Total ciclos recalculados: %', total_updated;
 END;
 $$;

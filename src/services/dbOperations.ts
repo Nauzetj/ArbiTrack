@@ -325,7 +325,7 @@ export const recalculateCycleMetrics = async (cycleId: string, userId: string): 
   }
 };
 
-// ─── Fallback local (mientras no se haya ejecutado la SP en Supabase) ─────────
+// ─── Fallback local (cálculo correcto: USDT_real = amount - commission) ────────
 const recalculateCycleMetrics_local = async (cycleId: string, userId: string): Promise<void> => {
   const { data: cycleRows } = await supabase.from('cycles').select('*').eq('id', cycleId).eq('user_id', userId).limit(1);
   if (!cycleRows || cycleRows.length === 0) return;
@@ -339,37 +339,51 @@ const recalculateCycleMetrics_local = async (cycleId: string, userId: string): P
   orders.forEach(o => {
     if (o.orderStatus?.toUpperCase() !== 'COMPLETED') return;
     const opType = o.operationType ?? (o.tradeType === 'SELL' ? 'VENTA_USDT' : 'COMPRA_USDT');
-    // Restar comisiones del monto
-    const amountNeto = o.amount - (o.commission ?? 0);
-    const isCompra = ['COMPRA_USDT', 'RECOMPRA'].includes(opType);
-    const isVenta = opType === 'VENTA_USDT';
     
-    if (isCompra) {
-      usdt_recomprado += amountNeto;
-      ves_pagado += o.totalPrice;
+    // ✅ CORRECCIÓN: USDT_real = amount - commission
+    // El 'amount' de Binance incluye la comisión. Lo que realmente se recibe/paga es lo neto.
+    const commission = Math.max(o.commission ?? 0, 0);
+    const amountNeto = Math.max(o.amount - commission, 0);
+    
+    // VES total_price es exacto tal como viene, no necesita corrección
+    if (opType === 'VENTA_USDT') {
+      usdt_vendido  += amountNeto;
+      ves_recibido  += o.totalPrice;
     }
-    if (isVenta) {
-      usdt_vendido += amountNeto;
-      ves_recibido += o.totalPrice;
+    if (opType === 'COMPRA_USDT' || opType === 'RECOMPRA') {
+      usdt_recomprado += amountNeto;
+      ves_pagado      += o.totalPrice;
     }
     if (opType === 'SOBRANTE') {
       usdt_recomprado += amountNeto;
+      ves_pagado      += o.totalPrice;
+    }
+    // COMPRA_USD y TRANSFERENCIA: afectan VES pero no USDT directamente
+    if (opType === 'COMPRA_USD') {
       ves_pagado += o.totalPrice;
     }
-    comision_total += o.commission ?? 0;
+    
+    comision_total += commission;
   });
 
+  // Tasas promedio calculadas sobre USDT netos (ya con comisión descontada)
   const tasa_venta_prom  = usdt_vendido    > 0 ? ves_recibido / usdt_vendido    : 0;
   const tasa_compra_prom = usdt_recomprado > 0 ? ves_pagado   / usdt_recomprado : 0;
   const diferencial_tasa = tasa_venta_prom > 0 && tasa_compra_prom > 0 ? tasa_venta_prom - tasa_compra_prom : 0;
-  const matched_vol      = Math.min(usdt_vendido, usdt_recomprado);
   
-  // Ganancia: diferencia real en Bs (sin restar comisiones - ellas son gasto separado)
-  const ganancia_ves = (matched_vol * tasa_venta_prom) - (matched_vol * tasa_compra_prom);
-  const ganancia_usdt = matched_vol > 0 ? ganancia_ves / tasa_compra_prom : 0;
+  // Volumen emparejado = mínimo entre lo vendido y lo recomprado
+  const matched_vol = Math.min(usdt_vendido, usdt_recomprado);
   
-  const capitalBase      = usdt_vendido > 0 ? usdt_vendido * tasa_venta_prom : ves_pagado;
-  const roi_percent      = capitalBase > 0 ? (ganancia_ves / capitalBase) * 100 : 0;
+  // Ganancia en VES = diferencial × volumen emparejado
+  const ganancia_ves = matched_vol * diferencial_tasa;
+  
+  // Ganancia en USDT = ganancia_ves / tasa_referencia
+  // (las comisiones ya están descontadas del amount, NO se restan de nuevo)
+  const tasa_ref = tasa_compra_prom > 0 ? tasa_compra_prom : (tasa_venta_prom > 0 ? tasa_venta_prom : 1);
+  const ganancia_usdt = matched_vol > 0 ? ganancia_ves / tasa_ref : 0;
+  
+  const capitalBase = usdt_vendido > 0 ? usdt_vendido * tasa_venta_prom : ves_pagado;
+  const roi_percent = capitalBase > 0 ? (ganancia_ves / capitalBase) * 100 : 0;
 
   await saveCycle({
     ...cycle,
