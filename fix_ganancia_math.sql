@@ -1,7 +1,7 @@
 -- ============================================================
--- FIX DEFINITIVO: recalculate_cycle_metrics  (v2 - corregido)
--- USDT_real = amount - commission  (neto recibido/pagado real)
--- Ganancia = diferencial de tasas × volumen emparejado
+-- FIX DEFINITIVO v3: ganancia_neta = diferencial_tasas - comisiones
+-- La ganancia USDT mostrada es SIEMPRE la ganancia neta real
+-- (después de restar las comisiones de Binance)
 -- Ejecutar en: Supabase Dashboard → SQL Editor → Run
 -- ============================================================
 
@@ -23,49 +23,43 @@ DECLARE
   v_tasa_compra     NUMERIC := 0;
   v_diferencial     NUMERIC := 0;
   v_ganancia_ves    NUMERIC := 0;
-  v_ganancia_usdt   NUMERIC := 0;
+  v_ganancia_usdt   NUMERIC := 0;  -- NETA (ya incluye descuento de comisiones)
   v_roi             NUMERIC := 0;
   v_tasa_ref        NUMERIC := 1;
   v_capital_base    NUMERIC := 0;
   v_matched_vol     NUMERIC := 0;
 BEGIN
   -- ─────────────────────────────────────────────────────────
-  -- CORRECCIÓN CRÍTICA:
-  --   USDT_real = amount - commission
-  --   El campo 'amount' de Binance incluye la comisión.
-  --   Lo que el usuario REALMENTE recibió/pagó en USDT es el neto.
-  --   total_price (VES) es exacto y no necesita corrección.
+  -- USAMOS EL AMOUNT BRUTO para calcular tasas reales
+  -- (el amount negociado es el que fija la tasa de cambio real)
+  -- Las comisiones se restan APARTE como costo explícito
   -- ─────────────────────────────────────────────────────────
   SELECT
-    -- USDT vendido neto (lo que el usuario realmente entregó)
+    -- USDT vendido bruto (el amount real de cada orden VENTA)
     COALESCE(SUM(CASE
       WHEN operation_type = 'VENTA_USDT'
-      THEN GREATEST(amount - COALESCE(commission, 0), 0)
-      ELSE 0
+      THEN amount ELSE 0
     END), 0),
 
-    -- USDT recomprado neto (COMPRA_USDT + RECOMPRA + SOBRANTE)
+    -- USDT recomprado bruto (COMPRA_USDT + RECOMPRA + SOBRANTE)
     COALESCE(SUM(CASE
       WHEN operation_type IN ('COMPRA_USDT', 'RECOMPRA', 'SOBRANTE')
-      THEN GREATEST(amount - COALESCE(commission, 0), 0)
-      ELSE 0
+      THEN amount ELSE 0
     END), 0),
 
-    -- VES recibido (exacto)
+    -- VES recibido total (exacto)
     COALESCE(SUM(CASE
       WHEN operation_type IN ('VENTA_USDT', 'RECOMPRA')
-      THEN total_price
-      ELSE 0
+      THEN total_price ELSE 0
     END), 0),
 
-    -- VES pagado (exacto)
+    -- VES pagado total (exacto)
     COALESCE(SUM(CASE
       WHEN operation_type IN ('COMPRA_USDT', 'COMPRA_USD', 'RECOMPRA', 'SOBRANTE')
-      THEN total_price
-      ELSE 0
+      THEN total_price ELSE 0
     END), 0),
 
-    -- Total comisiones acumuladas
+    -- Comisiones totales en USDT
     COALESCE(SUM(COALESCE(commission, 0)), 0)
 
   INTO
@@ -80,8 +74,7 @@ BEGIN
     AND user_id     = p_user_id
     AND order_status = 'COMPLETED';
 
-  -- ── Tasas promedio ───────────────────────────────────────
-  -- Usamos los USDT netos para las tasas promedio
+  -- ── Tasas promedio reales (basadas en amount bruto) ──────
   IF v_usdt_vendido > 0 THEN
     v_tasa_venta := v_ves_recibido / v_usdt_vendido;
   END IF;
@@ -94,37 +87,37 @@ BEGIN
     v_diferencial := v_tasa_venta - v_tasa_compra;
   END IF;
 
-  -- Tasa de referencia para la conversión VES ↔ USDT
   v_tasa_ref := CASE
     WHEN v_tasa_compra > 0 THEN v_tasa_compra
     WHEN v_tasa_venta  > 0 THEN v_tasa_venta
     ELSE 1
   END;
 
-  -- ── Ganancia ─────────────────────────────────────────────
-  -- Volumen emparejado real (mínimo entre vendido y recomprado)
+  -- ── Volumen emparejado ───────────────────────────────────
   v_matched_vol := LEAST(v_usdt_vendido, v_usdt_recomprado);
 
-  -- Ganancia en VES = diferencial de tasas × volumen emparejado
+  -- ── Ganancia VES bruta (del diferencial de tasas) ────────
   v_ganancia_ves := v_matched_vol * v_diferencial;
 
-  -- Ganancia en USDT (comisiones ya están en el amount neto, no se restan de nuevo)
+  -- ── Ganancia USDT NETA = bruta - comisiones ─────────────
+  -- Esto es la ganancia real que le quedó al usuario
   v_ganancia_usdt := CASE
-    WHEN v_tasa_ref > 0 THEN v_ganancia_ves / v_tasa_ref
-    ELSE 0
+    WHEN v_tasa_ref > 0 THEN (v_ganancia_ves / v_tasa_ref) - v_comision_total
+    ELSE -v_comision_total
   END;
 
-  -- ── ROI ──────────────────────────────────────────────────
+  -- ── ROI sobre capital base ───────────────────────────────
   v_capital_base := CASE
     WHEN v_usdt_vendido > 0 THEN v_usdt_vendido * NULLIF(v_tasa_venta, 0)
     ELSE v_ves_pagado
   END;
 
   IF v_capital_base > 0 THEN
-    v_roi := (v_ganancia_ves / v_capital_base) * 100;
+    -- ROI neto: usa ganancia neta sobre el capital
+    v_roi := ((v_ganancia_ves - v_comision_total * v_tasa_ref) / v_capital_base) * 100;
   END IF;
 
-  -- ── Actualizar el ciclo ───────────────────────────────────
+  -- ── Actualizar ciclo ─────────────────────────────────────
   UPDATE cycles SET
     usdt_vendido     = v_usdt_vendido,
     usdt_recomprado  = v_usdt_recomprado,
@@ -135,7 +128,7 @@ BEGIN
     tasa_compra_prom = v_tasa_compra,
     diferencial_tasa = v_diferencial,
     ganancia_ves     = v_ganancia_ves,
-    ganancia_usdt    = v_ganancia_usdt,
+    ganancia_usdt    = v_ganancia_usdt,   -- NETA (ya restadas comisiones)
     roi_percent      = v_roi
   WHERE id      = p_cycle_id
     AND user_id = p_user_id;
