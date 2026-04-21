@@ -275,6 +275,7 @@ export const getActiveCycleForUser = async (userId: string): Promise<Cycle | nul
     .select('*')
     .eq('user_id', userId)
     .eq('status', 'En curso')
+    .order('opened_at', { ascending: false })
     .limit(1);
   if (error || !data || data.length === 0) return null;
   return mapCycle(data[0]);
