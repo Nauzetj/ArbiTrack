@@ -8,15 +8,37 @@ export const MiniChart: React.FC = () => {
     const daysName = ['Dom', 'Lun', 'Mar', 'Mie', 'Jue', 'Vie', 'Sab'];
     const data = [];
     
+    // Calcular "Hoy" inicio del día en UTC (4 AM = 12 AM Venezuela)
+    const now = new Date();
+    const horaUTC = now.getUTCHours();
+    
+    let todayStart = new Date(now.getTime());
+    if (horaUTC < 4) {
+      todayStart.setUTCDate(todayStart.getUTCDate() - 1);
+    }
+    todayStart.setUTCHours(4, 0, 0, 0);
+    todayStart.setUTCMilliseconds(0);
+    
     // Generamos los últimos 7 días terminando en "Hoy"
     for (let i = 6; i >= 0; i--) {
-      const d = new Date();
-      d.setDate(d.getDate() - i);
-      const dateStr = d.toISOString().split('T')[0];
-      const dayLabel = i === 0 ? 'Hoy' : daysName[d.getDay()];
+      const dayStart = new Date(todayStart.getTime());
+      dayStart.setUTCDate(dayStart.getUTCDate() - i);
       
-      const dayCycles = cycles.filter(c => c.status === 'Completado' && c.closedAt && c.closedAt.startsWith(dateStr));
-      const dailyProfit = dayCycles.reduce((sum, c) => sum + c.ganancia_usdt, 0);
+      const dayEnd = new Date(dayStart.getTime());
+      dayEnd.setUTCDate(dayEnd.getUTCDate() + 1);
+      
+      // Obtener nombre del día ajustado a zona local (restando offset)
+      const localDayRef = new Date(dayStart.getTime() - 4 * 60 * 60 * 1000); 
+      const dayLabel = i === 0 ? 'Hoy' : daysName[localDayRef.getUTCDay()];
+      
+      const dayCycles = cycles.filter(c => {
+        if (c.status !== 'Completado' || !c.closedAt) return false;
+        const closed = new Date(c.closedAt);
+        return closed >= dayStart && closed < dayEnd;
+      });
+      
+      // Aseguramos que sea un número válido y no devuelva NaN
+      const dailyProfit = dayCycles.reduce((sum, c) => sum + (Number(c.ganancia_usdt) || 0), 0);
       
       data.push({ day: dayLabel, profit: dailyProfit });
     }
@@ -24,7 +46,8 @@ export const MiniChart: React.FC = () => {
     return data;
   }, [cycles]);
 
-  const maxVal = Math.max(...chartData.map(d => Math.abs(d.profit))) * 1.2 || 1;
+  // Si no hay datos, prevé que maxVal no sea NaN (0 || 1)
+  const maxVal = Math.max(...chartData.map(d => Math.abs(Number(d.profit) || 0))) * 1.2 || 1;
   const containerRef = useRef<HTMLDivElement>(null);
 
   return (
@@ -38,7 +61,7 @@ export const MiniChart: React.FC = () => {
             <div key={i} className="flex flex-col items-center gap-[8px] w-[14%] group relative h-full justify-end">
                {/* Tooltip */}
                <div className="absolute top-[calc(100%-10px)] -translate-y-full mb-[100%] opacity-0 group-hover:opacity-100 transition-opacity bg-[var(--bg-surface-3)] border border-[var(--border-strong)] rounded-[4px] px-[6px] py-[4px] text-[10px] mono whitespace-nowrap z-10 pointer-events-none shadow-sm">
-                 {d.profit > 0 ? '+' : ''}{d.profit.toFixed(2)}
+                 {d.profit > 0 ? '+' : ''}{Number(d.profit).toFixed(2)}
                </div>
                {/* Bar */}
                <div 
