@@ -14,16 +14,19 @@ env.split('\n').filter(Boolean).forEach(line => {
 });
 
 const supabase = createClient(envVars.VITE_SUPABASE_URL, envVars.VITE_SUPABASE_ANON_KEY, {
-  auth: { persistSession: false }
+  auth: { persistSession: false },
+  global: {
+    fetch: (url, options = {}) => fetch(url, { ...options, signal: AbortSignal.timeout(30000) })
+  }
 });
 
 // ── Config ─────────────────────────────────────────────────────────────────
 // Cycle number to backdate (last 4 digits shown in the table)
-const CYCLE_NUMBER_SUFFIX = '0202';
+const CYCLE_NUMBER_SUFFIX = '6596';
 
-// Target date: April 22, 2026 — keep the same time as the original closed_at
-// but move the date back one day. We'll read the original first.
-const TARGET_DATE = '2026-04-22';
+// Target date: April 23, 2026 — keep the same time as the original closed_at
+// but move the date to day 23. We'll read the original first.
+const TARGET_DATE = '2026-04-23';
 
 async function main() {
   console.log('🔍 Buscando ciclo #' + CYCLE_NUMBER_SUFFIX + '...');
