@@ -37,28 +37,21 @@ export const SpreadChart: React.FC<SpreadChartProps> = ({ liveData }) => {
     status: 'Simulado (Histórico)'
   });
 
-  // Generar datos simulados para el contexto histórico de las últimas 24h
-  const generateHistory = useCallback(() => {
-    const data: SpreadData[] = [];
-    let currentBuy = 627.89; 
-    let currentSell = 631.10;
-    
-    const now = new Date();
-    // Ajustar el inicio para que termine exactamente antes de nuestro primer dato real
-    const startTime = Math.floor(now.getTime() / 1000) - (24 * 60 * 60); 
+  const [historyGenerated, setHistoryGenerated] = useState(false);
 
-    for (let i = 0; i < 288; i++) {
-      const time = startTime + (i * 300);
-      const buyChange = (Math.random() - 0.48) * 0.5; 
-      const sellChange = (Math.random() - 0.52) * 0.5;
-      
-      currentBuy = Math.max(620, currentBuy + buyChange);
-      currentSell = Math.max(currentBuy + 1.5, currentSell + sellChange);
+  const generateHistory = useCallback((endBuy: number, endSell: number, endTimestamp: number) => {
+    const data: SpreadData[] = [];
+    let currentBuy = endBuy;
+    let currentSell = endSell;
+    
+    // Generar hacia atrás, así el punto más reciente es exactamente el liveData actual
+    for (let i = 0; i <= 288; i++) {
+      const time = Math.floor(endTimestamp / 1000) - (i * 300); // Hacia atrás en el tiempo
       
       const isGreenVol = Math.random() > 0.5;
       const volume = Math.floor(Math.random() * 100000) + 10000;
 
-      data.push({
+      data.unshift({
         time,
         buy: Number(currentBuy.toFixed(2)),
         sell: Number(currentSell.toFixed(2)),
@@ -66,6 +59,13 @@ export const SpreadChart: React.FC<SpreadChartProps> = ({ liveData }) => {
         volume,
         isGreenVol
       });
+
+      // Variar el precio para el siguiente punto (más atrás en el tiempo)
+      const buyChange = (Math.random() - 0.48) * 0.5; 
+      const sellChange = (Math.random() - 0.52) * 0.5;
+      
+      currentBuy = Math.max(620, currentBuy - buyChange);
+      currentSell = Math.max(currentBuy + 1.5, currentSell - sellChange);
     }
     return data;
   }, []);
@@ -87,6 +87,9 @@ export const SpreadChart: React.FC<SpreadChartProps> = ({ liveData }) => {
       timeScale: {
         borderColor: 'rgba(197, 203, 206, 0.8)',
         timeVisible: true,
+        fixLeftEdge: true,
+        fixRightEdge: true,
+        shiftVisibleRangeOnNewBar: true,
       },
       autoSize: true,
     });
@@ -117,25 +120,6 @@ export const SpreadChart: React.FC<SpreadChartProps> = ({ liveData }) => {
 
     chart.priceScale('').applyOptions({
       scaleMargins: { top: 0.8, bottom: 0 },
-    });
-
-    // Cargar historial simulado
-    const mockData = generateHistory();
-
-    buySeries.setData(mockData.map(d => ({ time: d.time as any, value: d.buy })));
-    sellSeries.setData(mockData.map(d => ({ time: d.time as any, value: d.sell })));
-    volumeSeries.setData(mockData.map(d => ({
-      time: d.time as any,
-      value: d.volume,
-      color: d.isGreenVol ? 'rgba(8, 153, 129, 0.5)' : 'rgba(242, 54, 69, 0.5)'
-    })));
-
-    const lastData = mockData[mockData.length - 1];
-    setLegendData({
-      buy: lastData.buy,
-      sell: lastData.sell,
-      spread: lastData.spread,
-      status: 'Simulado (Histórico)'
     });
 
     chart.subscribeCrosshairMove((param) => {
@@ -187,6 +171,21 @@ export const SpreadChart: React.FC<SpreadChartProps> = ({ liveData }) => {
   useEffect(() => {
     if (!liveData || !buySeriesRef.current || !sellSeriesRef.current || !volumeSeriesRef.current) return;
 
+    // Si no hemos generado el historial, lo generamos primero conectando con el punto actual
+    if (!historyGenerated) {
+        const mockData = generateHistory(liveData.topBuy, liveData.topSell, liveData.timestamp - 15000); // El historial termina 15s antes del punto actual
+        
+        buySeriesRef.current.setData(mockData.map(d => ({ time: d.time as any, value: d.buy })));
+        sellSeriesRef.current.setData(mockData.map(d => ({ time: d.time as any, value: d.sell })));
+        volumeSeriesRef.current.setData(mockData.map(d => ({
+          time: d.time as any,
+          value: d.volume,
+          color: d.isGreenVol ? 'rgba(8, 153, 129, 0.5)' : 'rgba(242, 54, 69, 0.5)'
+        })));
+        
+        setHistoryGenerated(true);
+    }
+
     const time = Math.floor(liveData.timestamp / 1000) as any;
 
     buySeriesRef.current.update({ time, value: liveData.topBuy });
@@ -207,7 +206,7 @@ export const SpreadChart: React.FC<SpreadChartProps> = ({ liveData }) => {
         status: 'EN VIVO 🔴'
     });
 
-  }, [liveData]);
+  }, [liveData, historyGenerated, generateHistory]);
 
   return (
     <div className="relative w-full h-full min-h-[500px] bg-[#131722] rounded-[12px] overflow-hidden border border-[var(--border)] shadow-xl flex flex-col">
