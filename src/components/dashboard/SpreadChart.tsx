@@ -1,6 +1,7 @@
 import React, { useEffect, useRef, useState, useCallback } from 'react';
-import { createChart, ColorType, LineSeries, HistogramSeries } from 'lightweight-charts';
-import type { IChartApi, ISeriesApi, LineData } from 'lightweight-charts';
+import { createChart, ColorType, LineSeries, HistogramSeries, createSeriesMarkers } from 'lightweight-charts';
+import type { IChartApi, ISeriesApi, LineData, SeriesMarker, Time } from 'lightweight-charts';
+import { useAppStore } from '../../store/useAppStore';
 
 // ─── Tipos ────────────────────────────────────────────────────────────────────
 
@@ -43,10 +44,14 @@ export const SpreadChart: React.FC<SpreadChartProps> = ({ liveData }) => {
   const buySeriesRef      = useRef<ISeriesApi<'Line'> | null>(null);
   const sellSeriesRef     = useRef<ISeriesApi<'Line'> | null>(null);
   const volumeSeriesRef   = useRef<ISeriesApi<'Histogram'> | null>(null);
+  
+  const buyMarkersPluginRef = useRef<any>(null);
+  const sellMarkersPluginRef = useRef<any>(null);
 
   const [legend, setLegend]             = useState({ buy: 0, sell: 0, spread: 0, isLive: false });
   const [selectedTF, setSelectedTF]     = useState<TF>('1D');
   const [historyLoaded, setHistoryLoaded] = useState(false);
+  const orders = useAppStore(state => state.orders);
 
   // Genera ~30 días de historial simulado anclado al punto actual
   const generateHistory = useCallback((endBuy: number, endSell: number, anchorTs: number): SpreadData[] => {
@@ -114,11 +119,13 @@ export const SpreadChart: React.FC<SpreadChartProps> = ({ liveData }) => {
       color: '#089981', lineWidth: 2,
       crosshairMarkerVisible: true, crosshairMarkerRadius: 4,
     });
+    buyMarkersPluginRef.current = createSeriesMarkers(buySeriesRef.current, []);
 
     sellSeriesRef.current = chart.addSeries(LineSeries, {
       color: '#f23645', lineWidth: 2,
       crosshairMarkerVisible: true, crosshairMarkerRadius: 4,
     });
+    sellMarkersPluginRef.current = createSeriesMarkers(sellSeriesRef.current, []);
 
     volumeSeriesRef.current = chart.addSeries(HistogramSeries, {
       priceFormat: { type: 'volume' },
@@ -179,6 +186,56 @@ export const SpreadChart: React.FC<SpreadChartProps> = ({ liveData }) => {
     if (!historyLoaded) return;
     applyTimeframe(selectedTF);
   }, [selectedTF, historyLoaded, applyTimeframe]);
+
+  // ── Agregar marcadores de órdenes reales del usuario ─────────────────────────
+  useEffect(() => {
+    if (!historyLoaded || !buySeriesRef.current || !sellSeriesRef.current) return;
+
+    const buyMarkers: SeriesMarker<Time>[] = [];
+    const sellMarkers: SeriesMarker<Time>[] = [];
+
+    // Filtrar órdenes de los últimos 7 días y ordenarlas cronológicamente
+    const now = Date.now();
+    const sevenDaysAgo = now - 7 * 24 * 60 * 60 * 1000;
+    
+    const validOrders = orders
+      .filter(o => o.orderStatus === 'COMPLETED' && new Date(o.createTime_utc).getTime() >= sevenDaysAgo)
+      .sort((a, b) => new Date(a.createTime_utc).getTime() - new Date(b.createTime_utc).getTime());
+
+    validOrders.forEach(o => {
+      const ts = Math.floor(new Date(o.createTime_utc).getTime() / 1000) as Time;
+      // En P2P Binance: 
+      // "BUY" = Usuario compra USDT (paga Bs) -> Demanda
+      // "SELL" = Usuario vende USDT (recibe Bs) -> Oferta
+      const isBuy = o.tradeType === 'BUY';
+      
+      const marker: SeriesMarker<Time> = {
+        time: ts,
+        position: isBuy ? 'belowBar' : 'aboveBar',
+        color: isBuy ? '#089981' : '#f23645',
+        shape: isBuy ? 'arrowUp' : 'arrowDown',
+        text: `${isBuy ? 'Compra' : 'Venta'} ${o.amount} U @ ${o.unitPrice.toFixed(2)}`,
+        size: 1,
+      };
+
+      if (isBuy) {
+        buyMarkers.push(marker);
+      } else {
+        sellMarkers.push(marker);
+      }
+    });
+
+    try {
+      if (buyMarkersPluginRef.current) {
+        buyMarkersPluginRef.current.setMarkers(buyMarkers);
+      }
+      if (sellMarkersPluginRef.current) {
+        sellMarkersPluginRef.current.setMarkers(sellMarkers);
+      }
+    } catch (e) {
+      console.warn('No se pudieron establecer los marcadores:', e);
+    }
+  }, [orders, historyLoaded]);
 
   // ─── Render ───────────────────────────────────────────────────────────────
   return (
