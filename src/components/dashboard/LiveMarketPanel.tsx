@@ -1,6 +1,61 @@
-import React, { useState, useEffect, useRef, useCallback } from 'react';
+import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { SpreadChart } from './SpreadChart';
-import { X, BarChart3, AlertCircle, RefreshCw, Clock } from 'lucide-react';
+import { X, BarChart3, AlertCircle, RefreshCw, Clock, BotMessageSquare, ChevronDown, TrendingUp, TrendingDown, Minus } from 'lucide-react';
+
+// ─── Motor de análisis de presión de mercado ─────────────────────────────────
+
+interface MarketAnalysis {
+  score: number;          // -1 (bajista fuerte) → +1 (alcista fuerte)
+  signal: 'ALCISTA' | 'BAJISTA' | 'NEUTRAL';
+  confidence: number;     // 0-100
+  volImbalance: number;   // % diferencia volumen
+  topConcentration: number;
+  spreadPct: number;
+  buyVol: number;
+  sellVol: number;
+  summary: string;
+}
+
+function analyzeMarket(buyAds: AdEntry[], sellAds: AdEntry[]): MarketAnalysis | null {
+  if (!buyAds.length || !sellAds.length) return null;
+
+  const totalBuy  = buyAds.reduce((s, a) => s + a.volume, 0);
+  const totalSell = sellAds.reduce((s, a) => s + a.volume, 0);
+  const volImb    = (totalBuy - totalSell) / (totalBuy + totalSell); // -1 a 1
+
+  const topBuyVol  = buyAds[0].volume;
+  const topSellVol = sellAds[0].volume;
+  const topConc    = (topBuyVol - topSellVol) / (topBuyVol + topSellVol);
+
+  const countImb   = (buyAds.length - sellAds.length) / (buyAds.length + sellAds.length);
+
+  const spreadPct  = sellAds[0].price > 0
+    ? ((sellAds[0].price - buyAds[0].price) / buyAds[0].price) * 100
+    : 0;
+
+  // Score ponderado
+  const score = volImb * 0.45 + topConc * 0.35 + countImb * 0.20;
+  const confidence = Math.min(100, Math.round(Math.abs(score) * 100 * 2.2));
+
+  let signal: MarketAnalysis['signal'] = 'NEUTRAL';
+  let summary = '';
+
+  if (score > 0.18) {
+    signal = 'ALCISTA';
+    summary = confidence > 60
+      ? `Presión compradora dominante (${(volImb * 100).toFixed(0)}% más vol. de compra). Alta probabilidad de que el precio de compra suba en los próximos minutos.`
+      : `Ligera presión compradora. El libro muestra más demanda que oferta, precio podría subir gradualmente.`;
+  } else if (score < -0.18) {
+    signal = 'BAJISTA';
+    summary = confidence > 60
+      ? `Exceso de oferta detectado (${(Math.abs(volImb) * 100).toFixed(0)}% más vol. vendedor). El precio podría ceder a la baja pronto.`
+      : `Ligera presión vendedora. Más anuncios de venta que de compra activos en este momento.`;
+  } else {
+    summary = `Mercado equilibrado. Spread del ${spreadPct.toFixed(3)}%. Monitorea el nivel superior del libro para detectar la próxima ruptura.`;
+  }
+
+  return { score, signal, confidence, volImbalance: volImb, topConcentration: topConc, spreadPct, buyVol: totalBuy, sellVol: totalSell, summary };
+}
 
 // ─── Bancos venezolanos soportados por Binance P2P ────────────────────────────
 
@@ -87,10 +142,17 @@ export const LiveMarketPanel: React.FC<{ onClose: () => void }> = ({ onClose }) 
   const [lastUpdate,  setLastUpdate]  = useState<Date | null>(null);
   const [ticking,     setTicking]     = useState(false);
   const [selectedBanks, setSelectedBanks] = useState<string[]>([]);
+  const [botOpen,     setBotOpen]     = useState(true);
 
   // Precios anteriores para indicadores ↑↓
   const prevSell = useRef<Map<string, number>>(new Map());
   const prevBuy  = useRef<Map<string, number>>(new Map());
+
+  // Análisis de mercado recalculado en cada tick
+  const analysis = useMemo(() => analyzeMarket(
+    liveData?.orderBook?.buy  ?? [],
+    liveData?.orderBook?.sell ?? [],
+  ), [liveData]);
 
   const fetchData = useCallback(async () => {
     setTicking(true);
@@ -266,6 +328,72 @@ export const LiveMarketPanel: React.FC<{ onClose: () => void }> = ({ onClose }) 
 
           {/* ── ORDER BOOK ── */}
           <div className="w-full lg:w-[360px] border-t lg:border-t-0 lg:border-l border-[var(--border)] flex flex-col overflow-hidden bg-[#0f131e]">
+
+            {/* ── BOT DE ANÁLISIS ── */}
+            <div className="border-b border-[var(--border)] bg-[#0d1117] shrink-0">
+              <button
+                onClick={() => setBotOpen(o => !o)}
+                className="w-full flex items-center justify-between px-3 py-2.5 hover:bg-white/5 transition-colors"
+              >
+                <div className="flex items-center gap-2">
+                  <BotMessageSquare size={14} className="text-[#a78bfa]" />
+                  <span className="text-[12px] font-semibold text-[#a78bfa]">Asistente IA · Presión de Mercado</span>
+                  {analysis && (
+                    <span className={`text-[10px] px-1.5 py-0.5 rounded font-bold ${
+                      analysis.signal === 'ALCISTA' ? 'bg-[#089981]/20 text-[#089981]' :
+                      analysis.signal === 'BAJISTA' ? 'bg-[#f23645]/20 text-[#f23645]' :
+                      'bg-white/10 text-gray-400'
+                    }`}>{analysis.signal}</span>
+                  )}
+                </div>
+                <ChevronDown size={13} className={`text-gray-500 transition-transform ${botOpen ? 'rotate-180' : ''}`} />
+              </button>
+
+              {botOpen && analysis && (
+                <div className="px-3 pb-3 flex flex-col gap-2">
+
+                  {/* Barra de presión */}
+                  <div className="relative h-5 rounded-full bg-[#1a1e2a] overflow-hidden">
+                    <div
+                      className="absolute inset-y-0 left-1/2 rounded-full transition-all duration-700"
+                      style={{
+                        width: `${Math.abs(analysis.score) * 50}%`,
+                        background: analysis.signal === 'ALCISTA' ? '#089981' : analysis.signal === 'BAJISTA' ? '#f23645' : '#6b7280',
+                        left: analysis.score >= 0 ? '50%' : `${50 - Math.abs(analysis.score) * 50}%`,
+                      }}
+                    />
+                    <div className="absolute inset-0 flex items-center justify-center text-[10px] font-bold text-white">
+                      {analysis.signal === 'ALCISTA' ? '▲' : analysis.signal === 'BAJISTA' ? '▼' : '—'}
+                      {' '}{analysis.confidence}% confianza
+                    </div>
+                  </div>
+
+                  {/* Métricas */}
+                  <div className="grid grid-cols-3 gap-1.5">
+                    {[
+                      { label: 'Vol. Compra', val: analysis.buyVol.toFixed(0) + ' U', color: '#089981' },
+                      { label: 'Vol. Venta',  val: analysis.sellVol.toFixed(0) + ' U', color: '#f23645' },
+                      { label: 'Spread %',    val: analysis.spreadPct.toFixed(3) + '%', color: '#d1d4dc' },
+                    ].map(m => (
+                      <div key={m.label} className="bg-[#131722] rounded p-1.5 text-center">
+                        <div className="font-mono font-bold text-[11px]" style={{ color: m.color }}>{m.val}</div>
+                        <div className="text-[9px] text-[#6b7280] mt-0.5">{m.label}</div>
+                      </div>
+                    ))}
+                  </div>
+
+                  {/* Icono señal + resumen */}
+                  <div className="flex items-start gap-2 bg-[#131722] rounded-lg p-2.5">
+                    {analysis.signal === 'ALCISTA' ? <TrendingUp  size={14} className="text-[#089981] mt-0.5 shrink-0" /> :
+                     analysis.signal === 'BAJISTA' ? <TrendingDown size={14} className="text-[#f23645] mt-0.5 shrink-0" /> :
+                                                     <Minus        size={14} className="text-gray-400 mt-0.5 shrink-0" />}
+                    <p className="text-[11px] text-[#d1d4dc] leading-relaxed">{analysis.summary}</p>
+                  </div>
+
+                  <p className="text-[9px] text-[#4b5563] text-center">Análisis basado en order book en tiempo real · No es asesoramiento financiero</p>
+                </div>
+              )}
+            </div>
 
             {/* Filtros por banco */}
             <div className="p-3 border-b border-[var(--border)] bg-[#131722] shrink-0">
