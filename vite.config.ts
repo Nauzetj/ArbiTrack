@@ -101,11 +101,17 @@ export default defineConfig({
   },
   server: {
     proxy: {
-      // Dev proxy: forward /api/binance to our local express server
-      '/api/binance': {
-        target: 'http://localhost:3001',
+      // Dev proxy: reenvía /api/binance_p2p_market directamente a Binance P2P (evita CORS)
+      '/api/binance_p2p_market': {
+        target: 'https://p2p.binance.com',
         changeOrigin: true,
-        rewrite: (path) => path.replace(/^\/api\/binance/, '/api/p2p-orders'),
+        rewrite: () => '/bapi/c2c/v2/friendly/c2c/adv/search',
+        configure: (proxy) => {
+          proxy.on('proxyReq', (proxyReq) => {
+            proxyReq.setHeader('User-Agent', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)');
+            proxyReq.setHeader('Content-Type', 'application/json');
+          });
+        },
       },
     },
   },

@@ -10,58 +10,67 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   }
 
   try {
-    const fetchAd = async (tradeType: 'BUY' | 'SELL') => {
-      const payload = {
-        fiat: "VES",
-        page: 1,
-        rows: 5, // Traer el top 5 para mostrar profundidad de mercado
-        tradeType: tradeType,
-        asset: "USDT",
-        countries: [],
-        proMerchantAds: false,
-        shieldMerchantAds: false,
-        filterType: "all",
-        periods: [],
-        additionalKycVerifyFilter: 0,
-        publisherType: null,
-        payTypes: [],
-        classifies: ["mass", "profession", "merchant"]
-      };
-
+    // Si el cliente envía un payload con tradeType, actúa como proxy puro hacia Binance
+    // (mismo flujo que el proxy de Vite en desarrollo)
+    const bodyPayload = req.body;
+    if (bodyPayload && bodyPayload.tradeType) {
       const response = await fetch('https://p2p.binance.com/bapi/c2c/v2/friendly/c2c/adv/search', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
           'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
         },
-        body: JSON.stringify(payload)
+        body: JSON.stringify(bodyPayload),
       });
-      
       const data = await response.json();
-      if (data.code === '000000' && data.data && data.data.length > 0) {
+      if (data.code === '000000' && data.data?.length) {
+        return res.json(data.data.map((item: any) => ({
+          price: parseFloat(item.adv.price),
+          volume: parseFloat(item.adv.tradableQuantity),
+          advertiser: item.advertiser.nickName,
+          minAmount: parseFloat(item.adv.minSingleTransAmount),
+          maxAmount: parseFloat(item.adv.dynamicMaxSingleTransAmount),
+        })));
+      }
+      return res.status(500).json({ error: 'No data from Binance' });
+    }
+
+    // Fallback: modo legacy — hace las dos llamadas aquí y devuelve el objeto completo
+    const fetchAd = async (tradeType: 'BUY' | 'SELL') => {
+      const payload = {
+        fiat: "VES", page: 1, rows: 5, tradeType, asset: "USDT",
+        countries: [], proMerchantAds: false, shieldMerchantAds: false,
+        filterType: "all", periods: [], additionalKycVerifyFilter: 0,
+        publisherType: null, payTypes: [],
+        classifies: ["mass", "profession", "merchant"]
+      };
+      const response = await fetch('https://p2p.binance.com/bapi/c2c/v2/friendly/c2c/adv/search', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)',
+        },
+        body: JSON.stringify(payload),
+      });
+      const data = await response.json();
+      if (data.code === '000000' && data.data?.length) {
         return data.data.map((item: any) => ({
           price: parseFloat(item.adv.price),
           volume: parseFloat(item.adv.tradableQuantity),
           advertiser: item.advertiser.nickName,
           minAmount: parseFloat(item.adv.minSingleTransAmount),
-          maxAmount: parseFloat(item.adv.dynamicMaxSingleTransAmount)
+          maxAmount: parseFloat(item.adv.dynamicMaxSingleTransAmount),
         }));
       }
       return [];
     };
 
-    const [buyAds, sellAds] = await Promise.all([
-      fetchAd('BUY'),
-      fetchAd('SELL')
-    ]);
-
+    const [buyAds, sellAds] = await Promise.all([fetchAd('BUY'), fetchAd('SELL')]);
     if (!buyAds.length || !sellAds.length) {
       return res.status(500).json({ error: 'Failed to fetch P2P data' });
     }
-
     const topBuy = buyAds[0];
     const topSell = sellAds[0];
-
     return res.json({
       timestamp: Date.now(),
       topBuy: topBuy.price,
@@ -69,10 +78,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       spread: topSell.price - topBuy.price,
       buyVolume: topBuy.volume,
       sellVolume: topSell.volume,
-      orderBook: {
-        buy: buyAds,
-        sell: sellAds
-      }
+      orderBook: { buy: buyAds, sell: sellAds },
     });
 
   } catch (error: any) {
@@ -80,3 +86,4 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     return res.status(500).json({ error: 'Internal server error', details: error.message });
   }
 }
+
