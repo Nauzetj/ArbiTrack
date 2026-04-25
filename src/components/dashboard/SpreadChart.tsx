@@ -53,26 +53,23 @@ export const SpreadChart: React.FC<SpreadChartProps> = ({ liveData }) => {
   const [historyLoaded, setHistoryLoaded] = useState(false);
   const orders = useAppStore(state => state.orders);
 
-  // Genera ~30 días de historial simulado que conecta perfectamente con el precio actual
+  // Genera una base histórica plana conectada al precio actual para no inventar datos falsos.
+  // El gráfico comenzará a dibujar volatilidad REAL a medida que lleguen los ticks en vivo.
   const generateHistory = useCallback((endBuy: number, endSell: number, anchorTs: number): SpreadData[] => {
     const POINTS   = 8_640; // 30 d × 288 puntos/día (5 min c/u)
     const INTERVAL = 300;
     const data: SpreadData[] = [];
-    let b = endBuy;
-    const spread = endSell - endBuy;
 
-    // Generamos caminando hacia atrás en el tiempo
+    // Generamos caminando hacia atrás en el tiempo, pero manteniendo el precio EXACTO actual
+    // para evitar que se desvíe (drift) como sucedía antes.
     for (let i = 0; i <= POINTS; i++) {
-      const s = b + spread + (Math.random() - 0.5) * 0.05; // Spread se mantiene casi igual
       data.push({
         time:       Math.floor(anchorTs / 1000) - i * INTERVAL,
-        buy:        +b.toFixed(2),
-        sell:       +s.toFixed(2),
-        volume:     Math.floor(Math.random() * 90_000) + 10_000,
-        isGreenVol: Math.random() > 0.5,
+        buy:        +endBuy.toFixed(2),
+        sell:       +endSell.toFixed(2),
+        volume:     0,
+        isGreenVol: true,
       });
-      // El precio anterior era ligeramente distinto (caminata aleatoria neutra)
-      b = b + (Math.random() - 0.5) * 0.1;
     }
     // Revertimos para que el array vaya de más antiguo a más reciente (cronológico)
     return data.reverse();
