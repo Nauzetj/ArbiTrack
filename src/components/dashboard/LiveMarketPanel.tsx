@@ -108,19 +108,22 @@ const fetchSide = async (tradeType: 'BUY' | 'SELL', payTypes: string[]): Promise
   if (!res.ok) throw new Error(`HTTP ${res.status}`);
   const json = await res.json();
 
-  // Respuesta de Vercel serverless (objeto con topBuy)
-  if (json.topBuy !== undefined) {
+  // Caso 1: Vercel devuelve array directo (modo proxy con tradeType en body)
+  if (Array.isArray(json)) return json;
+
+  // Caso 2: Vercel devuelve objeto legacy {topBuy, orderBook}
+  if (json.topBuy !== undefined && json.orderBook) {
     return tradeType === 'BUY' ? json.orderBook.buy : json.orderBook.sell;
   }
 
-  // Respuesta cruda de Binance via proxy Vite
+  // Caso 3: Proxy Vite en dev — respuesta raw de Binance
   if (json.code === '000000' && Array.isArray(json.data) && json.data.length) {
     return json.data.map((item: any) => ({
-      price:       parseFloat(item.adv.price),
-      volume:      parseFloat(item.adv.tradableQuantity),
-      advertiser:  item.advertiser.nickName,
-      minAmount:   parseFloat(item.adv.minSingleTransAmount),
-      maxAmount:   parseFloat(item.adv.dynamicMaxSingleTransAmount),
+      price:      parseFloat(item.adv.price),
+      volume:     parseFloat(item.adv.tradableQuantity),
+      advertiser: item.advertiser.nickName,
+      minAmount:  parseFloat(item.adv.minSingleTransAmount),
+      maxAmount:  parseFloat(item.adv.dynamicMaxSingleTransAmount),
     }));
   }
   return [];
