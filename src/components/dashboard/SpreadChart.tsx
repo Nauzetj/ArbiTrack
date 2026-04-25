@@ -53,15 +53,17 @@ export const SpreadChart: React.FC<SpreadChartProps> = ({ liveData }) => {
   const [historyLoaded, setHistoryLoaded] = useState(false);
   const orders = useAppStore(state => state.orders);
 
-  // Genera ~30 días de historial simulado anclado al punto actual
+  // Genera ~30 días de historial simulado que conecta perfectamente con el precio actual
   const generateHistory = useCallback((endBuy: number, endSell: number, anchorTs: number): SpreadData[] => {
     const POINTS   = 8_640; // 30 d × 288 puntos/día (5 min c/u)
     const INTERVAL = 300;
     const data: SpreadData[] = [];
     let b = endBuy;
-    let s = endSell;
+    const spread = endSell - endBuy;
 
-    for (let i = POINTS; i >= 0; i--) {
+    // Generamos caminando hacia atrás en el tiempo
+    for (let i = 0; i <= POINTS; i++) {
+      const s = b + spread + (Math.random() - 0.5) * 0.05; // Spread se mantiene casi igual
       data.push({
         time:       Math.floor(anchorTs / 1000) - i * INTERVAL,
         buy:        +b.toFixed(2),
@@ -69,10 +71,11 @@ export const SpreadChart: React.FC<SpreadChartProps> = ({ liveData }) => {
         volume:     Math.floor(Math.random() * 90_000) + 10_000,
         isGreenVol: Math.random() > 0.5,
       });
-      b = Math.max(610, b + (Math.random() - 0.48) * 0.5);
-      s = Math.max(b + 1.5, s + (Math.random() - 0.52) * 0.5);
+      // El precio anterior era ligeramente distinto (caminata aleatoria neutra)
+      b = b + (Math.random() - 0.5) * 0.1;
     }
-    return data;
+    // Revertimos para que el array vaya de más antiguo a más reciente (cronológico)
+    return data.reverse();
   }, []);
 
   // Aplica rango visible al timeframe elegido
@@ -110,6 +113,8 @@ export const SpreadChart: React.FC<SpreadChartProps> = ({ liveData }) => {
         fixRightEdge: true,
         rightOffset: 0,
       },
+      handleScroll: false,
+      handleScale: false,
       autoSize: true,
     });
 
