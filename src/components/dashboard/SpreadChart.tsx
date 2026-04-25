@@ -102,6 +102,8 @@ export const SpreadChart: React.FC<SpreadChartProps> = ({ liveData }) => {
         borderColor: 'rgba(197,203,206,0.8)',
         timeVisible: true,
         shiftVisibleRangeOnNewBar: true,
+        fixRightEdge: true,
+        rightOffset: 0,
       },
       autoSize: true,
     });
