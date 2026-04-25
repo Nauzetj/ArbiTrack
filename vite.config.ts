@@ -99,15 +99,4 @@ export default defineConfig({
   esbuild: {
     drop: ['console', 'debugger'],
   },
-  server: {
-    proxy: {
-      // Dev: redirige POST /api/binance_p2p_market → https://p2p.binance.com/bapi/c2c/v2/friendly/c2c/adv/search
-      '/api/binance_p2p_market': {
-        target: 'https://p2p.binance.com',
-        changeOrigin: true,
-        rewrite: () => '/bapi/c2c/v2/friendly/c2c/adv/search',
-        secure: false,
-      },
-    },
-  },
 });

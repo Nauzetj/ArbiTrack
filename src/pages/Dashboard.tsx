@@ -6,13 +6,11 @@ import { MetricCard } from '../components/ui/MetricCard';
 import { ActiveCyclePanel } from '../components/dashboard/ActiveCyclePanel';
 import { MiniChart } from '../components/dashboard/MiniChart';
 import { UnassignedOrdersPool } from '../components/dashboard/UnassignedOrdersPool';
-import { LiveMarketPanel } from '../components/dashboard/LiveMarketPanel';
 
 export const Dashboard: React.FC = () => {
   const { orders, cycles } = useAppStore();
   const containerRef = useRef<HTMLDivElement>(null);
   const [showChart, setShowChart] = useState(false);
-  const [showSpreadChart, setShowSpreadChart] = useState(false);
 
 
 
@@ -137,23 +135,6 @@ export const Dashboard: React.FC = () => {
           </div>
         </button>
 
-        <button 
-          onClick={() => setShowSpreadChart(true)}
-          className="dashboard-chart w-full bg-[var(--bg-surface-2)] rounded-[16px] border border-[var(--border)] p-[16px] flex items-center justify-between hover:bg-[var(--bg-surface-3)] transition-colors group"
-        >
-          <div className="flex items-center gap-[12px] relative z-10">
-            <div className="w-[42px] h-[42px] rounded-[10px] bg-[rgba(52,211,153,0.1)] text-[#34d399] flex items-center justify-center border border-[#34d399]/20">
-              <BarChart3 size={20} />
-            </div>
-            <div className="flex flex-col items-start">
-              <h3 className="font-bold text-[14px] text-[var(--text-primary)]">Mercado Spread P2P</h3>
-              <p className="text-[12px] text-[var(--text-secondary)]">Visualizar diferencial Compra/Venta USDT</p>
-            </div>
-          </div>
-          <div className="relative z-10 w-[30px] h-[30px] rounded-full bg-[var(--bg-surface-4)] flex items-center justify-center group-hover:bg-[#34d399] group-hover:text-[var(--bg-surface-1)] text-[var(--text-tertiary)] transition-colors">
-            <ChevronRight size={16} />
-          </div>
-        </button>
       </div>
 
       {/* Modal / Caja Flotante de la Gráfica */}
@@ -189,11 +170,6 @@ export const Dashboard: React.FC = () => {
           </div>
         </div>,
         document.body
-      )}
-
-      {/* Modal / Caja Flotante del SpreadChart / LiveMarketPanel */}
-      {showSpreadChart && (
-        <LiveMarketPanel onClose={() => setShowSpreadChart(false)} />
       )}
 
     </div>
