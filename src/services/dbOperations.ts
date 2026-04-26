@@ -371,23 +371,23 @@ const recalculateCycleMetrics_local = async (cycleId: string, userId: string): P
   // Volumen emparejado real
   const matched_vol  = Math.min(usdt_vendido, usdt_recomprado);
 
-  // Ganancia VES bruta del diferencial de tasas
-  const ganancia_ves = matched_vol * diferencial_tasa;
-
   // Tasa de referencia para convertir comisiones de USDT a VES y viceversa
   const tasa_ref = tasa_compra_prom > 0 ? tasa_compra_prom
                  : tasa_venta_prom  > 0 ? tasa_venta_prom : 1;
 
-  // ✅ Ganancia USDT NETA = diferencial convertido a USDT - comisiones Binance
+  // Ganancia VES NETA = bruta - comisiones convertidas
+  const ganancia_ves = (matched_vol * diferencial_tasa) - (comision_total * tasa_ref);
+
+  // ✅ Ganancia USDT NETA = ganancia_ves neta convertida a USDT
   // Esta es la ganancia real que le quedó al usuario
   const ganancia_usdt = matched_vol > 0
-    ? (ganancia_ves / tasa_ref) - comision_total
+    ? (ganancia_ves / tasa_ref)
     : -comision_total;
 
   // ROI neto sobre capital base
   const capitalBase = usdt_vendido > 0 ? usdt_vendido * tasa_venta_prom : ves_pagado;
   const roi_percent = capitalBase > 0
-    ? ((ganancia_ves - comision_total * tasa_ref) / capitalBase) * 100
+    ? (ganancia_ves / capitalBase) * 100
     : 0;
 
   await saveCycle({

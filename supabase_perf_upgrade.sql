@@ -29,6 +29,7 @@ DECLARE
   v_roi             NUMERIC := 0;
   v_matched_vol     NUMERIC := 0;
   v_capital_base    NUMERIC := 0;
+  v_tasa_ref        NUMERIC := 1;
 BEGIN
   -- Un solo SELECT que acumula todos los totales
   SELECT
@@ -74,11 +75,12 @@ BEGIN
   -- Matched Volume para ganancias precisas en ciclos parciales
   v_matched_vol := LEAST(v_usdt_vendido, v_usdt_recomprado);
 
-  -- Ganancias
-  v_ganancia_ves := v_matched_vol * v_diferencial;
+  -- Ganancias (Netas, descontando comisiones)
+  v_tasa_ref := CASE WHEN v_tasa_compra > 0 THEN v_tasa_compra WHEN v_tasa_venta > 0 THEN v_tasa_venta ELSE 1 END;
   
+  v_ganancia_ves := (v_matched_vol * v_diferencial) - (v_comision_total * v_tasa_ref);
   IF v_tasa_compra > 0 THEN
-    v_ganancia_usdt := (v_ganancia_ves / v_tasa_compra) - v_comision_total;
+    v_ganancia_usdt := v_ganancia_ves / v_tasa_compra;
   ELSE
     v_ganancia_usdt := -v_comision_total;
   END IF;

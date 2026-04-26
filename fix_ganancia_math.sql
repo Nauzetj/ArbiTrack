@@ -96,13 +96,13 @@ BEGIN
   -- ── Volumen emparejado ───────────────────────────────────
   v_matched_vol := LEAST(v_usdt_vendido, v_usdt_recomprado);
 
-  -- ── Ganancia VES bruta (del diferencial de tasas) ────────
-  v_ganancia_ves := v_matched_vol * v_diferencial;
+  -- ── Ganancia VES NETA = (bruta) - (comisiones convertidas a VES) ────────
+  v_ganancia_ves := (v_matched_vol * v_diferencial) - (v_comision_total * v_tasa_ref);
 
   -- ── Ganancia USDT NETA = bruta - comisiones ─────────────
   -- Esto es la ganancia real que le quedó al usuario
   v_ganancia_usdt := CASE
-    WHEN v_tasa_ref > 0 THEN (v_ganancia_ves / v_tasa_ref) - v_comision_total
+    WHEN v_tasa_ref > 0 THEN (v_ganancia_ves / v_tasa_ref)
     ELSE -v_comision_total
   END;
 
@@ -113,8 +113,8 @@ BEGIN
   END;
 
   IF v_capital_base > 0 THEN
-    -- ROI neto: usa ganancia neta sobre el capital
-    v_roi := ((v_ganancia_ves - v_comision_total * v_tasa_ref) / v_capital_base) * 100;
+    -- ROI neto: usa ganancia_ves neta sobre el capital
+    v_roi := (v_ganancia_ves / v_capital_base) * 100;
   END IF;
 
   -- ── Actualizar ciclo ─────────────────────────────────────
