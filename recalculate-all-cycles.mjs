@@ -46,19 +46,21 @@ function recalculate(orders) {
     ? tasa_venta_prom - tasa_compra_prom : 0;
 
   const matched_vol  = Math.min(usdt_vendido, usdt_recomprado);
-  const ganancia_ves = matched_vol * diferencial_tasa;
 
   const tasa_ref = tasa_compra_prom > 0 ? tasa_compra_prom
                  : tasa_venta_prom  > 0 ? tasa_venta_prom : 1;
 
-  // ✅ GANANCIA NETA = diferencial de tasas convertido a USDT - comisiones Binance
+  // Ganancia VES NETA
+  const ganancia_ves = (matched_vol * diferencial_tasa) - (comision_total * tasa_ref);
+
+  // ✅ GANANCIA NETA USDT (ya no se restan las comisiones doblemente)
   const ganancia_usdt = matched_vol > 0
-    ? (ganancia_ves / tasa_ref) - comision_total
+    ? (ganancia_ves / tasa_ref)
     : -comision_total;
 
   const capitalBase = usdt_vendido > 0 ? usdt_vendido * tasa_venta_prom : ves_pagado;
   const roi_percent = capitalBase > 0
-    ? ((ganancia_ves - comision_total * tasa_ref) / capitalBase) * 100
+    ? (ganancia_ves / capitalBase) * 100
     : 0;
 
   return {
@@ -104,7 +106,8 @@ async function run() {
 
     if (eUpdate) { console.error(`  ❌ #${cycle.cycle_number}:`, eUpdate.message); errors++; }
     else {
-      const gBruta = m.ganancia_ves / (m.tasa_compra_prom || 1);
+      // Revertir a bruta solo para el log (para ver la diferencia)
+      const gBruta = (m.ganancia_ves + m.comision_total * (m.tasa_compra_prom || 1)) / (m.tasa_compra_prom || 1);
       totalGananciaBrutaDia += gBruta;
       totalComisionesDia    += m.comision_total;
       totalGananciaNeta     += m.ganancia_usdt;
