@@ -59,19 +59,14 @@ export const Topbar: React.FC = () => {
       console.log('[SYNC] cycleOpenedAtVal:', cycleOpenedAtVal ? new Date(cycleOpenedAtVal).toISOString() : 'sin ciclo');
       
       // Obtener órdenes de Binance EN PARALELO (más rápido)
-      const maxPages = 1; // Solo 1 página = 20 órdenes máx
+      // Con ciclo activo: 5 páginas (100 órdenes por tipo) para no perder nada
+      // Sin ciclo activo: 1 página (20 órdenes) para monitoreo ligero
+      const maxPages = activeCycle ? 5 : 1;
       const requests = [];
       
-      // Fetch paralelo: BUY página1 + SELL página1 al mismo tiempo
-      requests.push(fetchP2POrders(currentState.binanceKeys!.apiKey, currentState.binanceKeys!.secretKey, 1, 'BUY'));
-      requests.push(fetchP2POrders(currentState.binanceKeys!.apiKey, currentState.binanceKeys!.secretKey, 1, 'SELL'));
-      
-      // página 2 solo si hay ciclo activo (buscar más órdenes históricas)
-      if (activeCycle) {
-        if (maxPages >= 2) {
-          requests.push(fetchP2POrders(currentState.binanceKeys!.apiKey, currentState.binanceKeys!.secretKey, 2, 'BUY'));
-          requests.push(fetchP2POrders(currentState.binanceKeys!.apiKey, currentState.binanceKeys!.secretKey, 2, 'SELL'));
-        }
+      for (let page = 1; page <= maxPages; page++) {
+        requests.push(fetchP2POrders(currentState.binanceKeys!.apiKey, currentState.binanceKeys!.secretKey, page, 'BUY'));
+        requests.push(fetchP2POrders(currentState.binanceKeys!.apiKey, currentState.binanceKeys!.secretKey, page, 'SELL'));
       }
       
       // Ejecutar TODAS las requests en paralelo
@@ -92,14 +87,15 @@ export const Topbar: React.FC = () => {
       });
       let uniqueBinanceOrders = Array.from(uniqueOrdersMap.values());
       
-      // Buscar TODAS las órdenes desde 30min antes de abrir el ciclo (no solo las nuevas)
-      const filterStartMs = cycleOpenedAtVal ? cycleOpenedAtVal - (30 * 60 * 1000) : null;
+      // Filtrar órdenes anteriores a la apertura del ciclo (con margen de 60min)
+      // para capturar órdenes que se registraron justo antes de abrir formalmente el ciclo.
+      const filterStartMs = cycleOpenedAtVal ? cycleOpenedAtVal - (60 * 60 * 1000) : null;
       if (filterStartMs) {
         uniqueBinanceOrders = uniqueBinanceOrders.filter(o => {
           const orderTime = new Date(o.createTime).getTime();
           return orderTime >= filterStartMs;
         });
-        console.log('[SYNC] Órdenes desde 30min antes:', uniqueBinanceOrders.length);
+        console.log('[SYNC] Órdenes desde 60min antes de apertura:', uniqueBinanceOrders.length);
       }
       
       // Debug: contar tipos de órdenes
