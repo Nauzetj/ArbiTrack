@@ -59,10 +59,18 @@ export const Dashboard: React.FC = () => {
   const completedMonth = cycles.filter(c => c.status === 'Completado' && c.closedAt && new Date(c.closedAt) >= monthStart);
   const profitMonthUsdt = completedMonth.reduce((sum, c) => sum + c.ganancia_usdt, 0);
 
+  // Semana
+  const currentDayOfWeek = todayStart.getUTCDay(); // 0 es Domingo
+  const weekStart = new Date(todayStart.getTime());
+  weekStart.setUTCDate(weekStart.getUTCDate() - currentDayOfWeek);
+  
+  const completedWeek = cycles.filter(c => c.status === 'Completado' && c.closedAt && new Date(c.closedAt) >= weekStart);
+  const profitWeekUsdt = completedWeek.reduce((sum, c) => sum + c.ganancia_usdt, 0);
+
   return (
     <div ref={containerRef} className="flex flex-col gap-[10px] md:gap-[14px] max-w-[1400px] mx-auto min-h-[calc(100vh-80px)]">
-      {/* Metric cards: 2 columns on mobile, 4 on desktop */}
-      <div className="grid grid-cols-2 xl:grid-cols-4 gap-[10px]">
+      {/* Metric cards: 2 columns on mobile, 3 on tablet, 5 on desktop */}
+      <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-5 gap-[10px]">
         <MetricCard
           title="Ganancia Hoy"
           icon={<DollarSign size={14} />}
@@ -76,6 +84,13 @@ export const Dashboard: React.FC = () => {
           mainValue={completedToday.length}
           subValue="Completados"
           delayMs={60}
+        />
+        <MetricCard
+          title="Semana (USDT)"
+          icon={<BarChart3 size={14} />}
+          mainValue={profitWeekUsdt}
+          subValue="Acumulado"
+          delayMs={90}
         />
         <MetricCard
           title="Mes (USDT)"
