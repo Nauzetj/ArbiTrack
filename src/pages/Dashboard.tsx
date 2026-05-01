@@ -52,7 +52,7 @@ export const Dashboard: React.FC = () => {
   // ✅ USDT neto real = amount - commission (lo que realmente se entregó/recibió)
   const usdtTotalOperated = ordersToday.filter(o => o.tradeType === 'SELL').reduce((sum, o) => sum + Math.max(o.amount - (o.commission ?? 0), 0), 0);
 
-  const monthStart = new Date(now.getTime());
+  const monthStart = new Date(todayStart.getTime());
   monthStart.setUTCDate(1);
   monthStart.setUTCHours(4, 0, 0, 0); // 4 AM UTC = 12 AM Venezuela
   
