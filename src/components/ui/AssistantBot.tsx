@@ -356,14 +356,32 @@ function buildResponse(input: string, ctx: StoreCtx): { text: string; action?: F
 
   // ── PROYECCIÓN ───────────────────────────────────────────────────────────
   if (/proyecc|cuánto ganaría|cuanto ganaria|si hago|al mes ganaría|estimado/.test(q)) {
-    if (completed.length===0) return { text: '📭 Necesito ciclos completados para proyectar.' };
-    const avg=completed.reduce((s,c)=>s+c.ganancia_usdt,0)/completed.length;
-    const days=Math.max(1,Math.ceil((Date.now()-new Date(completed[completed.length-1].openedAt).getTime())/86400000));
-    const cpd=completed.length/days;
-    const p30=avg*cpd*30;
-    const nm=q.match(/(\d+)\s*(?:ciclos?|al día)?/);
-    const cc=nm?parseInt(nm[1]):null;
-    return { text: `📈 **Proyección (${completed.length} ciclos base):**\n• Ganancia promedio/ciclo: ${fmtN(avg,4)} USDT\n• Tu ritmo: ~${cpd.toFixed(1)} ciclos/día\n• **Proyección mensual: ${fmtN(p30,2)} USDT**${cc?`\n• Con ${cc} ciclos/día: ${fmtN(avg*cc*30,2)} USDT/mes`:''}\n\n💡 Di "proyección si hago 3 ciclos" para simular.` };
+    const monthCyc = completed.filter(c => c.closedAt && new Date(c.closedAt) >= monthStart);
+    if (monthCyc.length === 0) return { text: '📭 Necesito ciclos completados este mes para proyectar con precisión.' };
+    
+    const avgGainPerCycle = monthCyc.reduce((s,c)=>s+c.ganancia_usdt,0) / monthCyc.length;
+    const monthEarned = monthCyc.reduce((s,c)=>s+c.ganancia_usdt,0);
+    const daysPassed = Math.max(1, new Date().getDate());
+    const dailyGain = monthEarned / daysPassed;
+    const weeklyGain = dailyGain * 7;
+    
+    const today = new Date();
+    const daysInMonth = new Date(today.getFullYear(), today.getMonth() + 1, 0).getDate();
+    const daysLeft = daysInMonth - today.getDate();
+    
+    const nm = q.match(/(\d+)\s*(?:ciclos?|al día|diarios?)?/);
+    const customCycles = nm ? parseInt(nm[1]) : null;
+    
+    if (customCycles) {
+      const customDaily = customCycles * avgGainPerCycle;
+      const customRest = customDaily * daysLeft;
+      return { text: `📈 **Simulación (${customCycles} ciclos/día):**\n• Ganancia/ciclo: ${fmtN(avgGainPerCycle,2)} USDT\n• Por día: ${fmtN(customDaily,2)} USDT\n• Por semana: ${fmtN(customDaily * 7,2)} USDT\n\n**Mes Actual:**\n• Proyectado restante (${daysLeft}d): ${fmtN(customRest,2)} USDT\n• **Cierre de mes estimado: ${fmtN(monthEarned + customRest,2)} USDT**` };
+    }
+
+    const restOfMonthProj = dailyGain * daysLeft;
+    const totalMonthProj = monthEarned + restOfMonthProj;
+
+    return { text: `📈 **Proyección (Ritmo actual):**\n\n**Promedios:**\n• Por día: ${fmtN(dailyGain,2)} USDT\n• Por semana: ${fmtN(weeklyGain,2)} USDT\n\n**Cierre de Mes:**\n• Ganado hasta hoy: ${fmtN(monthEarned,2)} USDT\n• Proyectado restante (${daysLeft}d): ${fmtN(restOfMonthProj,2)} USDT\n• **Cierre estimado: ${fmtN(totalMonthProj,2)} USDT**` };
   }
 
   // ── TOP CONTRAPARTES ─────────────────────────────────────────────────────
@@ -512,7 +530,7 @@ export const AssistantBot: React.FC = () => {
         id="assistant-bot-trigger"
         onClick={() => setOpen(v => !v)}
         className={`fixed bottom-[80px] md:bottom-[28px] right-[20px] z-[200] w-[52px] h-[52px] rounded-full
-          flex items-center justify-center shadow-lg transition-all duration-300 relative
+          flex items-center justify-center shadow-lg transition-all duration-300
           ${open ? 'bg-[var(--bg-surface-3)] border border-[var(--border-strong)] scale-95' : 'bg-[var(--accent)] hover:scale-110 animate-bot-bounce'}`}
         title="Asistente ARBI"
         aria-label="Abrir asistente"
