@@ -8,7 +8,7 @@ export default defineConfig({
     react(),
     VitePWA({
       registerType: 'autoUpdate',
-      includeAssets: ['favicon.svg', 'icons.svg'],
+      includeAssets: ['favicon.svg', 'icons.svg', 'icons/*.png'],
       manifest: {
         name: 'ArbiTrack P2P Trading System',
         short_name: 'ArbiTrack',
