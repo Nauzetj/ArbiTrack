@@ -8,6 +8,7 @@ import { getUserProfile } from './services/dbOperations';
 
 // Dashboard carga eagerly (es la primera pantalla post-login)
 import { Dashboard } from './pages/Dashboard';
+import { ArbiBot } from './components/ui/ArbiBot';
 
 // Páginas pesadas → lazy (solo se descargan cuando se navega a ellas)
 const Cycles     = lazy(() => import('./pages/Cycles').then(m => ({ default: m.Cycles })));
@@ -187,10 +188,25 @@ function App() {
 
   if (authStatus === 'loading') {
     return (
-      <div className="h-screen bg-[var(--bg-base)] text-[var(--text-primary)] flex flex-col items-center justify-center relative">
-        <div className="flex flex-col items-center gap-[16px]">
-          <div className="w-[40px] h-[40px] border-[3px] border-[var(--accent)] border-t-transparent rounded-full animate-spin" />
-          <span className="text-[14px] text-[var(--text-secondary)]">Iniciando ArbiTrack...</span>
+      <div className="h-screen bg-[var(--bg-base)] text-[var(--text-primary)] flex flex-col items-center justify-center relative overflow-hidden">
+        {/* Glow de fondo para el bot */}
+        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[200px] h-[200px] bg-[var(--accent)] rounded-full blur-[100px] opacity-20 animate-pulse-green pointer-events-none" />
+        
+        <div className="flex flex-col items-center gap-[24px] relative z-10 animate-fade-in-up">
+          <div className="animate-float-y relative">
+            <div className="absolute inset-0 bg-[var(--accent)] rounded-full blur-xl opacity-30 animate-pulse-green"></div>
+            <ArbiBot size={80} className="relative z-10 drop-shadow-[0_0_15px_rgba(59,130,246,0.5)]" />
+          </div>
+          
+          <div className="flex flex-col items-center gap-2">
+            <span className="text-[18px] font-bold text-[var(--text-primary)] tracking-wide">ArbiTrack AI</span>
+            <div className="flex items-center gap-2 text-[14px] text-[var(--accent)]">
+              <span className="w-2 h-2 rounded-full bg-[var(--accent)] animate-bcv-dot-pulse" style={{ animationDelay: '0ms' }} />
+              <span className="w-2 h-2 rounded-full bg-[var(--accent)] animate-bcv-dot-pulse" style={{ animationDelay: '200ms' }} />
+              <span className="w-2 h-2 rounded-full bg-[var(--accent)] animate-bcv-dot-pulse" style={{ animationDelay: '400ms' }} />
+              <span className="ml-2 font-medium animate-pulse">Sincronizando...</span>
+            </div>
+          </div>
         </div>
 
         {showRecoveryBtn && (
