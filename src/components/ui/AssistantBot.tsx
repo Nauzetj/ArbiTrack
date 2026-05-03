@@ -503,8 +503,7 @@ export const AssistantBot: React.FC = () => {
     { label: '🏆 Mejor ciclo', text: 'Mejor ciclo' },
     { label: '👥 Contrapartes', text: 'Top contrapartes' },
   ];
-
-  const hasAlert = unassigned.length > 0;
+  const hasAlert = orders.filter(o => !o.cycleId && o.orderStatus?.toUpperCase() !== 'DELETED').length > 0;
 
   return (
     <>
