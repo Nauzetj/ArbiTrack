@@ -18,6 +18,9 @@
     </filter>
   </defs>
 
+  <!-- Solid App Background to prevent black square on PWA Splash -->
+  <rect width="512" height="512" fill="#020B16" />
+
   <!-- Background circle -->
   <circle cx="256" cy="256" r="256" fill="url(#bg)"/>
 
