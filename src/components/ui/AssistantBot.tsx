@@ -529,8 +529,8 @@ export const AssistantBot: React.FC = () => {
       <button
         id="assistant-bot-trigger"
         onClick={() => setOpen(v => !v)}
-        style={{ position: 'fixed', bottom: '24px', right: '24px', zIndex: 9999 }}
-        className={`w-[56px] h-[56px] rounded-full flex items-center justify-center shadow-2xl transition-all duration-300
+        style={{ position: 'fixed', bottom: 'calc(16px + env(safe-area-inset-bottom, 0px) + 60px)', right: '16px', zIndex: 9999 }}
+        className={`w-[56px] h-[56px] md:bottom-[24px] md:right-[24px] rounded-full flex items-center justify-center shadow-2xl transition-all duration-300
           ${open ? 'bg-[var(--bg-surface-3)] border border-[var(--border-strong)] scale-95' : 'bg-[var(--accent)] hover:scale-110 animate-bot-bounce'}`}
         title="Asistente ARBI"
         aria-label="Abrir asistente"
@@ -543,8 +543,8 @@ export const AssistantBot: React.FC = () => {
 
       {/* Panel */}
       <div
-        style={{ position: 'fixed', bottom: '90px', right: '24px', zIndex: 9998 }}
-        className={`w-[360px] max-h-[540px] rounded-[18px] flex flex-col overflow-hidden
+        style={{ position: 'fixed', bottom: 'calc(16px + env(safe-area-inset-bottom, 0px) + 60px + 64px)', right: '16px', zIndex: 9998 }}
+        className={`w-[360px] md:bottom-[90px] md:right-[24px] max-h-[540px] rounded-[18px] flex flex-col overflow-hidden
         border border-[var(--border-strong)] shadow-[0_20px_60px_rgba(0,0,0,0.3)]
         bg-[var(--bg-surface-1)]
         transition-all duration-300 origin-bottom-right
