@@ -1,8 +1,7 @@
 import React, { useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
-import { AreaChart, Layers, DollarSign, Clock, BarChart3, ChevronRight, X } from 'lucide-react';
+import { AreaChart, Layers, Clock, BarChart3, X, RefreshCw } from 'lucide-react';
 import { useAppStore } from '../store/useAppStore';
-import { MetricCard } from '../components/ui/MetricCard';
 import { ActiveCyclePanel } from '../components/dashboard/ActiveCyclePanel';
 import { MiniChart } from '../components/dashboard/MiniChart';
 import { UnassignedOrdersPool } from '../components/dashboard/UnassignedOrdersPool';
