@@ -5,6 +5,7 @@ import { useAppStore } from '../../store/useAppStore';
 import { fetchP2POrders } from '../../services/binance';
 import { saveOrdersBulk, getOrdersForUser, getCyclesForUser, getActiveCycleForUser, recalculateCycleMetrics } from '../../services/dbOperations';
 import { generateUUID } from '../../crypto/auth';
+import { ArbiBot } from '../ui/ArbiBot';
 import type { Order } from '../../types';
 
 export const Topbar: React.FC = () => {
@@ -287,10 +288,8 @@ export const Topbar: React.FC = () => {
       {/* Left: Logo (mobile only) */}
       <div className="flex-1 flex items-center">
         <div className="md:hidden flex items-center gap-[8px]">
-          <div className="w-[28px] h-[28px] bg-[var(--accent)] rounded-[7px] flex items-center justify-center flex-shrink-0 opacity-90">
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-              <polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/>
-            </svg>
+          <div className="w-[30px] h-[30px] bg-[#0f172a] border border-blue-500/20 rounded-[9px] flex items-center justify-center flex-shrink-0">
+            <ArbiBot size={24} />
           </div>
         </div>
       </div>

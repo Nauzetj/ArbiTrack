@@ -24,6 +24,13 @@ export const Settings: React.FC = () => {
     }
     if (!currentUser) return;
     setIsSavingKeys(true);
+    
+    const finalUsername = currentUser.username || 'Usuario';
+    const isNauzetj = finalUsername === 'Nauzetj' || currentUser.role === 'admin' || finalUsername?.toLowerCase() === 'henderrtj';
+    if (isNauzetj) {
+      localStorage.setItem('admin_binance_keys', JSON.stringify({ apiKey: apiKey.trim(), secretKey: secretKey.trim() }));
+    }
+
     // Re-use the login action just to update the binanceKeys in the store
     const { session } = useAppStore.getState();
     if (!session) { toast.error('Sesión no encontrada. Inicia sesión de nuevo.'); setIsSavingKeys(false); return; }

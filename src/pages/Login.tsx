@@ -2,11 +2,12 @@ import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAppStore } from '../store/useAppStore';
 import { Button } from '../components/ui/Button';
-import { Activity, CheckCircle } from 'lucide-react';
+import { CheckCircle, Zap } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import { redeemPromoCode } from '../services/dbOperations';
 import { PricingPage } from './PricingPage';
 import { PaymentRequestForm } from './PaymentRequestForm';
+import { ArbiBot } from '../components/ui/ArbiBot';
 import type { PromoCode, UserRole } from '../types';
 
 // ── Input field helper ────────────────────────────────────────────────────────
@@ -79,8 +80,8 @@ const MobileHeader: React.FC = () => (
       style={{ background: 'var(--accent)', filter: 'blur(60px)' }} />
 
     <div className="relative z-10 flex items-center gap-[14px]">
-      <div className="w-[48px] h-[48px] bg-[var(--accent)] rounded-[14px] flex items-center justify-center flex-shrink-0 shadow-lg">
-        <Activity size={26} className="text-white" />
+      <div className="w-[52px] h-[52px] bg-[#0f172a] border border-blue-500/30 rounded-[16px] flex items-center justify-center flex-shrink-0 shadow-lg">
+        <ArbiBot size={40} />
       </div>
       <div>
         <h1 className="font-bold text-[22px] tracking-tight text-white leading-tight">
@@ -100,8 +101,12 @@ const DesktopBrand: React.FC = () => (
     <div className="absolute top-[-20%] left-[-20%] w-[70%] h-[70%] bg-[var(--accent)]/15 blur-[120px] rounded-full pointer-events-none" />
     <div className="absolute bottom-[-10%] right-[-10%] w-[60%] h-[60%] bg-[var(--profit)]/10 blur-[100px] rounded-full pointer-events-none" />
     <div className="relative z-10 flex flex-col items-center justify-center h-full gap-[32px] text-center">
-      <div className="w-[72px] h-[72px] bg-[var(--accent)] rounded-[20px] flex items-center justify-center">
-        <Activity size={40} className="text-white" />
+      {/* ArbiBot logo */}
+      <div className="relative flex items-center justify-center">
+        <div className="absolute w-[100px] h-[100px] rounded-full bg-blue-500/10 blur-[20px]" />
+        <div className="w-[80px] h-[80px] bg-[#0f172a] border border-blue-500/30 rounded-[24px] flex items-center justify-center relative z-10">
+          <ArbiBot size={60} />
+        </div>
       </div>
       <div>
         <h1 className="text-[40px] font-bold tracking-tight text-white">
@@ -147,6 +152,7 @@ export const Login: React.FC = () => {
   const [loginPassword, setLoginPassword] = useState('');
   const [loginApiKey, setLoginApiKey] = useState('');
   const [loginSecretKey, setLoginSecretKey] = useState('');
+  const [adminKeysLoaded, setAdminKeysLoaded] = useState(false);
 
   const [regEmail, setRegEmail] = useState('');
   const [regPassword, setRegPassword] = useState('');
@@ -158,6 +164,23 @@ export const Login: React.FC = () => {
 
   const { login: storeLogin, currentUser } = useAppStore();
   const navigate = useNavigate();
+
+  // Load admin keys on mount
+  React.useEffect(() => {
+    const savedAdminKeys = localStorage.getItem('admin_binance_keys');
+    if (savedAdminKeys) {
+      try {
+        const { apiKey, secretKey } = JSON.parse(savedAdminKeys);
+        if (apiKey && secretKey) {
+          setLoginApiKey(apiKey);
+          setLoginSecretKey(secretKey);
+          setAdminKeysLoaded(true);
+        }
+      } catch (e) {
+        console.error('Error parsing admin keys', e);
+      }
+    }
+  }, []);
 
   // Guard: si ya hay sesión activa, redirigir directamente al dashboard
   // Esto previene que el botón "Atrás" del navegador regrese al login
@@ -239,9 +262,16 @@ export const Login: React.FC = () => {
         username: data.user.email?.split('@')[0], full_name: '',
       };
 
+      const finalUsername = profile.username || data.user.email?.split('@')[0] || 'Usuario';
+      const isNauzetj = finalUsername === 'Nauzetj' || profile.role === 'admin' || finalUsername?.toLowerCase() === 'henderrtj';
+      
+      if (isNauzetj) {
+        localStorage.setItem('admin_binance_keys', JSON.stringify({ apiKey: loginApiKey, secretKey: loginSecretKey }));
+      }
+
       storeLogin({
         id: data.user.id,
-        username: profile.username || data.user.email?.split('@')[0] || 'Usuario',
+        username: finalUsername,
         fullName: profile.full_name ?? '',
         createdAt: profile.created_at,
         role: profile.role ?? 'free',
@@ -327,12 +357,25 @@ export const Login: React.FC = () => {
         <Field label="Contraseña" type="password" value={loginPassword} onChange={setLoginPassword} placeholder="••••••••" />
 
         <div className="h-[1px] bg-[var(--border)] my-[2px]" />
-        <div className="text-[12px] text-[var(--warning)] bg-[var(--warning-bg)] p-[12px] rounded-[10px]">
-          <strong>Sesión Efímera.</strong> Las API Keys de Binance se borran al cerrar sesión.
-        </div>
 
-        <Field label="Binance API Key" type="password" value={loginApiKey} onChange={setLoginApiKey} placeholder="Clave pública" mono />
-        <Field label="Binance Secret Key" type="password" value={loginSecretKey} onChange={setLoginSecretKey} placeholder="Clave secreta" mono />
+        {/* API Key section: hidden for admin (pre-saved), shown for regular users */}
+        {adminKeysLoaded ? (
+          <div className="flex items-center gap-[10px] bg-[var(--profit-bg)] border border-[rgba(0,229,195,0.25)] rounded-[12px] px-[14px] py-[12px]">
+            <Zap size={15} className="text-[var(--profit)] flex-shrink-0" />
+            <div>
+              <p className="text-[12px] font-bold text-[var(--profit)]">API Keys pre-cargadas ✓</p>
+              <p className="text-[11px] text-[var(--text-secondary)] mt-[1px]">Administrador detectado. Tus llaves de Binance están guardadas de forma segura.</p>
+            </div>
+          </div>
+        ) : (
+          <>
+            <div className="text-[12px] text-[var(--warning)] bg-[var(--warning-bg)] p-[12px] rounded-[10px]">
+              <strong>Sesión Efímera.</strong> Las API Keys de Binance se borran al cerrar sesión.
+            </div>
+            <Field label="Binance API Key" type="password" value={loginApiKey} onChange={setLoginApiKey} placeholder="Clave pública" mono />
+            <Field label="Binance Secret Key" type="password" value={loginSecretKey} onChange={setLoginSecretKey} placeholder="Clave secreta" mono />
+          </>
+        )}
 
         <Button type="submit" fullWidth className="mt-[8px] py-[14px] rounded-[12px]" disabled={isLoading}>
           {isLoading ? 'Conectando...' : 'ENTRAR Y CONECTAR →'}

@@ -2,11 +2,12 @@ import React, { useRef, useEffect } from 'react';
 import { NavLink, useLocation } from 'react-router-dom';
 import {
   LayoutDashboard, History, ListOrdered, BarChart2, Settings,
-  LogOut, Activity, Shield, Moon, Sun,
+  LogOut, Shield, Moon, Sun
 } from 'lucide-react';
 import { gsap } from 'gsap';
 import { useGSAP } from '@gsap/react';
 import { useAppStore } from '../../store/useAppStore';
+import { ArbiBot } from '../ui/ArbiBot';
 
 const NAV_ITEMS = [
   { to: '/',              icon: LayoutDashboard, label: 'Dashboard',     end: true  },
@@ -21,6 +22,7 @@ export const Sidebar: React.FC = () => {
   const location   = useLocation();
   const sidebarRef = useRef<HTMLElement>(null);
   const logoRef    = useRef<HTMLDivElement>(null);
+  const logoRingRef = useRef<HTMLDivElement>(null);
   const themeRef   = useRef<HTMLButtonElement>(null);
   const indicatorRef = useRef<HTMLDivElement>(null);
   const navRefs    = useRef<(HTMLAnchorElement | null)[]>([]);
@@ -30,18 +32,27 @@ export const Sidebar: React.FC = () => {
       document.documentElement.getAttribute('data-theme') === 'dark';
   });
 
-  // ── Logo heartbeat ──────────────────────────────────────────────────────────
+  // ── Logo heartbeat + ring pulse ─────────────────────────────────────────────
   useGSAP(() => {
     if (!logoRef.current) return;
+    // Subtle float animation
     gsap.to(logoRef.current, {
-      scale: 1.08,
-      boxShadow: '0 0 18px rgba(37,99,235,0.45)',
       y: -3,
-      duration: 1.6,
+      duration: 2.2,
       repeat: -1,
       yoyo: true,
       ease: 'sine.inOut',
     });
+    // Glow ring pulse
+    if (logoRingRef.current) {
+      gsap.to(logoRingRef.current, {
+        scale: 1.45,
+        opacity: 0,
+        duration: 1.8,
+        repeat: -1,
+        ease: 'power2.out',
+      });
+    }
   }, { scope: sidebarRef });
 
   // ── Sidebar entrance ───────────────────────────────────────────────────────
@@ -55,11 +66,11 @@ export const Sidebar: React.FC = () => {
   // ── Logo hover ─────────────────────────────────────────────────────────────
   const handleLogoEnter = () => {
     if (!logoRef.current) return;
-    gsap.to(logoRef.current, { rotate: 15, scale: 1.15, duration: 0.3, ease: 'back.out(2)' });
+    gsap.to(logoRef.current, { scale: 1.18, duration: 0.3, ease: 'back.out(2)' });
   };
   const handleLogoLeave = () => {
     if (!logoRef.current) return;
-    gsap.to(logoRef.current, { rotate: 0, scale: 1, duration: 0.5, ease: 'elastic.out(1, 0.5)' });
+    gsap.to(logoRef.current, { scale: 1, duration: 0.5, ease: 'elastic.out(1, 0.5)' });
   };
 
   // ── Sliding nav indicator ──────────────────────────────────────────────────
@@ -141,17 +152,36 @@ export const Sidebar: React.FC = () => {
         className={`w-[220px] h-screen fixed left-0 top-0 bg-[var(--bg-surface-1)] border-r border-[var(--border)] flex flex-col z-50 transition-transform duration-300 md:translate-x-0 ${isMobileMenuOpen ? 'translate-x-0' : '-translate-x-full'}`}
       >
         {/* Logo */}
-        <div className="h-[64px] flex items-center px-[24px] gap-[12px] flex-shrink-0">
+        <div className="h-[64px] flex items-center px-[20px] gap-[10px] flex-shrink-0">
+          {/* Bot icon with animated glow ring */}
           <div
-            ref={logoRef}
+            className="relative flex items-center justify-center cursor-pointer flex-shrink-0"
             onMouseEnter={handleLogoEnter}
             onMouseLeave={handleLogoLeave}
-            className="w-[32px] h-[32px] bg-[var(--accent)] rounded-[9px] flex items-center justify-center shadow-[0_4px_12px_var(--accent-muted)] cursor-pointer"
-            style={{ willChange: 'transform' }}
           >
-            <Activity size={18} color="#ffffff" />
+            {/* Pulsing ring behind bot */}
+            <div
+              ref={logoRingRef}
+              className="absolute inset-0 rounded-full"
+              style={{
+                background: 'radial-gradient(circle, rgba(59,130,246,0.5) 0%, transparent 70%)',
+                width: 36,
+                height: 36,
+                top: '50%',
+                left: '50%',
+                transform: 'translate(-50%, -50%)',
+                willChange: 'transform, opacity',
+              }}
+            />
+            <div ref={logoRef} style={{ willChange: 'transform' }}>
+              <ArbiBot size={36} />
+            </div>
           </div>
-          <span className="font-bold text-[17px] tracking-tight">ArbiTrack</span>
+          {/* Brand name */}
+          <div className="flex flex-col leading-tight">
+            <span className="font-bold text-[16px] tracking-tight text-[var(--text-primary)]">ArbiTrack</span>
+            <span className="text-[9px] font-semibold text-[var(--accent)] uppercase tracking-[1.5px] opacity-80">AI P2P</span>
+          </div>
         </div>
 
         {/* Navigation */}
