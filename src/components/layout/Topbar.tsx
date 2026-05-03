@@ -59,9 +59,9 @@ export const Topbar: React.FC = () => {
       console.log('[SYNC] cycleOpenedAtVal:', cycleOpenedAtVal ? new Date(cycleOpenedAtVal).toISOString() : 'sin ciclo');
       
       // Obtener órdenes de Binance EN PARALELO (más rápido)
-      // Con ciclo activo: 5 páginas (100 órdenes por tipo) para no perder nada
-      // Sin ciclo activo: 1 página (20 órdenes) para monitoreo ligero
-      const maxPages = activeCycle ? 5 : 1;
+      // Optimización Extrema: Auto-sync (cada 10s) SÓLO necesita 1 página (las más recientes).
+      // Solo buscamos profundo (3 páginas) si el usuario hace clic manualmente.
+      const maxPages = (activeCycle && isManual) ? 3 : 1;
       const requests = [];
       
       for (let page = 1; page <= maxPages; page++) {
@@ -262,14 +262,14 @@ export const Topbar: React.FC = () => {
     // Sync inmediato al montar
     handleSync(false);
 
-    // OPTIMIZACIÓN FASE 1: Intervalo reducido de 20s a 15s
-    // Con ciclo activo → cada 15s (más rápido sin saturar la API)
-    // Sin ciclo activo → cada 45s (monitoreo más espaciado)
+    // OPTIMIZACIÓN EXTREMA: Intervalo reducido a 10s (Tiempo Real)
+    // Con ciclo activo → cada 10s (ahora ultra rápido porque solo pide 1 página)
+    // Sin ciclo activo → cada 30s
     let timeoutId: ReturnType<typeof setTimeout>;
 
     const scheduleNext = async () => {
       const { activeCycle } = useAppStore.getState();
-      const delay = activeCycle ? 15_000 : 45_000;
+      const delay = activeCycle ? 10_000 : 30_000;
       timeoutId = setTimeout(async () => {
         await handleSync(false);
         scheduleNext();
