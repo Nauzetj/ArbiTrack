@@ -21,54 +21,42 @@ export const BottomNav: React.FC = () => {
   ];
 
   return (
-    <nav
-      className="md:hidden fixed bottom-0 left-0 right-0 z-50 flex items-stretch"
-      style={{
-        background: 'var(--bg-surface-1)',
-        borderTop: '1px solid var(--border)',
-        paddingBottom: 'env(safe-area-inset-bottom, 0px)',
-        boxShadow: '0 -4px 20px rgba(0,0,0,0.15)',
-      }}
-    >
-      {navItems.map(({ to, icon: Icon, label }) => (
-        <NavLink
-          key={to}
-          to={to}
-          end={to === '/'}
-          className={({ isActive }) =>
-            `flex-1 flex flex-col items-center justify-center gap-[4px] py-[10px] transition-all duration-200 relative ${
-              isActive ? 'text-[var(--accent)]' : 'text-[var(--text-tertiary)]'
-            }`
-          }
-        >
-          {({ isActive }) => (
-            <>
-              {isActive && (
+    <nav className="md:hidden fixed bottom-[16px] left-[16px] right-[16px] z-50" style={{ paddingBottom: 'env(safe-area-inset-bottom, 0px)' }}>
+      <div className="bg-[var(--bg-surface-2)]/80 backdrop-blur-xl border border-[var(--border-strong)] rounded-full flex items-center justify-between px-[8px] py-[8px] shadow-[0_20px_40px_rgba(0,0,0,0.6)]">
+        {navItems.map(({ to, icon: Icon, label }) => (
+          <NavLink
+            key={to}
+            to={to}
+            end={to === '/'}
+            className={({ isActive }) =>
+              `flex-1 flex flex-col items-center justify-center gap-[4px] py-[6px] transition-all duration-200 relative ${
+                isActive ? 'text-[var(--text-primary)]' : 'text-[var(--text-tertiary)]'
+              }`
+            }
+          >
+            {({ isActive }) => (
+              <>
+                <div
+                  className={`flex items-center justify-center w-[40px] h-[32px] rounded-full transition-all duration-200 ${
+                    isActive
+                      ? 'bg-[var(--accent)] text-white shadow-[0_4px_12px_var(--accent-muted)]'
+                      : 'bg-transparent hover:bg-[var(--bg-surface-3)]'
+                  }`}
+                >
+                  <Icon size={isActive ? 18 : 20} strokeWidth={isActive ? 2.5 : 1.8} />
+                </div>
                 <span
-                  className="absolute top-0 left-[50%] -translate-x-1/2 w-[32px] h-[2px] rounded-b-full"
-                  style={{ background: 'var(--accent)' }}
-                />
-              )}
-              <div
-                className={`flex items-center justify-center w-[40px] h-[28px] rounded-[10px] transition-all duration-200 ${
-                  isActive
-                    ? 'bg-[var(--accent-muted)]'
-                    : 'bg-transparent'
-                }`}
-              >
-                <Icon size={isActive ? 20 : 18} strokeWidth={isActive ? 2.5 : 1.8} />
-              </div>
-              <span
-                className={`text-[10px] font-semibold tracking-wide transition-all ${
-                  isActive ? 'opacity-100' : 'opacity-60'
-                }`}
-              >
-                {label}
-              </span>
-            </>
-          )}
-        </NavLink>
-      ))}
+                  className={`text-[10px] font-semibold tracking-tight transition-all ${
+                    isActive ? 'opacity-100 text-[var(--accent)]' : 'opacity-60'
+                  }`}
+                >
+                  {label}
+                </span>
+              </>
+            )}
+          </NavLink>
+        ))}
+      </div>
     </nav>
   );
 };
