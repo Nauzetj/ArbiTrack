@@ -281,44 +281,38 @@ export const Topbar: React.FC = () => {
   }, [currentUser?.id, binanceKeys?.apiKey]);
 
   return (
-    <header className="h-[56px] md:h-[64px] fixed top-0 right-0 left-0 md:left-[220px] bg-[var(--bg-surface-1)] border-b border-[var(--border)] z-40 flex items-center justify-between px-[16px] md:px-[32px]"
+    <header className="h-[56px] md:h-[64px] fixed top-0 right-0 left-0 md:left-[220px] bg-[var(--bg-base)]/80 backdrop-blur-md border-b border-[var(--border)] z-40 flex items-center justify-between px-[16px] md:px-[32px]"
       style={{ paddingTop: 'env(safe-area-inset-top, 0px)' }}
     >
       {/* Left: Logo (mobile only) */}
-      <div className="flex items-center gap-[10px]">
+      <div className="flex-1 flex items-center">
         <div className="md:hidden flex items-center gap-[8px]">
-          <div className="w-[28px] h-[28px] bg-[var(--accent)] rounded-[7px] flex items-center justify-center flex-shrink-0">
+          <div className="w-[28px] h-[28px] bg-[var(--accent)] rounded-[7px] flex items-center justify-center flex-shrink-0 opacity-90">
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
               <polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/>
             </svg>
           </div>
-          <span className="font-bold text-[15px] tracking-tight">ArbiTrack</span>
         </div>
+      </div>
 
-        {/* BCV on mobile — shown prominently next to logo */}
-        <div className="md:hidden flex items-center gap-[5px] bg-[var(--bg-surface-3)] border border-[var(--border-strong)] rounded-full px-[10px] py-[4px]">
-          <div className="w-[5px] h-[5px] rounded-full bg-[var(--accent)] flex-shrink-0" />
-          <span className="font-mono text-[11px] font-semibold tracking-wide">
-            {bcvRate ? `Bs. ${bcvRate.tasa_bcv.toFixed(2)}` : 'BCV ---'}
+      {/* Center: Floating Pill */}
+      <div className="flex-shrink-0 flex items-center justify-center">
+        <div className="flex items-center gap-[8px] bg-[var(--bg-surface-3)]/60 border border-[var(--border-strong)] rounded-full px-[14px] py-[4px] md:py-[6px] shadow-sm">
+          <div className="w-[6px] h-[6px] rounded-full bg-[var(--accent)] animate-pulse-green" style={{ backgroundColor: 'var(--accent)' }}></div>
+          <span className="font-mono text-[12px] md:text-[13px] font-medium tracking-wide">
+            {bcvRate ? `Tasa BCV Bs.S ${bcvRate.tasa_bcv.toFixed(2)}` : 'BCV ---'}
           </span>
         </div>
       </div>
 
-      <div className="flex items-center gap-[12px] md:gap-[20px]">
-        {/* BCV Pill - Desktop only */}
-        <div className="hidden md:flex items-center gap-[8px] bg-[var(--bg-surface-3)] border border-[var(--border-strong)] rounded-full px-[16px] py-[6px]">
-          <div className="w-[6px] h-[6px] rounded-full bg-[var(--accent)]"></div>
-          <span className="font-mono text-[13px] font-medium tracking-wide">
-            BCV: Bs. {bcvRate ? bcvRate.tasa_bcv.toFixed(2) : '---'}
-          </span>
-        </div>
-
+      {/* Right: Actions */}
+      <div className="flex-1 flex items-center justify-end gap-[12px] md:gap-[20px]">
         {/* Sync Button */}
         <button 
           onClick={() => handleSync(true)}
           disabled={isSyncing}
           title="Sincronizar con Binance"
-          className="flex items-center gap-[8px] text-[13px] font-medium text-[var(--text-secondary)] hover:text-[var(--text-primary)] transition-colors disabled:opacity-50 p-[6px] md:p-0 hover:bg-[var(--bg-surface-3)] md:hover:bg-transparent rounded-[8px] md:rounded-none"
+          className="flex items-center justify-center w-[36px] h-[36px] md:w-auto md:h-auto md:gap-[8px] text-[13px] font-medium text-[var(--text-secondary)] hover:text-[var(--text-primary)] transition-colors disabled:opacity-50 hover:bg-[var(--bg-surface-3)] md:hover:bg-transparent rounded-full md:rounded-none"
         >
           {syncStatus === 'success' ? (
              <CheckCircle2 size={18} className="text-[var(--profit)]" />
@@ -327,7 +321,7 @@ export const Topbar: React.FC = () => {
           )}
           {syncStatus === 'success' ? (
             <span className="text-[var(--profit)] hidden md:inline">
-              Actualizado {new Date().toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}
+              {new Date().toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}
             </span>
           ) : (
             <span className="hidden md:inline">Sincronizar</span>
@@ -335,7 +329,7 @@ export const Topbar: React.FC = () => {
         </button>
 
         {/* Avatar */}
-        <div className="w-[32px] h-[32px] md:w-[36px] md:h-[36px] rounded-full bg-[var(--bg-surface-3)] border border-[var(--border-strong)] flex items-center justify-center">
+        <div className="w-[32px] h-[32px] md:w-[36px] md:h-[36px] rounded-full bg-[var(--bg-surface-2)] border border-[var(--border-strong)] flex items-center justify-center shadow-sm">
           <User size={16} className="text-[var(--text-secondary)]" />
         </div>
       </div>
