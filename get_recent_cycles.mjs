@@ -17,7 +17,13 @@ const supabase = createClient(envVars.VITE_SUPABASE_URL, envVars.VITE_SUPABASE_A
 });
 
 async function main() {
-  const { data: orders } = await supabase.from('orders').select('*').limit(5);
-  console.log('Orders:', orders);
+  const { data: cycles, error } = await supabase
+    .from('cycles')
+    .select('id, cycle_number, opened_at, closed_at')
+    .order('opened_at', { ascending: false })
+    .limit(10);
+    
+  if (error) console.error(error);
+  else console.log('Recent 10 cycles:', cycles);
 }
 main();

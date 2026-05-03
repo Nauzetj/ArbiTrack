@@ -17,7 +17,17 @@ const supabase = createClient(envVars.VITE_SUPABASE_URL, envVars.VITE_SUPABASE_A
 });
 
 async function main() {
-  const { data: orders } = await supabase.from('orders').select('*').limit(5);
-  console.log('Orders:', orders);
+  const { data: orders, error } = await supabase
+    .from('orders')
+    .select('*')
+    .like('order_number', '%0316%')
+    .limit(5);
+    
+  if (error) {
+    console.error('Error finding orders:', error);
+    return;
+  }
+  
+  console.log('Found orders:', JSON.stringify(orders, null, 2));
 }
 main();

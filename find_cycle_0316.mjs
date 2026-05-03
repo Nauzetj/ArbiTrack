@@ -17,7 +17,16 @@ const supabase = createClient(envVars.VITE_SUPABASE_URL, envVars.VITE_SUPABASE_A
 });
 
 async function main() {
-  const { data: orders } = await supabase.from('orders').select('*').limit(5);
-  console.log('Orders:', orders);
+  const { data: records, error } = await supabase
+    .from('orders')
+    .select('*');
+    
+  if (error) {
+    console.error('Error finding records:', error);
+    return;
+  }
+  
+  const found = records.filter(c => c.order_number?.toString().endsWith('0316') || c.id?.toString().endsWith('0316'));
+  console.log('Found records:', JSON.stringify(found, null, 2));
 }
 main();

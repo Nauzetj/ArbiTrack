@@ -22,11 +22,11 @@ const supabase = createClient(envVars.VITE_SUPABASE_URL, envVars.VITE_SUPABASE_A
 
 // ── Config ─────────────────────────────────────────────────────────────────
 // Cycle number to backdate (last 4 digits shown in the table)
-const CYCLE_NUMBER_SUFFIX = '6596';
+const CYCLE_NUMBER_SUFFIX = '0316';
 
 // Target date: April 23, 2026 — keep the same time as the original closed_at
 // but move the date to day 23. We'll read the original first.
-const TARGET_DATE = '2026-04-23';
+const TARGET_DATE = '2026-04-29';
 
 async function main() {
   console.log('🔍 Buscando ciclo #' + CYCLE_NUMBER_SUFFIX + '...');
@@ -35,7 +35,7 @@ async function main() {
   const { data: cycles, error: fetchErr } = await supabase
     .from('cycles')
     .select('id, cycle_number, opened_at, closed_at, status')
-    .ilike('cycle_number::text', '%' + CYCLE_NUMBER_SUFFIX)
+    .eq('cycle_number', Number(CYCLE_NUMBER_SUFFIX))
     .limit(5);
 
   if (fetchErr) {

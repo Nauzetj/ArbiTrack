@@ -92,6 +92,11 @@ function buildResponse(input: string, ctx: StoreCtx): { text: string; action?: F
   const completed  = cycles.filter(c => c.status === 'Completado');
   const todayStart = new Date(); todayStart.setHours(0, 0, 0, 0);
   const monthStart = new Date(); monthStart.setDate(1); monthStart.setHours(0, 0, 0, 0);
+  const weekStart  = new Date(); weekStart.setDate(weekStart.getDate() - weekStart.getDay()); weekStart.setHours(0,0,0,0);
+  const doneOrders = orders.filter(o => o.orderStatus?.toUpperCase() === 'COMPLETED');
+  const unassigned = orders.filter(o => !o.cycleId && o.orderStatus?.toUpperCase() !== 'DELETED');
+  const fmtVes = (n: number) => 'Bs. ' + n.toLocaleString('es-VE',{minimumFractionDigits:2,maximumFractionDigits:2});
+  const pct = (a: number, b: number) => b > 0 ? ((a/b)*100).toFixed(1)+'%' : '—';
 
   // ── 0. Llenar formulario ────────────────────────────────────────────────────
   const fillMatch = q.match(/(?:llena|rellena|registra|anota|agrega)\s+(?:el\s+formulario\s+con\s*:?\s*)?(?:una?\s+)?(venta|compra|recompra|transferencia)(?:\s+de)?\s*([\d.,]+)?\s*(?:usdt|usd|usdt)?\s*(?:a\s+(?:tasa\s+)?)?([\d.,]+)?\s*(?:en\s+(.+))?/i);
@@ -305,7 +310,97 @@ function buildResponse(input: string, ctx: StoreCtx): { text: string; action?: F
 
   // ── 18. Ayuda ────────────────────────────────────────────────────────────
   if (/ayuda|help|qué puedes|que puedes|comandos/.test(q)) {
-    return { text: `🤖 **ARBI — Lo que sé hacer:**\n\n✏️ **Pre-llenar formulario:**\n• "Registra una venta de 200 USDT a 38.50 en Binance"\n• "Llena el formulario con: recompra 150 USDT en Bybit"\n• "Agrega una compra USD de 50"\n\nℹ️ **Sobre el sistema:**\n• "¿Cómo funciona el modo automático?"\n• "¿Qué tipos de operación hay?"\n• "¿Cómo se calculan las ganancias?"\n• "¿Cómo funciona la venta rápida?"\n• "Niveles de comisión Binance"\n\n📊 **Mis datos:**\n• "Ciclo activo", "Último ciclo", "Mejor ciclo"\n• "Ganancia hoy / mes / total" · "ROI"\n• "Orden #12345678" · "Tasa BCV"` };
+    return { text: `🤖 **ARBI — Superbot ArbiTrack**\n\n✏️ **Formularios:**\n• "Registra una venta de 200 USDT a 38.50 en Binance"\n• "Llena recompra 150 USDT en Bybit"\n\n📊 **Análisis inteligente:**\n• "Dame un resumen" — estado general\n• "Diagnosticar ciclo" — por qué gana/pierde\n• "Spread histórico" — análisis de tasas\n• "Top contrapartes" — traders frecuentes\n• "Proyección mensual" — estimado de ganancias\n• "Comparar últimos 5 ciclos"\n\n📅 **Por período:**\n• "Ganancia hoy / semana / mes / total"\n• "Esta semana" · "Órdenes de hoy"\n\n🔍 **Búsqueda:**\n• "Orden #12345" · "Contraparte [nombre]"\n• "Órdenes sin asignar" · "Tasa BCV"\n• "Liquidez disponible" · "ROI promedio"` };
+  }
+
+  // ── SEMANA ──────────────────────────────────────────────────────────────
+  if (/semana|semanal|esta semana/.test(q) && !/bcv|tasa/.test(q)) {
+    const wc = completed.filter(c => c.closedAt && new Date(c.closedAt) >= weekStart);
+    const wg = wc.reduce((s,c)=>s+c.ganancia_usdt,0);
+    const wo = orders.filter(o=>new Date(o.createTime_utc)>=weekStart).length;
+    return { text: `📅 **Esta semana:**\n• Ciclos completados: ${wc.length}\n• Ganancia: ${fmtN(wg,4)} USDT\n• En Bs: ${fmtN(wc.reduce((s,c)=>s+c.ganancia_ves,0),2)}\n• Órdenes procesadas: ${wo}` };
+  }
+
+  // ── RESUMEN GENERAL ──────────────────────────────────────────────────────
+  if (/resumen|status|cómo voy|como voy|dame un resumen/.test(q)) {
+    const mc = completed.filter(c=>c.closedAt&&new Date(c.closedAt)>=monthStart);
+    const mg = mc.reduce((s,c)=>s+c.ganancia_usdt,0);
+    const prog = activeCycle && activeCycle.usdt_vendido>0 ? pct(activeCycle.usdt_recomprado,activeCycle.usdt_vendido) : null;
+    return { text: `📊 **Resumen ArbiTrack**\n\n🔄 Ciclo activo: ${activeCycle?'#'+activeCycle.cycleNumber.toString().slice(-4)+' en curso'+(prog?` (${prog} recomprado)`:''): 'Ninguno'}\n📆 Este mes: ${fmtN(mg,4)} USDT (${mc.length} ciclos)\n💰 Ganancia total: ${fmtN(completed.reduce((s,c)=>s+c.ganancia_usdt,0),4)} USDT\n📋 Órdenes: ${orders.length} total · ${unassigned.length} sin asignar\n💱 BCV: ${bcvRate?fmtAbs(bcvRate.tasa_bcv,2)+' Bs/USD':'No disponible'}` };
+  }
+
+  // ── DIAGNÓSTICO DEL CICLO ────────────────────────────────────────────────
+  if (/diagnost|por.?qu[eé].*(negat|baj|poca ganancia|mal)|analiz[a]? ciclo/.test(q)) {
+    if (!activeCycle) return { text: '📭 No hay ciclo activo para diagnosticar.' };
+    const co = orders.filter(o=>o.cycleId===activeCycle.id&&o.orderStatus?.toUpperCase()==='COMPLETED');
+    const ventas = co.filter(o=>(o.operationType??(o.tradeType==='SELL'?'VENTA_USDT':''))==='VENTA_USDT');
+    const compras = co.filter(o=>['COMPRA_USDT','RECOMPRA','SOBRANTE'].includes(o.operationType??(o.tradeType==='BUY'?'COMPRA_USDT':'')));
+    const uV=ventas.reduce((s,o)=>s+o.amount,0), uC=compras.reduce((s,o)=>s+o.amount,0);
+    const tV=ventas.reduce((s,o)=>s+o.totalPrice,0)/(uV||1), tC=compras.reduce((s,o)=>s+o.totalPrice,0)/(uC||1);
+    const comm=co.reduce((s,o)=>s+(o.commission??0),0);
+    const issues:string[]=[];
+    if (tV-tC < 2) issues.push(`⚠️ Spread bajo (${(tV-tC).toFixed(2)} Bs/USDT). Busca tasas de venta más altas.`);
+    if (comm > uV*0.003) issues.push(`⚠️ Comisiones altas (${comm.toFixed(4)} USDT = ${pct(comm,uV)} del capital). Considera nivel Oro.`);
+    if (uC < uV*0.3) issues.push(`⚠️ Solo ${pct(uC,uV)} recomprado. La ganancia parcial puede ser negativa.`);
+    if (tC > tV && uC>0) issues.push(`🚨 Compras más caras que ventas (${tC.toFixed(2)} > ${tV.toFixed(2)} Bs/USDT).`);
+    return { text: `🔬 **Diagnóstico #${activeCycle.cycleNumber.toString().slice(-4)}**\n• Spread: ${(tV-tC).toFixed(2)} Bs/USDT\n• Recompra: ${pct(uC,uV)}\n• Comisiones: ${comm.toFixed(4)} USDT\n\n${issues.length?issues.join('\n'):'✅ Todo bien. La ganancia mejorará al completar la recompra.'}` };
+  }
+
+  // ── ÓRDENES SIN ASIGNAR ──────────────────────────────────────────────────
+  if (/sin asignar|no asignadas|sueltas|huérfanas|flotantes/.test(q)) {
+    if (unassigned.length===0) return { text: '✅ Todas las órdenes están asignadas a un ciclo.' };
+    const uV=unassigned.filter(o=>o.tradeType==='SELL'||o.operationType==='VENTA_USDT');
+    const uC=unassigned.filter(o=>o.tradeType==='BUY'||o.operationType==='COMPRA_USDT');
+    return { text: `🔍 **${unassigned.length} órdenes sin asignar:**\n• 🔴 Ventas: ${uV.length}\n• 🟢 Compras: ${uC.length}\n• Volumen: ${fmtAbs(unassigned.reduce((s,o)=>s+o.amount,0),2)} USDT\n\n💡 Asígnalas desde el panel del ciclo activo.` };
+  }
+
+  // ── PROYECCIÓN ───────────────────────────────────────────────────────────
+  if (/proyecc|cuánto ganaría|cuanto ganaria|si hago|al mes ganaría|estimado/.test(q)) {
+    if (completed.length===0) return { text: '📭 Necesito ciclos completados para proyectar.' };
+    const avg=completed.reduce((s,c)=>s+c.ganancia_usdt,0)/completed.length;
+    const days=Math.max(1,Math.ceil((Date.now()-new Date(completed[completed.length-1].openedAt).getTime())/86400000));
+    const cpd=completed.length/days;
+    const p30=avg*cpd*30;
+    const nm=q.match(/(\d+)\s*(?:ciclos?|al día)?/);
+    const cc=nm?parseInt(nm[1]):null;
+    return { text: `📈 **Proyección (${completed.length} ciclos base):**\n• Ganancia promedio/ciclo: ${fmtN(avg,4)} USDT\n• Tu ritmo: ~${cpd.toFixed(1)} ciclos/día\n• **Proyección mensual: ${fmtN(p30,2)} USDT**${cc?`\n• Con ${cc} ciclos/día: ${fmtN(avg*cc*30,2)} USDT/mes`:''}\n\n💡 Di "proyección si hago 3 ciclos" para simular.` };
+  }
+
+  // ── TOP CONTRAPARTES ─────────────────────────────────────────────────────
+  if (/top contraparte|mejores trader|contrapartes frecuentes|con quien m[aá]s/.test(q)) {
+    if (doneOrders.length===0) return { text: '📭 Sin órdenes para analizar.' };
+    const map:{[k:string]:{count:number;vol:number}}={};
+    doneOrders.forEach(o=>{const k=o.counterPartNickName||'Anónimo';if(!map[k])map[k]={count:0,vol:0};map[k].count++;map[k].vol+=o.amount;});
+    const top=Object.entries(map).sort((a,b)=>b[1].count-a[1].count).slice(0,5);
+    return { text: `👥 **Top 5 contrapartes:**\n${top.map(([n,d],i)=>`${i+1}. **${n}** — ${d.count} ops · ${fmtAbs(d.vol,2)} USDT`).join('\n')}` };
+  }
+
+  // ── SPREAD / ANÁLISIS DE TASAS ───────────────────────────────────────────
+  if (/spread|diferencial de tasa|análisis de tasas|analisis de tasas/.test(q)) {
+    const vs=doneOrders.filter(o=>o.operationType==='VENTA_USDT'||o.tradeType==='SELL');
+    const cs=doneOrders.filter(o=>['COMPRA_USDT','RECOMPRA'].includes(o.operationType??'')||o.tradeType==='BUY');
+    if (!vs.length||!cs.length) return { text: '📭 Necesito ventas Y compras para calcular spread.' };
+    const aV=vs.reduce((s,o)=>s+o.unitPrice,0)/vs.length;
+    const aC=cs.reduce((s,o)=>s+o.unitPrice,0)/cs.length;
+    const mxV=Math.max(...vs.map(o=>o.unitPrice)), mnC=Math.min(...cs.map(o=>o.unitPrice));
+    return { text: `📊 **Spread histórico:**\n• Tasa venta prom: ${fmtAbs(aV,2)} Bs/USDT\n• Tasa compra prom: ${fmtAbs(aC,2)} Bs/USDT\n• **Spread prom: ${fmtAbs(aV-aC,2)} Bs/USDT**\n\n🏆 Mejor venta: ${fmtAbs(mxV,2)} · Mejor compra: ${fmtAbs(mnC,2)}\n\n💡 Spread > 5 Bs/USDT es generalmente rentable.` };
+  }
+
+  // ── LIQUIDEZ ─────────────────────────────────────────────────────────────
+  if (/liquidez|fondos disponibles|cuánto tengo|cuanto tengo en banco/.test(q)) {
+    if (!activeCycle) return { text: '📭 No hay ciclo activo.' };
+    const liq=activeCycle.ves_recibido-activeCycle.ves_pagado;
+    const falt=Math.max(activeCycle.usdt_vendido-activeCycle.usdt_recomprado,0);
+    return { text: `💧 **Liquidez Ciclo #${activeCycle.cycleNumber.toString().slice(-4)}:**\n• En banco: ${fmtVes(liq)}\n• USDT por recomprar: ${fmtAbs(falt,2)} USDT\n• Costo estimado: ${fmtVes(falt*(activeCycle.tasa_compra_prom||activeCycle.tasa_venta_prom||1))}` };
+  }
+
+  // ── COMPARAR ÚLTIMOS CICLOS ───────────────────────────────────────────────
+  if (/comparar|últimos \d+ ciclos|ultimos \d+ ciclos/.test(q)) {
+    const nm=q.match(/(\d+)/); const n=Math.min(parseInt(nm?.[1]||'5'),10);
+    const rec=completed.slice(0,n);
+    if (!rec.length) return { text: '📭 Sin ciclos completados.' };
+    const avg=rec.reduce((s,c)=>s+c.ganancia_usdt,0)/rec.length;
+    return { text: `📊 **Últimos ${rec.length} ciclos:**\n${rec.map((c,i)=>`${i+1}. #${c.cycleNumber.toString().slice(-4)} · ${fmtN(c.ganancia_usdt,4)} USDT · ROI ${fmtAbs(c.roi_percent,2)}%`).join('\n')}\n\n📈 Promedio: ${fmtN(avg,4)} USDT/ciclo` };
   }
 
   // ── Fallback ─────────────────────────────────────────────────────────────
@@ -395,13 +490,21 @@ export const AssistantBot: React.FC = () => {
       </span>
     ));
 
-  const quickPrompts = [
-    { label: 'Ganancia hoy', text: 'Ganancia de hoy' },
-    { label: 'Ciclo activo', text: 'Ciclo activo' },
-    { label: 'Tasa BCV', text: 'Tasa BCV' },
-    { label: 'Última orden', text: 'Última orden' },
-    { label: '¿Cómo funciona?', text: '¿Cómo funciona el sistema?' },
+  const quickPrompts = activeCycle ? [
+    { label: '📊 Resumen', text: 'Dame un resumen' },
+    { label: '🔬 Diagnosticar', text: 'Diagnosticar ciclo activo' },
+    { label: '💧 Liquidez', text: 'Liquidez disponible' },
+    { label: '📅 Esta semana', text: 'Esta semana' },
+    { label: '📈 Proyección', text: 'Proyección mensual' },
+  ] : [
+    { label: '📊 Resumen', text: 'Dame un resumen' },
+    { label: '📅 Esta semana', text: 'Esta semana' },
+    { label: '📈 Proyección', text: 'Proyección mensual' },
+    { label: '🏆 Mejor ciclo', text: 'Mejor ciclo' },
+    { label: '👥 Contrapartes', text: 'Top contrapartes' },
   ];
+
+  const hasAlert = unassigned.length > 0;
 
   return (
     <>
@@ -410,12 +513,15 @@ export const AssistantBot: React.FC = () => {
         id="assistant-bot-trigger"
         onClick={() => setOpen(v => !v)}
         className={`fixed bottom-[80px] md:bottom-[28px] right-[20px] z-[200] w-[52px] h-[52px] rounded-full
-          flex items-center justify-center shadow-lg transition-all duration-300
+          flex items-center justify-center shadow-lg transition-all duration-300 relative
           ${open ? 'bg-[var(--bg-surface-3)] border border-[var(--border-strong)] scale-95' : 'bg-[var(--accent)] hover:scale-110 animate-bot-bounce'}`}
         title="Asistente ARBI"
         aria-label="Abrir asistente"
       >
         {open ? <X size={22} className="text-[var(--text-primary)]"/> : <Bot size={22} className="text-white"/>}
+        {!open && hasAlert && (
+          <span className="absolute top-[8px] right-[8px] w-[10px] h-[10px] rounded-full bg-[var(--warning)] border-2 border-[var(--accent)] animate-pulse"/>
+        )}
       </button>
 
       {/* Panel */}
