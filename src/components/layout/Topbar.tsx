@@ -155,6 +155,15 @@ export const Topbar: React.FC = () => {
                 isUpdated = true;
               }
 
+              // FIX: Auto-assign if it was saved without cycle but belongs to the active cycle's timeframe
+              if (!existingOrder.cycleId && activeCycle && cycleOpenedAtVal) {
+                const orderTime = new Date(o.createTime).getTime();
+                if (orderTime >= cycleOpenedAtVal - (60 * 60 * 1000)) {
+                  updatedOrder.cycleId = activeCycle.id;
+                  isUpdated = true;
+                }
+              }
+
               if (isUpdated) {
                 ordersToUpsert.push(updatedOrder);
                 addedCount++;
