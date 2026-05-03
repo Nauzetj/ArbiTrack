@@ -287,9 +287,16 @@ export const Topbar: React.FC = () => {
     >
       {/* Left: Logo (mobile only) */}
       <div className="flex-1 flex items-center">
-        <div className="md:hidden flex items-center gap-[8px]">
-          <div className="w-[30px] h-[30px] bg-[#0f172a] border border-blue-500/20 rounded-[9px] flex items-center justify-center flex-shrink-0">
-            <ArbiBot size={24} />
+        <div className="md:hidden flex items-center gap-[7px]">
+          {/* ArbiBot with glow ring */}
+          <div className="relative flex items-center justify-center w-[34px] h-[34px]">
+            <div className="absolute inset-0 rounded-full opacity-40"
+              style={{ background: 'radial-gradient(circle, rgba(59,130,246,0.6) 0%, transparent 70%)' }} />
+            <ArbiBot size={30} />
+          </div>
+          <div className="flex flex-col leading-tight">
+            <span className="font-bold text-[14px] tracking-tight text-[var(--text-primary)]">ArbiTrack</span>
+            <span className="text-[8px] font-semibold text-[var(--accent)] uppercase tracking-[1.2px] opacity-80">AI P2P</span>
           </div>
         </div>
       </div>
