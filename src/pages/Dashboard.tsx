@@ -121,18 +121,8 @@ export const Dashboard: React.FC = () => {
 
       </div>
 
-      {/* ── 3. CICLO ACTIVO (Banner Central) ── */}
-      <div className="animate-fade-in-up" style={{ animationDelay: '200ms' }}>
-        <ActiveCyclePanel />
-      </div>
-
-      {/* ── 4. ÓRDENES SIN ASIGNAR ── */}
-      <div className="animate-fade-in-up" style={{ animationDelay: '300ms' }}>
-        <UnassignedOrdersPool />
-      </div>
-
-      {/* ── 5. MÉTRICAS SECUNDARIAS (Flat Dark Cards) ── */}
-      <div className="grid grid-cols-2 gap-[12px] mt-[16px] animate-fade-in-up" style={{ animationDelay: '400ms' }}>
+      {/* ── 3. MÉTRICAS SECUNDARIAS (Flat Dark Cards) ── */}
+      <div className="grid grid-cols-2 gap-[12px] animate-fade-in-up" style={{ animationDelay: '200ms' }}>
         <div className="bg-[var(--bg-surface-2)] rounded-[20px] p-[20px] border border-[var(--border-strong)] flex flex-col gap-[8px]">
            <div className="flex items-center gap-[8px] text-[var(--text-tertiary)]">
              <Layers size={16} />
@@ -161,6 +151,16 @@ export const Dashboard: React.FC = () => {
            </div>
            <p className="text-[24px] font-bold text-[var(--text-primary)]">{usdtTotalOperated.toFixed(2)} <span className="text-[14px] text-[var(--text-secondary)] font-normal">USDT</span></p>
         </div>
+      </div>
+
+      {/* ── 4. CICLO ACTIVO (Banner Central) ── */}
+      <div className="animate-fade-in-up mt-[8px]" style={{ animationDelay: '300ms' }}>
+        <ActiveCyclePanel />
+      </div>
+
+      {/* ── 5. ÓRDENES SIN ASIGNAR ── */}
+      <div className="animate-fade-in-up" style={{ animationDelay: '400ms' }}>
+        <UnassignedOrdersPool />
       </div>
 
       {/* Modal / Caja Flotante de la Gráfica */}
