@@ -50,9 +50,9 @@ export const MiniChart: React.FC = () => {
   const containerRef = useRef<HTMLDivElement>(null);
 
   return (
-    <div ref={containerRef} className="bg-[var(--bg-surface-2)] rounded-[16px] border border-[var(--border)] p-[20px] flex flex-col h-full min-h-[220px]">
+    <div ref={containerRef} className="bg-[var(--bg-surface-2)] rounded-[16px] border border-[var(--border)] p-[20px] flex flex-col min-h-[240px]">
       <h3 className="text-[13px] font-semibold text-[var(--text-secondary)] mb-[16px]">Ganancias últimos 7 días (USDT)</h3>
-      <div className="flex-1 flex items-end justify-between pt-[10px] pb-[4px]">
+      <div className="h-[140px] flex items-end justify-between pt-[10px] pb-[4px]">
         {chartData.map((d, i) => {
           let heightVal = (Math.abs(d.profit) / maxVal) * 100;
           if (isNaN(heightVal)) heightVal = 0;
@@ -61,7 +61,7 @@ export const MiniChart: React.FC = () => {
           
           return (
             <div key={i} className="flex flex-col items-center gap-[8px] w-[14%] group relative h-full justify-end">
-               <div className="absolute top-[calc(100%-10px)] -translate-y-full mb-[100%] opacity-0 group-hover:opacity-100 transition-opacity bg-[var(--bg-surface-3)] text-[var(--text-primary)] border border-[var(--border-strong)] rounded-[4px] px-[6px] py-[4px] text-[10px] mono whitespace-nowrap z-10 pointer-events-none shadow-sm">
+               <div className="absolute top-auto bottom-full mb-[8px] opacity-0 group-hover:opacity-100 transition-opacity bg-[var(--bg-surface-3)] text-[var(--text-primary)] border border-[var(--border-strong)] rounded-[4px] px-[6px] py-[4px] text-[10px] mono whitespace-nowrap z-10 pointer-events-none shadow-sm">
                  {d.profit > 0 ? '+' : ''}{Number(d.profit).toFixed(2)}
                </div>
                <div 
