@@ -205,29 +205,22 @@ export const Topbar: React.FC = () => {
           }
         }
 
-        if (addedCount > 0 || (activeCycle && existingOrders.some(o => o.cycleId === activeCycle.id))) {
+        if (addedCount > 0) {
           if (activeCycle) {
             await recalculateCycleMetrics(activeCycle.id, user.id);
             console.log('[SYNC] Recálculo completado, actualizando UI...');
             
-            // Obtener datos frescos
+            // Obtener datos frescos sin vaciar el estado para evitar parpadeos/congelamientos
             const [freshActiveCycle, freshCycles, freshOrders] = await Promise.all([
               getActiveCycleForUser(user.id),
               getCyclesForUser(user.id),
               getOrdersForUser(user.id),
             ]);
             
-            // Limpiar y luego setear con pequeño delay para forzar re-render
-            setCycles([]);
-            setOrders([]);
-            setActiveCycle(null);
-            
-            setTimeout(() => {
-              setActiveCycle(freshActiveCycle);
-              setCycles(freshCycles);
-              setOrders(freshOrders);
-              console.log('[SYNC] UI actualizada');
-            }, 200);
+            setActiveCycle(freshActiveCycle);
+            setCycles(freshCycles);
+            setOrders(freshOrders);
+            console.log('[SYNC] UI actualizada');
           } else {
             const freshOrders = await getOrdersForUser(user.id);
             setOrders(freshOrders);
