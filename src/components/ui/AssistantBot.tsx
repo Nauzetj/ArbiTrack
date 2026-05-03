@@ -232,7 +232,7 @@ function buildResponse(input: string, ctx: StoreCtx): { text: string; action?: F
   }
 
   // ── 8. Ganancia del mes ──────────────────────────────────────────────────
-  if (/mes|mensual|este mes/.test(q) && !/bcv|tasa/.test(q)) {
+  if (/mes|mensual|este mes/.test(q) && !/bcv|tasa|proyecc|estimado/.test(q)) {
     const monthCycles = completed.filter(c => c.closedAt && new Date(c.closedAt) >= monthStart);
     const gainMonth = monthCycles.reduce((s, c) => s + c.ganancia_usdt, 0);
     return { text: `📆 **Este mes (${monthCycles.length} ciclos):**\n• USDT: ${fmtN(gainMonth, 4)}\n• Bs.: ${fmtN(monthCycles.reduce((s,c) => s + c.ganancia_ves, 0), 2)}` };
@@ -314,7 +314,7 @@ function buildResponse(input: string, ctx: StoreCtx): { text: string; action?: F
   }
 
   // ── SEMANA ──────────────────────────────────────────────────────────────
-  if (/semana|semanal|esta semana/.test(q) && !/bcv|tasa/.test(q)) {
+  if (/semana|semanal|esta semana/.test(q) && !/bcv|tasa|proyecc|estimado/.test(q)) {
     const wc = completed.filter(c => c.closedAt && new Date(c.closedAt) >= weekStart);
     const wg = wc.reduce((s,c)=>s+c.ganancia_usdt,0);
     const wo = orders.filter(o=>new Date(o.createTime_utc)>=weekStart).length;
