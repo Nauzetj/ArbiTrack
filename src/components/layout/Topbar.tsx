@@ -301,11 +301,41 @@ export const Topbar: React.FC = () => {
         </div>
       </div>
 
-      {/* Center: Floating Pill */}
+      {/* Center: Floating Pill — compact on mobile, full on desktop */}
       <div className="flex-shrink-0 flex items-center justify-center">
-        <div className="flex items-center gap-[8px] bg-[var(--bg-surface-3)]/60 border border-[var(--border-strong)] rounded-full px-[14px] py-[4px] md:py-[6px] shadow-sm">
-          <div className="w-[6px] h-[6px] rounded-full bg-[var(--accent)] animate-pulse-green" style={{ backgroundColor: 'var(--accent)' }}></div>
-          <span className="font-mono text-[12px] md:text-[13px] font-medium tracking-wide">
+        <div
+          className="flex items-center gap-[5px] md:gap-[8px] border rounded-full shadow-sm relative overflow-hidden"
+          style={{
+            background: 'var(--bg-surface-3)',
+            borderColor: 'var(--border-strong)',
+            padding: '3px 10px 3px 8px',
+          }}
+        >
+          {/* Shimmer sweep */}
+          <div
+            className="absolute inset-0 pointer-events-none"
+            style={{
+              background: 'linear-gradient(90deg, transparent 0%, rgba(59,130,246,0.12) 50%, transparent 100%)',
+              animation: 'bcv-shimmer 2.4s ease-in-out infinite',
+            }}
+          />
+          {/* Live dot */}
+          <div
+            className="relative flex-shrink-0"
+            style={{
+              width: 6, height: 6,
+              borderRadius: '50%',
+              backgroundColor: 'var(--accent)',
+              boxShadow: '0 0 0 0 rgba(59,130,246,0.6)',
+              animation: 'bcv-dot-pulse 1.8s ease-out infinite',
+            }}
+          />
+          {/* Mobile: short label */}
+          <span className="font-mono font-semibold tracking-wide md:hidden" style={{ fontSize: 10, color: 'var(--text-primary)' }}>
+            {bcvRate ? `${bcvRate.tasa_bcv.toFixed(0)} Bs` : '---'}
+          </span>
+          {/* Desktop: full label */}
+          <span className="font-mono font-medium tracking-wide hidden md:inline" style={{ fontSize: 13, color: 'var(--text-primary)' }}>
             {bcvRate ? `Tasa BCV Bs.S ${bcvRate.tasa_bcv.toFixed(2)}` : 'BCV ---'}
           </span>
         </div>
