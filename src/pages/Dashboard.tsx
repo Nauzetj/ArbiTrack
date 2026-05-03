@@ -67,100 +67,105 @@ export const Dashboard: React.FC = () => {
   const profitWeekUsdt = completedWeek.reduce((sum, c) => sum + c.ganancia_usdt, 0);
 
   return (
-    <div ref={containerRef} className="flex flex-col gap-[20px] md:gap-[24px] max-w-[800px] mx-auto min-h-[calc(100vh-80px)] pb-[80px]">
+    <div ref={containerRef} className="flex flex-col lg:flex-row gap-[24px] lg:gap-[32px] max-w-[1200px] mx-auto min-h-[calc(100vh-80px)] pb-[80px]">
       
-      {/* ── 1. HERO: Saldo Principal (Ganancia Hoy) ── */}
-      <div className="flex flex-col items-center justify-center pt-[24px] pb-[16px] animate-fade-in-up">
-        <p className="text-[14px] text-[var(--text-secondary)] font-medium mb-[8px]">Ganancia Hoy</p>
-        <h1 className="text-[52px] md:text-[64px] font-bold text-[var(--text-primary)] leading-none tracking-tighter flex items-center gap-[4px]">
-          {profitTodayUsdt > 0 && <span className="text-[36px] md:text-[44px] text-[var(--profit)]">+</span>}
-          {profitTodayUsdt === 0 ? '$0.00' : `${profitTodayUsdt.toFixed(2)}`}
-        </h1>
-        <p className="text-[14px] text-[var(--text-tertiary)] font-mono mt-[8px]">
-          ≈ Bs.S {profitTodayVes.toFixed(2)}
-        </p>
-      </div>
+      {/* ── COLUMNA IZQUIERDA (Balance & Métricas) ── */}
+      <div className="w-full lg:w-[35%] flex flex-col gap-[24px]">
+        {/* ── 1. HERO: Saldo Principal (Ganancia Hoy) ── */}
+        <div className="flex flex-col items-center justify-center pt-[24px] pb-[16px] animate-fade-in-up">
+          <p className="text-[14px] text-[var(--text-secondary)] font-medium mb-[8px]">Ganancia Hoy</p>
+          <h1 className="text-[52px] md:text-[64px] font-bold text-[var(--text-primary)] leading-none tracking-tighter flex items-center gap-[4px]">
+            {profitTodayUsdt > 0 && <span className="text-[36px] md:text-[44px] text-[var(--profit)]">+</span>}
+            {profitTodayUsdt === 0 ? '$0.00' : `${profitTodayUsdt.toFixed(2)}`}
+          </h1>
+          <p className="text-[14px] text-[var(--text-tertiary)] font-mono mt-[8px]">
+            ≈ Bs.S {profitTodayVes.toFixed(2)}
+          </p>
+        </div>
 
-      {/* ── 2. ACCIONES RÁPIDAS (Quick Actions Grid) ── */}
-      <div className="flex items-start justify-center gap-[24px] md:gap-[48px] mb-[24px] animate-fade-in-up" style={{ animationDelay: '100ms' }}>
-        <button 
-          onClick={() => {
-            const btn = document.querySelector('button[title="Sincronizar con Binance"]') as HTMLButtonElement;
-            if (btn) btn.click();
-          }}
-          className="flex flex-col items-center gap-[10px] group"
-        >
-          <div className="w-[56px] h-[56px] rounded-[18px] border border-[var(--border-strong)] bg-[var(--bg-surface-2)] flex items-center justify-center group-hover:bg-[var(--bg-surface-3)] group-hover:border-[var(--accent)] transition-all">
-             <RefreshCw size={22} className="text-[var(--text-secondary)] group-hover:text-[var(--accent)] transition-colors" />
+        {/* ── 2. ACCIONES RÁPIDAS (Quick Actions Grid) ── */}
+        <div className="flex items-start justify-center gap-[24px] md:gap-[32px] animate-fade-in-up" style={{ animationDelay: '100ms' }}>
+          <button 
+            onClick={() => {
+              const btn = document.querySelector('button[title="Sincronizar con Binance"]') as HTMLButtonElement;
+              if (btn) btn.click();
+            }}
+            className="flex flex-col items-center gap-[10px] group"
+          >
+            <div className="w-[56px] h-[56px] rounded-[18px] border border-[var(--border-strong)] bg-[var(--bg-surface-2)] flex items-center justify-center group-hover:bg-[var(--bg-surface-3)] group-hover:border-[var(--accent)] transition-all">
+               <RefreshCw size={22} className="text-[var(--text-secondary)] group-hover:text-[var(--accent)] transition-colors" />
+            </div>
+            <span className="text-[12px] font-medium text-[var(--text-secondary)]">Sincronizar</span>
+          </button>
+
+          <button 
+            onClick={() => {
+              const botBtn = document.getElementById('assistant-bot-trigger');
+              if (botBtn) botBtn.click();
+            }}
+            className="flex flex-col items-center gap-[10px] group"
+          >
+            <div className="w-[56px] h-[56px] rounded-[18px] border border-[var(--border-strong)] bg-[var(--bg-surface-2)] flex items-center justify-center group-hover:bg-[var(--bg-surface-3)] group-hover:text-[var(--accent)] transition-all">
+               <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-[var(--text-secondary)] group-hover:text-[var(--accent)] transition-colors"><path d="M12 8V4H8"/><rect width="16" height="12" x="4" y="8" rx="2"/><path d="M2 14h2"/><path d="M20 14h2"/><path d="M15 13v2"/><path d="M9 13v2"/></svg>
+            </div>
+            <span className="text-[12px] font-medium text-[var(--text-secondary)]">Soporte</span>
+          </button>
+
+          <button 
+            onClick={() => setShowChart(true)}
+            className="flex flex-col items-center gap-[10px] group"
+          >
+            <div className="w-[56px] h-[56px] rounded-[18px] border border-[var(--border-strong)] bg-[var(--bg-surface-2)] flex items-center justify-center group-hover:bg-[var(--bg-surface-3)] group-hover:border-[var(--accent)] transition-all">
+               <BarChart3 size={22} className="text-[var(--text-secondary)] group-hover:text-[var(--accent)] transition-colors" />
+            </div>
+            <span className="text-[12px] font-medium text-[var(--text-secondary)]">Rendimiento</span>
+          </button>
+        </div>
+
+        {/* ── 3. MÉTRICAS SECUNDARIAS (Flat Dark Cards) ── */}
+        <div className="grid grid-cols-2 gap-[12px] animate-fade-in-up" style={{ animationDelay: '200ms' }}>
+          <div className="bg-[var(--bg-surface-2)] rounded-[20px] p-[20px] border border-[var(--border-strong)] flex flex-col gap-[8px]">
+             <div className="flex items-center gap-[8px] text-[var(--text-tertiary)]">
+               <Layers size={16} />
+               <span className="text-[13px] font-medium">Ciclos Hoy</span>
+             </div>
+             <p className="text-[24px] font-bold text-[var(--text-primary)]">{completedToday.length}</p>
           </div>
-          <span className="text-[12px] font-medium text-[var(--text-secondary)]">Sincronizar</span>
-        </button>
-
-        <button 
-          onClick={() => {
-            const botBtn = document.getElementById('assistant-bot-trigger');
-            if (botBtn) botBtn.click();
-          }}
-          className="flex flex-col items-center gap-[10px] group"
-        >
-          <div className="w-[56px] h-[56px] rounded-[18px] border border-[var(--border-strong)] bg-[var(--bg-surface-2)] flex items-center justify-center group-hover:bg-[var(--bg-surface-3)] group-hover:text-[var(--accent)] transition-all">
-             <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-[var(--text-secondary)] group-hover:text-[var(--accent)] transition-colors"><path d="M12 8V4H8"/><rect width="16" height="12" x="4" y="8" rx="2"/><path d="M2 14h2"/><path d="M20 14h2"/><path d="M15 13v2"/><path d="M9 13v2"/></svg>
+          <div className="bg-[var(--bg-surface-2)] rounded-[20px] p-[20px] border border-[var(--border-strong)] flex flex-col gap-[8px]">
+             <div className="flex items-center gap-[8px] text-[var(--text-tertiary)]">
+               <BarChart3 size={16} />
+               <span className="text-[13px] font-medium">Semana</span>
+             </div>
+             <p className="text-[24px] font-bold text-[var(--text-primary)] text-[var(--profit)]">+{profitWeekUsdt.toFixed(2)}</p>
           </div>
-          <span className="text-[12px] font-medium text-[var(--text-secondary)]">Soporte</span>
-        </button>
-
-        <button 
-          onClick={() => setShowChart(true)}
-          className="flex flex-col items-center gap-[10px] group"
-        >
-          <div className="w-[56px] h-[56px] rounded-[18px] border border-[var(--border-strong)] bg-[var(--bg-surface-2)] flex items-center justify-center group-hover:bg-[var(--bg-surface-3)] group-hover:border-[var(--accent)] transition-all">
-             <BarChart3 size={22} className="text-[var(--text-secondary)] group-hover:text-[var(--accent)] transition-colors" />
+          <div className="bg-[var(--bg-surface-2)] rounded-[20px] p-[20px] border border-[var(--border-strong)] flex flex-col gap-[8px]">
+             <div className="flex items-center gap-[8px] text-[var(--text-tertiary)]">
+               <AreaChart size={16} />
+               <span className="text-[13px] font-medium">Mes Actual</span>
+             </div>
+             <p className="text-[24px] font-bold text-[var(--text-primary)] text-[var(--profit)]">+{profitMonthUsdt.toFixed(2)}</p>
           </div>
-          <span className="text-[12px] font-medium text-[var(--text-secondary)]">Rendimiento</span>
-        </button>
-
-      </div>
-
-      {/* ── 3. MÉTRICAS SECUNDARIAS (Flat Dark Cards) ── */}
-      <div className="grid grid-cols-2 gap-[12px] animate-fade-in-up" style={{ animationDelay: '200ms' }}>
-        <div className="bg-[var(--bg-surface-2)] rounded-[20px] p-[20px] border border-[var(--border-strong)] flex flex-col gap-[8px]">
-           <div className="flex items-center gap-[8px] text-[var(--text-tertiary)]">
-             <Layers size={16} />
-             <span className="text-[13px] font-medium">Ciclos Hoy</span>
-           </div>
-           <p className="text-[24px] font-bold text-[var(--text-primary)]">{completedToday.length}</p>
-        </div>
-        <div className="bg-[var(--bg-surface-2)] rounded-[20px] p-[20px] border border-[var(--border-strong)] flex flex-col gap-[8px]">
-           <div className="flex items-center gap-[8px] text-[var(--text-tertiary)]">
-             <BarChart3 size={16} />
-             <span className="text-[13px] font-medium">Semana</span>
-           </div>
-           <p className="text-[24px] font-bold text-[var(--text-primary)] text-[var(--profit)]">+{profitWeekUsdt.toFixed(2)}</p>
-        </div>
-        <div className="bg-[var(--bg-surface-2)] rounded-[20px] p-[20px] border border-[var(--border-strong)] flex flex-col gap-[8px]">
-           <div className="flex items-center gap-[8px] text-[var(--text-tertiary)]">
-             <AreaChart size={16} />
-             <span className="text-[13px] font-medium">Mes Actual</span>
-           </div>
-           <p className="text-[24px] font-bold text-[var(--text-primary)] text-[var(--profit)]">+{profitMonthUsdt.toFixed(2)}</p>
-        </div>
-        <div className="bg-[var(--bg-surface-2)] rounded-[20px] p-[20px] border border-[var(--border-strong)] flex flex-col gap-[8px]">
-           <div className="flex items-center gap-[8px] text-[var(--text-tertiary)]">
-             <Clock size={16} />
-             <span className="text-[13px] font-medium">Vol. Diario</span>
-           </div>
-           <p className="text-[24px] font-bold text-[var(--text-primary)]">{usdtTotalOperated.toFixed(2)} <span className="text-[14px] text-[var(--text-secondary)] font-normal">USDT</span></p>
+          <div className="bg-[var(--bg-surface-2)] rounded-[20px] p-[20px] border border-[var(--border-strong)] flex flex-col gap-[8px]">
+             <div className="flex items-center gap-[8px] text-[var(--text-tertiary)]">
+               <Clock size={16} />
+               <span className="text-[13px] font-medium">Vol. Diario</span>
+             </div>
+             <p className="text-[24px] font-bold text-[var(--text-primary)]">{usdtTotalOperated.toFixed(2)} <span className="text-[14px] text-[var(--text-secondary)] font-normal">USDT</span></p>
+          </div>
         </div>
       </div>
 
-      {/* ── 4. CICLO ACTIVO (Banner Central) ── */}
-      <div className="animate-fade-in-up mt-[8px]" style={{ animationDelay: '300ms' }}>
-        <ActiveCyclePanel />
-      </div>
+      {/* ── COLUMNA DERECHA (Ciclo Activo & Órdenes) ── */}
+      <div className="w-full lg:w-[65%] flex flex-col gap-[24px] mt-[16px] lg:mt-[24px]">
+        {/* ── 4. CICLO ACTIVO (Banner Central) ── */}
+        <div className="animate-fade-in-up" style={{ animationDelay: '300ms' }}>
+          <ActiveCyclePanel />
+        </div>
 
-      {/* ── 5. ÓRDENES SIN ASIGNAR ── */}
-      <div className="animate-fade-in-up" style={{ animationDelay: '400ms' }}>
-        <UnassignedOrdersPool />
+        {/* ── 5. ÓRDENES SIN ASIGNAR ── */}
+        <div className="animate-fade-in-up" style={{ animationDelay: '400ms' }}>
+          <UnassignedOrdersPool />
+        </div>
       </div>
 
       {/* Modal / Caja Flotante de la Gráfica */}
