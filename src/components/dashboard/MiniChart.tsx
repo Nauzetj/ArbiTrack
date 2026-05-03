@@ -50,8 +50,8 @@ export const MiniChart: React.FC = () => {
   const containerRef = useRef<HTMLDivElement>(null);
 
   return (
-    <div ref={containerRef} className="bg-[var(--bg-surface-2)] rounded-[16px] border border-[var(--border)] p-[20px] flex flex-col h-full min-h-[220px]">
-      <h3 className="text-[13px] font-semibold text-[var(--text-secondary)] mb-[16px]">Ganancias últimos 7 días (USDT)</h3>
+    <div ref={containerRef} className="bg-[#1A1A24] rounded-[16px] border border-[rgba(255,255,255,0.04)] p-[20px] flex flex-col h-full min-h-[220px]">
+      <h3 className="text-[13px] font-semibold text-[#94A3B8] mb-[16px]">Ganancias últimos 7 días (USDT)</h3>
       <div className="flex-1 flex items-end justify-between pt-[10px] pb-[4px]">
         {chartData.map((d, i) => {
           let heightVal = (Math.abs(d.profit) / maxVal) * 100;
@@ -61,18 +61,17 @@ export const MiniChart: React.FC = () => {
           
           return (
             <div key={i} className="flex flex-col items-center gap-[8px] w-[14%] group relative h-full justify-end">
-               <div className="absolute top-[calc(100%-10px)] -translate-y-full mb-[100%] opacity-0 group-hover:opacity-100 transition-opacity bg-[var(--bg-surface-3)] border border-[var(--border-strong)] rounded-[4px] px-[6px] py-[4px] text-[10px] mono whitespace-nowrap z-10 pointer-events-none shadow-sm">
+               <div className="absolute top-[calc(100%-10px)] -translate-y-full mb-[100%] opacity-0 group-hover:opacity-100 transition-opacity bg-[#222230] text-white border border-[rgba(255,255,255,0.08)] rounded-[4px] px-[6px] py-[4px] text-[10px] mono whitespace-nowrap z-10 pointer-events-none shadow-sm">
                  {d.profit > 0 ? '+' : ''}{Number(d.profit).toFixed(2)}
                </div>
-               {/* Usamos background-color en styles para asegurar que se aplique siempre */}
                <div 
                  className="chart-bar w-[60%] rounded-t-[4px] transition-all duration-300 opacity-80 group-hover:opacity-100"
                  style={{ 
                    height: d.profit === 0 ? '5px' : `${finalHeight}%`,
-                   backgroundColor: d.profit === 0 ? 'var(--bg-surface-4)' : isProfit ? 'var(--profit)' : 'var(--loss)'
+                   backgroundColor: d.profit === 0 ? '#2D2D3F' : isProfit ? '#10B981' : '#F43F5E'
                  }}
                />
-               <span className="text-[10px] text-[var(--text-tertiary)]">{d.day}</span>
+               <span className="text-[10px] text-[#64748B]">{d.day}</span>
             </div>
           );
         })}

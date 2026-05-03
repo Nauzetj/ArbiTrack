@@ -171,12 +171,12 @@ export const Dashboard: React.FC = () => {
           onClick={() => setShowChart(false)}
         >
           <div 
-            className="w-full max-w-[600px] bg-[var(--bg-surface-1)] rounded-[24px] shadow-2xl overflow-hidden border border-[var(--border-strong)] relative"
+            className="w-full max-w-[600px] bg-[#13131A] text-white rounded-[24px] shadow-2xl overflow-hidden border border-[rgba(255,255,255,0.08)] relative"
             onClick={e => e.stopPropagation()}
             style={{ boxShadow: '0 24px 60px rgba(0,0,0,0.8)' }}
           >
             <div className="absolute top-0 left-0 right-0 h-[2px]" style={{ background: 'linear-gradient(90deg, transparent, var(--accent), transparent)' }}/>
-            <div className="flex items-center justify-between p-[24px] border-b border-[var(--border)]">
+            <div className="flex items-center justify-between p-[24px] border-b border-[rgba(255,255,255,0.08)]">
               <div className="flex items-center gap-[12px]">
                 <div className="w-[36px] h-[36px] rounded-[10px] flex items-center justify-center bg-[var(--accent-muted)] text-[var(--accent)]">
                   <BarChart3 size={18}/>
@@ -185,7 +185,7 @@ export const Dashboard: React.FC = () => {
               </div>
               <button 
                 onClick={() => setShowChart(false)}
-                className="w-[36px] h-[36px] rounded-full flex items-center justify-center hover:bg-[var(--bg-surface-3)] text-[var(--text-tertiary)] hover:text-[var(--text-primary)] transition-colors"
+                className="w-[36px] h-[36px] rounded-full flex items-center justify-center hover:bg-[#1A1A24] text-[#94A3B8] hover:text-white transition-colors"
               >
                 <X size={18}/>
               </button>
