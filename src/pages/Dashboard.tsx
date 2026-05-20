@@ -31,8 +31,8 @@ export const Dashboard: React.FC = () => {
   
   console.log('[Dashboard] todayStart UTC:', todayStart.toISOString());
   
-  // Filtrar ciclos de hoy
-  const completedToday = cycles.filter(c => c.status === 'Completado' && c.closedAt && new Date(c.closedAt) >= todayStart);
+  // Filtrar ciclos de hoy — incluir Completado, Con pérdida y Neutral (todo lo que no sea 'En curso')
+  const completedToday = cycles.filter(c => c.status && c.status.toLowerCase() !== 'en curso' && c.closedAt && new Date(c.closedAt) >= todayStart);
   console.log('[Dashboard] Ciclos completados hoy:', completedToday.length);
   console.log('[Dashboard] Detalles ciclos:', completedToday.map(c => ({
     num: c.cycleNumber,
@@ -55,7 +55,7 @@ export const Dashboard: React.FC = () => {
   monthStart.setUTCDate(1);
   monthStart.setUTCHours(4, 0, 0, 0); // 4 AM UTC = 12 AM Venezuela
   
-  const completedMonth = cycles.filter(c => c.status === 'Completado' && c.closedAt && new Date(c.closedAt) >= monthStart);
+  const completedMonth = cycles.filter(c => c.status && c.status.toLowerCase() !== 'en curso' && c.closedAt && new Date(c.closedAt) >= monthStart);
   const profitMonthUsdt = completedMonth.reduce((sum, c) => sum + c.ganancia_usdt, 0);
 
   // Semana
@@ -63,7 +63,7 @@ export const Dashboard: React.FC = () => {
   const weekStart = new Date(todayStart.getTime());
   weekStart.setUTCDate(weekStart.getUTCDate() - currentDayOfWeek);
   
-  const completedWeek = cycles.filter(c => c.status === 'Completado' && c.closedAt && new Date(c.closedAt) >= weekStart);
+  const completedWeek = cycles.filter(c => c.status && c.status.toLowerCase() !== 'en curso' && c.closedAt && new Date(c.closedAt) >= weekStart);
   const profitWeekUsdt = completedWeek.reduce((sum, c) => sum + c.ganancia_usdt, 0);
 
   return (

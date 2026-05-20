@@ -89,7 +89,8 @@ function buildResponse(input: string, ctx: StoreCtx): { text: string; action?: F
   const q = input.toLowerCase().trim();
   const { cycles, orders, activeCycle, bcvRate, currentUser } = ctx;
 
-  const completed  = cycles.filter(c => c.status === 'Completado');
+  // Todos los ciclos cerrados (Completado, Con pérdida, Neutral) — excluye solo 'En curso'
+  const completed  = cycles.filter(c => c.status && c.status.toLowerCase() !== 'en curso' && c.closedAt);
   const todayStart = new Date(); todayStart.setHours(0, 0, 0, 0);
   const monthStart = new Date(); monthStart.setDate(1); monthStart.setHours(0, 0, 0, 0);
   const weekStart  = new Date(); weekStart.setDate(weekStart.getDate() - weekStart.getDay()); weekStart.setHours(0,0,0,0);

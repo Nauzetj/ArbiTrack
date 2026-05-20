@@ -19,7 +19,11 @@ export const Reports: React.FC = () => {
   const [expandedNodes, setExpandedNodes] = useState<Record<string, boolean>>({});
   const [selectedNode, setSelectedNode] = useState<{ type: string; title: string; cycles: Cycle[] } | null>(null);
 
-  const completedCycles = cycles.filter(c => c.status === 'Completado');
+  // Incluir todos los ciclos que tengan estado cerrado (cualquiera diferente de 'En curso')
+  // e ignorar diferencias de mayúsculas/minúsculas.
+  const completedCycles = cycles.filter(c => 
+    c.status && c.status.toLowerCase() !== 'en curso' && c.closedAt
+  );
 
   // Build Tree
   const treeData = useMemo(() => {
@@ -30,17 +34,26 @@ export const Reports: React.FC = () => {
       // Skip si no tiene closedAt válido
       if (!c.closedAt || typeof c.closedAt !== 'string') return;
       
-      // Clean date string
       const rawDate = c.closedAt.trim();
-      if (!rawDate || !rawDate.includes('T')) return;
+      if (!rawDate) return;
       
       let dateStr = '';
       try {
-        // Convertir de UTC a hora de Venezuela (RESTAR 4 horas)
-        const utcDate = new Date(rawDate);
-        const venTime = new Date(utcDate.getTime() - (4 * 60 * 60 * 1000));
-        const venDateStr = venTime.toISOString().split('T')[0];
-        dateStr = venDateStr;
+        if (rawDate.length <= 10) {
+          // Si tiene formato simple de fecha sin hora (ej: YYYY-MM-DD), lo usamos directamente
+          dateStr = rawDate;
+        } else {
+          // Si tiene hora, lo convertimos a formato ISO si es necesario y restamos 4 horas (Venezuela)
+          let isoStr = rawDate;
+          if (!isoStr.includes('T') && isoStr.includes(' ')) {
+            isoStr = isoStr.replace(' ', 'T');
+          }
+          const utcDate = new Date(isoStr);
+          if (isNaN(utcDate.getTime())) return;
+          
+          const venTime = new Date(utcDate.getTime() - (4 * 60 * 60 * 1000));
+          dateStr = venTime.toISOString().split('T')[0];
+        }
         if (!dateStr || dateStr.length < 10) return;
       } catch {
         return;
@@ -158,10 +171,19 @@ export const Reports: React.FC = () => {
       
       try {
         const rawDate = c.closedAt.trim();
-        if (!rawDate || !rawDate.includes('T')) return '—';
+        if (!rawDate) return '—';
         
-        // Convertir de UTC a Venezuela (RESTAR 4 horas)
-        const utcDate = new Date(rawDate);
+        if (rawDate.length <= 10) {
+          return rawDate;
+        }
+        
+        let isoStr = rawDate;
+        if (!isoStr.includes('T') && isoStr.includes(' ')) {
+          isoStr = isoStr.replace(' ', 'T');
+        }
+        const utcDate = new Date(isoStr);
+        if (isNaN(utcDate.getTime())) return '—';
+        
         const venTime = new Date(utcDate.getTime() - (4 * 60 * 60 * 1000));
         return venTime.toISOString().split('T')[0];
       } catch {

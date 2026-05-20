@@ -29,7 +29,8 @@ export const MiniChart: React.FC = () => {
       const dayLabel = i === 0 ? 'Hoy' : daysName[localDayRef.getUTCDay()];
       
       const dayCycles = cycles.filter(c => {
-        if (c.status !== 'Completado' || !c.closedAt) return false;
+        // Incluir todos los ciclos cerrados: Completado, Con pérdida, Neutral
+        if (!c.status || c.status.toLowerCase() === 'en curso' || !c.closedAt) return false;
         const closed = new Date(c.closedAt);
         return closed >= dayStart && closed < dayEnd;
       });
