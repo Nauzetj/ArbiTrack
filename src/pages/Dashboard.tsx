@@ -66,16 +66,26 @@ export const Dashboard: React.FC = () => {
   const profitTodayVes = completedToday.reduce((sum, c) => sum + (c.ganancia_usdt * (c.tasa_compra_prom || 1)), 0);
   console.log('[Dashboard] profitTodayUsdt:', profitTodayUsdt, 'profitTodayVes:', profitTodayVes);
 
-  const ordersToday = orders.filter(o => new Date(o.createTime_utc) >= todayStart && o.orderStatus === 'COMPLETED');
+  const todayCycleIds = cycles.filter(c => c.openedAt && new Date(c.openedAt) >= todayStart).map(c => c.id);
+
+  const ordersToday = orders.filter(o => {
+    if (o.orderStatus !== 'COMPLETED') return false;
+    // Si la orden pertenece a un ciclo, contarla solo si el ciclo pertenece a 'Hoy'
+    if (o.cycleId) {
+      return todayCycleIds.includes(o.cycleId);
+    }
+    // Si no tiene ciclo asignado, contarla si se creó hoy
+    return new Date(o.createTime_utc) >= todayStart;
+  });
+
   // ✅ USDT neto real = amount - commission (lo que realmente se entregó/recibió)
   const usdtTotalOperated = ordersToday.filter(o => o.tradeType === 'SELL').reduce((sum, o) => sum + Math.max(o.amount - (o.commission ?? 0), 0), 0);
 
-
-
-  // Semana
-  const currentDayOfWeek = todayStart.getUTCDay(); // 0 es Domingo
+  // Semana (Lunes a Domingo)
+  let currentDayOfWeek = todayStart.getUTCDay(); // 0 es Domingo, 1 es Lunes
+  if (currentDayOfWeek === 0) currentDayOfWeek = 7; 
   const weekStart = new Date(todayStart.getTime());
-  weekStart.setUTCDate(weekStart.getUTCDate() - currentDayOfWeek);
+  weekStart.setUTCDate(weekStart.getUTCDate() - (currentDayOfWeek - 1));
   
   const completedWeek = cycles.filter(c => c.status && c.status.toLowerCase() !== 'en curso' && c.openedAt && new Date(c.openedAt) >= weekStart);
   const profitWeekUsdt = completedWeek.reduce((sum, c) => sum + c.ganancia_usdt, 0);
