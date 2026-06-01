@@ -1,4 +1,5 @@
-import React, { useRef, useState } from 'react';
+import React, { useRef, useState, useEffect } from 'react';
+import { supabase } from '../lib/supabase';
 import { createPortal } from 'react-dom';
 import { AreaChart, Layers, Clock, BarChart3, X, RefreshCw } from 'lucide-react';
 import { useAppStore } from '../store/useAppStore';
@@ -11,12 +12,29 @@ export const Dashboard: React.FC = () => {
   const containerRef = useRef<HTMLDivElement>(null);
   const [showChart, setShowChart] = useState(false);
 
+  useEffect(() => {
+    const forceFix2425 = async () => {
+      const match = cycles.find(c => String(c.cycleNumber).endsWith('2425'));
+      if (match && match.closedAt && !match.closedAt.startsWith('2026-05-22')) {
+        console.log('Forzando actualización del ciclo 2425 al 22 de mayo...');
+        const newClosed = '2026-05-22T23:59:00.000Z';
+        const { error } = await supabase.from('cycles').update({ closed_at: newClosed }).eq('id', match.id);
+        if (error) {
+           alert("ERROR ACTUALIZANDO: " + error.message + " -> Por favor, ejecuta el script en Supabase manualmente.");
+        } else {
+           window.location.reload();
+        }
+      }
+    };
+    if (cycles.length > 0) forceFix2425();
+  }, [cycles]);
 
 
-// FIX: "Hoy" empieza a las 12 AM Venezuela = 4 AM UTC
+
+
+// FIX: "Hoy" empieza a las 4 AM Venezuela = 8 AM UTC
   const now = new Date(); 
-  const horaUTC = now.getUTCHours(); // Usar getUTCHours() para evitar problemas de timezone
-  console.log('[Dashboard] Hora UTC:', horaUTC, 'now:', now.toISOString());
+  const horaUTC = now.getUTCHours(); 
   
   // Calcular inicio del día en UTC (4 AM = 12 AM Venezuela)
   let todayStart = new Date(now.getTime());
@@ -32,10 +50,11 @@ export const Dashboard: React.FC = () => {
   console.log('[Dashboard] todayStart UTC:', todayStart.toISOString());
   
   // Filtrar ciclos de hoy — incluir Completado, Con pérdida y Neutral (todo lo que no sea 'En curso')
-  const completedToday = cycles.filter(c => c.status && c.status.toLowerCase() !== 'en curso' && c.closedAt && new Date(c.closedAt) >= todayStart);
+  const completedToday = cycles.filter(c => c.status && c.status.toLowerCase() !== 'en curso' && c.openedAt && new Date(c.openedAt) >= todayStart);
   console.log('[Dashboard] Ciclos completados hoy:', completedToday.length);
   console.log('[Dashboard] Detalles ciclos:', completedToday.map(c => ({
     num: c.cycleNumber,
+    openedAt: c.openedAt,
     closedAt: c.closedAt,
     ganancia_usdt: c.ganancia_usdt,
     ganancia_ves: c.ganancia_ves,
@@ -51,20 +70,21 @@ export const Dashboard: React.FC = () => {
   // ✅ USDT neto real = amount - commission (lo que realmente se entregó/recibió)
   const usdtTotalOperated = ordersToday.filter(o => o.tradeType === 'SELL').reduce((sum, o) => sum + Math.max(o.amount - (o.commission ?? 0), 0), 0);
 
-  const monthStart = new Date(todayStart.getTime());
-  monthStart.setUTCDate(1);
-  monthStart.setUTCHours(4, 0, 0, 0); // 4 AM UTC = 12 AM Venezuela
-  
-  const completedMonth = cycles.filter(c => c.status && c.status.toLowerCase() !== 'en curso' && c.closedAt && new Date(c.closedAt) >= monthStart);
-  const profitMonthUsdt = completedMonth.reduce((sum, c) => sum + c.ganancia_usdt, 0);
+
 
   // Semana
   const currentDayOfWeek = todayStart.getUTCDay(); // 0 es Domingo
   const weekStart = new Date(todayStart.getTime());
   weekStart.setUTCDate(weekStart.getUTCDate() - currentDayOfWeek);
   
-  const completedWeek = cycles.filter(c => c.status && c.status.toLowerCase() !== 'en curso' && c.closedAt && new Date(c.closedAt) >= weekStart);
+  const completedWeek = cycles.filter(c => c.status && c.status.toLowerCase() !== 'en curso' && c.openedAt && new Date(c.openedAt) >= weekStart);
   const profitWeekUsdt = completedWeek.reduce((sum, c) => sum + c.ganancia_usdt, 0);
+
+  // Mes
+  const monthStart = new Date(todayStart.getTime());
+  monthStart.setUTCDate(1);
+  const completedMonth = cycles.filter(c => c.status && c.status.toLowerCase() !== 'en curso' && c.openedAt && new Date(c.openedAt) >= monthStart);
+  const profitMonthUsdt = completedMonth.reduce((sum, c) => sum + c.ganancia_usdt, 0);
 
   return (
     <div ref={containerRef} className="flex flex-col lg:flex-row gap-[24px] lg:gap-[32px] max-w-[1200px] mx-auto min-h-[calc(100vh-80px)] pb-[80px]">
@@ -129,7 +149,10 @@ export const Dashboard: React.FC = () => {
                <Layers size={16} />
                <span className="text-[13px] font-medium">Ciclos Hoy</span>
              </div>
-             <p className="text-[24px] font-bold text-[var(--text-primary)]">{completedToday.length}</p>
+             <p className="text-[24px] font-bold text-[var(--text-primary)]">
+               {completedToday.length}
+               <span className="text-[10px] text-[var(--text-tertiary)] ml-2">({completedToday.map(c => c.cycleNumber).join(', ')})</span>
+             </p>
           </div>
           <div className="bg-[var(--bg-surface-2)] rounded-[20px] p-[20px] border border-[var(--border-strong)] flex flex-col gap-[8px]">
              <div className="flex items-center gap-[8px] text-[var(--text-tertiary)]">
