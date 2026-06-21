@@ -120,11 +120,11 @@ export default function App() {
 
   const gananciaWeek = (() => {
     const d = today()
-    const dayOfWeek = d.getDay() === 0 ? 6 : d.getDay() - 1
-    const monday = new Date(d)
-    monday.setDate(d.getDate() - dayOfWeek)
-    monday.setHours(0, 0, 0, 0)
-    return sum(cycles.filter(c => cycleDate(c) >= monday))
+    const dayOfWeek = d.getDay() // 0=Domingo, 1=Lunes, ..., 6=Sábado
+    const sunday = new Date(d)
+    sunday.setDate(d.getDate() - dayOfWeek)
+    sunday.setHours(0, 0, 0, 0)
+    return sum(cycles.filter(c => cycleDate(c) >= sunday))
   })()
 
   const gananciaMes = (() => {
@@ -146,11 +146,11 @@ export default function App() {
     if (activeTab === 'ayer')  return yesterdayCycles
     if (activeTab === 'semana') {
       const d = today()
-      const dayOfWeek = d.getDay() === 0 ? 6 : d.getDay() - 1
-      const monday = new Date(d)
-      monday.setDate(d.getDate() - dayOfWeek)
-      monday.setHours(0, 0, 0, 0)
-      return cycles.filter(c => cycleDate(c) >= monday)
+      const dayOfWeek = d.getDay() // 0=Domingo, 1=Lunes, ..., 6=Sábado
+      const sunday = new Date(d)
+      sunday.setDate(d.getDate() - dayOfWeek)
+      sunday.setHours(0, 0, 0, 0)
+      return cycles.filter(c => cycleDate(c) >= sunday)
     }
     return [...cycles].sort((a, b) => new Date(b.dateStart) - new Date(a.dateStart))
   })()
