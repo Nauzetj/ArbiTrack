@@ -653,6 +653,8 @@
 .ctx-item.danger:hover { background: var(--red-bg); }
 .ctx-item.highlight { color: var(--yellow); }
 .ctx-item.highlight:hover { background: var(--yellow-bg); }
+.ctx-item.success { color: var(--green); }
+.ctx-item.success:hover { background: var(--green-bg); }
 .ctx-divider {
   height: 1px;
   background: var(--border);

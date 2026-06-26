@@ -209,6 +209,16 @@ export default function App() {
     setCtxMenu(null)
   }
 
+  const handleChangeStatus = async (id, newStatus) => {
+    const { error } = await supabase
+      .from('cycles')
+      .update({ status: newStatus })
+      .eq('id', id)
+    if (error) { console.error(error); return }
+    setCycles(prev => prev.map(c => c.id === id ? { ...c, status: newStatus } : c))
+    setCtxMenu(null)
+  }
+
   const openEdit = (cycle) => {
     setEditCycle(cycle)
     setShowModal(true)
@@ -473,6 +483,22 @@ export default function App() {
           <div className="ctx-item" onClick={() => openEdit(ctxMenu.cycle)}>
             ✏️ Editar ciclo
           </div>
+          {ctxMenu.cycle.status !== 'COMPLETADO' && (
+            <div
+              className="ctx-item success"
+              onClick={() => handleChangeStatus(ctxMenu.cycle.id, 'COMPLETADO')}
+            >
+              ✅ Marcar como COMPLETADO
+            </div>
+          )}
+          {ctxMenu.cycle.status !== 'ACTIVO' && (
+            <div
+              className="ctx-item"
+              onClick={() => handleChangeStatus(ctxMenu.cycle.id, 'ACTIVO')}
+            >
+              🔄 Marcar como ACTIVO
+            </div>
+          )}
           {!isSameDay(cycleDate(ctxMenu.cycle), yesterday()) && (
             <div
               className="ctx-item highlight"
