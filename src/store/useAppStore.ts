@@ -94,10 +94,12 @@ export const useAppStore = create<AppState>()(
         });
 
         // Enviar la petición de red a Supabase para deslogear el servidor SIN BLOQUEAR la UI
-        supabase.auth.signOut({ scope: 'local' }).catch(console.error);
-
-        // ¡Sustituye la ruta AL INSTANTE!
-        window.location.replace('/login');
+        supabase.auth.signOut({ scope: 'local' })
+          .catch(console.error)
+          .finally(() => {
+            // ¡Sustituye la ruta garantizando que el fetch no fue abortado!
+            window.location.replace('/login');
+          });
       },
 
       setOrders: (orders) => set({ orders }),

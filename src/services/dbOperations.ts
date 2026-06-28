@@ -165,12 +165,18 @@ export const validatePromoCode = async (codeStr: string): Promise<{ valid: boole
 
 export const redeemPromoCode = async (codeStr: string, userId: string): Promise<void> => {
   const now = new Date().toISOString();
-  const { error } = await supabase
+  const { data, error } = await supabase
     .from('promo_codes')
     .update({ used_at: now, used_by: userId })
     .eq('code', codeStr.trim().toUpperCase())
-    .is('used_at', null);  // CORRECCIÓN: solo redimir si aún no fue usado (evita race condition)
+    .is('used_at', null)
+    .select(); // CORRECCIÓN: Pedimos la fila actualizada
+    
   if (error) throw error;
+  
+  if (!data || data.length === 0) {
+    throw new Error('El código promocional no es válido o ya fue utilizado.');
+  }
 };
 
 export const deletePromoCode = async (codeId: string): Promise<void> => {

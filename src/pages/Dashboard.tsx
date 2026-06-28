@@ -75,11 +75,7 @@ export const Dashboard: React.FC = () => {
 
   const ordersToday = orders.filter(o => {
     if (o.orderStatus !== 'COMPLETED') return false;
-    // Si la orden pertenece a un ciclo, contarla solo si el ciclo pertenece a 'Hoy'
-    if (o.cycleId) {
-      return todayCycleIds.includes(o.cycleId);
-    }
-    // Si no tiene ciclo asignado, contarla si se creó hoy
+    // El volumen diario debe basarse exclusivamente en cuándo se ejecutó la orden
     return new Date(o.createTime_utc) >= todayStart;
   });
 
