@@ -36,21 +36,23 @@ export const Dashboard: React.FC = () => {
   const now = new Date(); 
   const horaUTC = now.getUTCHours(); 
   
-  // Calcular inicio del día en UTC (4 AM = 12 AM Venezuela)
+  // Calcular inicio del día en UTC (8 AM UTC = 4 AM Venezuela)
   let todayStart = new Date(now.getTime());
   
-  // Si son las 00-03 UTC (8 PM - 11:59 PM Venezuela del día anterior)
-  if (horaUTC < 4) {
+  // Si son las 00-07 UTC (es decir, antes de las 4 AM Venezuela)
+  // pertenece al "día" (turno) anterior.
+  if (horaUTC < 8) {
     todayStart.setUTCDate(todayStart.getUTCDate() - 1);
-    todayStart.setUTCHours(4, 0, 0, 0);
+    todayStart.setUTCHours(8, 0, 0, 0);
   } else {
-    todayStart.setUTCHours(4, 0, 0, 0);
+    todayStart.setUTCHours(8, 0, 0, 0);
   }
   
   console.log('[Dashboard] todayStart UTC:', todayStart.toISOString());
   
   // Filtrar ciclos de hoy — incluir Completado, Con pérdida y Neutral (todo lo que no sea 'En curso')
-  const completedToday = cycles.filter(c => c.status && c.status.toLowerCase() !== 'en curso' && c.openedAt && new Date(c.openedAt) >= todayStart);
+  // Usamos closedAt porque la ganancia se consolida al cerrar el ciclo.
+  const completedToday = cycles.filter(c => c.status && c.status.toLowerCase() !== 'en curso' && c.closedAt && new Date(c.closedAt) >= todayStart);
   console.log('[Dashboard] Ciclos completados hoy:', completedToday.length);
   console.log('[Dashboard] Detalles ciclos:', completedToday.map(c => ({
     num: c.cycleNumber,
@@ -66,7 +68,10 @@ export const Dashboard: React.FC = () => {
   const profitTodayVes = completedToday.reduce((sum, c) => sum + (c.ganancia_usdt * (c.tasa_compra_prom || 1)), 0);
   console.log('[Dashboard] profitTodayUsdt:', profitTodayUsdt, 'profitTodayVes:', profitTodayVes);
 
-  const todayCycleIds = cycles.filter(c => c.openedAt && new Date(c.openedAt) >= todayStart).map(c => c.id);
+  const todayCycleIds = cycles.filter(c => 
+    (c.closedAt && new Date(c.closedAt) >= todayStart) || 
+    (!c.closedAt && c.openedAt && new Date(c.openedAt) >= todayStart)
+  ).map(c => c.id);
 
   const ordersToday = orders.filter(o => {
     if (o.orderStatus !== 'COMPLETED') return false;
@@ -87,13 +92,13 @@ export const Dashboard: React.FC = () => {
   const weekStart = new Date(todayStart.getTime());
   weekStart.setUTCDate(weekStart.getUTCDate() - (currentDayOfWeek - 1));
   
-  const completedWeek = cycles.filter(c => c.status && c.status.toLowerCase() !== 'en curso' && c.openedAt && new Date(c.openedAt) >= weekStart);
+  const completedWeek = cycles.filter(c => c.status && c.status.toLowerCase() !== 'en curso' && c.closedAt && new Date(c.closedAt) >= weekStart);
   const profitWeekUsdt = completedWeek.reduce((sum, c) => sum + c.ganancia_usdt, 0);
 
   // Mes
   const monthStart = new Date(todayStart.getTime());
   monthStart.setUTCDate(1);
-  const completedMonth = cycles.filter(c => c.status && c.status.toLowerCase() !== 'en curso' && c.openedAt && new Date(c.openedAt) >= monthStart);
+  const completedMonth = cycles.filter(c => c.status && c.status.toLowerCase() !== 'en curso' && c.closedAt && new Date(c.closedAt) >= monthStart);
   const profitMonthUsdt = completedMonth.reduce((sum, c) => sum + c.ganancia_usdt, 0);
 
   return (
