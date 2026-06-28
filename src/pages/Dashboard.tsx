@@ -68,10 +68,7 @@ export const Dashboard: React.FC = () => {
   const profitTodayVes = completedToday.reduce((sum, c) => sum + (c.ganancia_usdt * (c.tasa_compra_prom || 1)), 0);
   console.log('[Dashboard] profitTodayUsdt:', profitTodayUsdt, 'profitTodayVes:', profitTodayVes);
 
-  const todayCycleIds = cycles.filter(c => 
-    (c.closedAt && new Date(c.closedAt) >= todayStart) || 
-    (!c.closedAt && c.openedAt && new Date(c.openedAt) >= todayStart)
-  ).map(c => c.id);
+
 
   const ordersToday = orders.filter(o => {
     if (o.orderStatus !== 'COMPLETED') return false;

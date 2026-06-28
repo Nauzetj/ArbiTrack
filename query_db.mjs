@@ -17,22 +17,12 @@ const supabase = createClient(envVars.VITE_SUPABASE_URL, envVars.VITE_SUPABASE_A
 });
 
 async function main() {
-  const orderNumbers = ['22884093956911820800', '22884095394053517312'];
   const { data: orders, error: ordErr } = await supabase
     .from('orders')
-    .select('id, order_number, cycle_id, order_status, operation_type, amount')
-    .in('order_number', orderNumbers);
+    .select('id, order_number, cycle_id, order_status, operation_type, amount, trade_type, user_id')
+    .or('amount.eq.700.06,amount.eq.287.02,order_number.ilike.%11584%');
   
   if (ordErr) console.error("Orders Error:", ordErr);
   else console.log("Orders found:", orders);
-
-  const { data: allCycles, error: cycErr } = await supabase
-    .from('cycles')
-    .select('id, cycle_number, status, opened_at')
-    .order('opened_at', { ascending: false })
-    .limit(5);
-
-  if (cycErr) console.error("Cycles Error:", cycErr);
-  else console.log("All cycles:", allCycles);
 }
 main();

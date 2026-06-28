@@ -12,11 +12,10 @@ async function queryMgmt(sql) {
 }
 
 const SQL = `
-SELECT id, cycle_number, opened_at, closed_at, status 
+SELECT id, cycle_number, status, opened_at, closed_at 
 FROM cycles 
-WHERE cycle_number::text LIKE '%0316%' OR id::text LIKE '%0316%'
-ORDER BY closed_at DESC NULLS LAST
-LIMIT 10;
+ORDER BY opened_at DESC 
+LIMIT 20;
 `;
 
 async function main() {
