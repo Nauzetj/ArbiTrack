@@ -1,4 +1,4 @@
-import React, { useRef, useState, useEffect } from 'react';
+import React, { useRef, useState, useEffect, useCallback } from 'react';
 import { supabase } from '../lib/supabase';
 import { createPortal } from 'react-dom';
 import { AreaChart, Layers, Clock, BarChart3, X, RefreshCw } from 'lucide-react';
@@ -6,12 +6,30 @@ import { useAppStore } from '../store/useAppStore';
 import { ActiveCyclePanel } from '../components/dashboard/ActiveCyclePanel';
 import { MiniChart } from '../components/dashboard/MiniChart';
 import { UnassignedOrdersPool } from '../components/dashboard/UnassignedOrdersPool';
+import {
+  getVenezuelaToday,
+  getVenezuelaWeekStart,
+  getVenezuelaMonthStart,
+  isNewVenezuelaDay,
+  isFirstDayOfVenezuelaMonth,
+} from '../utils/timeUtils';
+import { saveMonthSnapshot, monthSnapshotExists } from '../services/monthSnapshots';
+import { getCyclesForUser, getOrdersForUser, getActiveCycleForUser } from '../services/dbOperations';
+import toast from 'react-hot-toast';
+
+// ─── Constante: clave localStorage para saber el último día procesado ─────────
+const LS_LAST_RESET_DAY = 'arbitrack_last_reset_day';
+const LS_LAST_MONTH_SNAP = 'arbitrack_last_month_snap';
 
 export const Dashboard: React.FC = () => {
-  const { orders, cycles } = useAppStore();
+  const { orders, cycles, currentUser, setCycles, setOrders, setActiveCycle } = useAppStore();
   const containerRef = useRef<HTMLDivElement>(null);
   const [showChart, setShowChart] = useState(false);
 
+  // ─── Estado reactivo del "ahora" — se actualiza cada minuto ────────────────
+  const [now, setNow] = useState(() => new Date());
+
+  // ─── Fix puntual del ciclo 2425 ────────────────────────────────────────────
   useEffect(() => {
     const forceFix2425 = async () => {
       const match = cycles.find(c => String(c.cycleNumber).endsWith('2425'));
@@ -29,68 +47,164 @@ export const Dashboard: React.FC = () => {
     if (cycles.length > 0) forceFix2425();
   }, [cycles]);
 
+  // ─── Función para refrescar los datos desde Supabase ──────────────────────
+  const refreshData = useCallback(async () => {
+    if (!currentUser) return;
+    try {
+      const [fc, fo, fa] = await Promise.all([
+        getCyclesForUser(currentUser.id),
+        getOrdersForUser(currentUser.id),
+        getActiveCycleForUser(currentUser.id),
+      ]);
+      setCycles(fc);
+      setOrders(fo);
+      setActiveCycle(fa);
+    } catch (e) {
+      console.error('[Dashboard] Error al refrescar datos:', e);
+    }
+  }, [currentUser, setCycles, setOrders, setActiveCycle]);
 
+  // ─── Lógica de cierre de mes ───────────────────────────────────────────────
+  const checkAndSaveMonthSnapshot = useCallback(async (currentNow: Date) => {
+    if (!currentUser || cycles.length === 0) return;
 
+    // Solo se ejecuta si es el primer día del mes
+    if (!isFirstDayOfVenezuelaMonth(currentNow)) return;
 
-// "Hoy" empieza a las 12:00 AM Venezuela = 4:00 AM UTC
-  const now = new Date(); 
-  const horaUTC = now.getUTCHours(); 
-  
-  // Calcular inicio del día en UTC (4 AM UTC = 12 AM Venezuela)
-  let todayStart = new Date(now.getTime());
-  
-  if (horaUTC < 4) {
-    todayStart.setUTCDate(todayStart.getUTCDate() - 1);
-    todayStart.setUTCHours(4, 0, 0, 0);
-  } else {
-    todayStart.setUTCHours(4, 0, 0, 0);
-  }
-  
+    const { getPrevVenezuelaYearMonth } = await import('../utils/timeUtils');
+    const prevYearMonth = getPrevVenezuelaYearMonth(currentNow);
+
+    // Evitar guardar duplicados (verificamos localStorage + DB)
+    const lsKey = `${LS_LAST_MONTH_SNAP}_${currentUser.id}`;
+    const lastSnap = localStorage.getItem(lsKey);
+    if (lastSnap === prevYearMonth) {
+      console.log(`[MonthSnapshot] Snapshot ${prevYearMonth} ya procesado localmente.`);
+      return;
+    }
+
+    // Verificar en DB si ya existe
+    const alreadyExists = await monthSnapshotExists(currentUser.id, prevYearMonth);
+    if (alreadyExists) {
+      localStorage.setItem(lsKey, prevYearMonth);
+      console.log(`[MonthSnapshot] Snapshot ${prevYearMonth} ya existe en DB.`);
+      return;
+    }
+
+    // ¡Nuevo mes! Guardar snapshot del mes anterior
+    console.log(`[MonthSnapshot] 🗓️ Primer día del mes. Guardando snapshot de ${prevYearMonth}...`);
+    toast.loading(`Guardando resumen de ${prevYearMonth}...`, { id: 'month-snap' });
+
+    const result = await saveMonthSnapshot(currentUser.id, cycles, currentNow);
+
+    if (result.saved) {
+      localStorage.setItem(lsKey, prevYearMonth);
+      toast.success(
+        `✅ Resumen de ${prevYearMonth} guardado: +${result.snapshot.profitUsdt?.toFixed(2)} USDT en ${result.snapshot.totalCycles} ciclos`,
+        { id: 'month-snap', duration: 6000 }
+      );
+    } else {
+      toast.error(`Error guardando resumen de ${prevYearMonth}`, { id: 'month-snap' });
+    }
+  }, [currentUser, cycles]);
+
+  // ─── Lógica de reset diario a las 12 AM Venezuela ─────────────────────────
+  const checkDailyReset = useCallback(async (currentNow: Date) => {
+    if (!currentUser) return;
+
+    if (!isNewVenezuelaDay(currentNow)) return;
+
+    // Evitar resetear múltiples veces el mismo día
+    const todayKey = getVenezuelaToday(currentNow).toISOString().slice(0, 10);
+    const lsKey = `${LS_LAST_RESET_DAY}_${currentUser.id}`;
+    const lastReset = localStorage.getItem(lsKey);
+
+    if (lastReset === todayKey) {
+      console.log(`[DailyReset] Reset del ${todayKey} ya procesado.`);
+      return;
+    }
+
+    // Primero verificar si hay que guardar snapshot de fin de mes
+    await checkAndSaveMonthSnapshot(currentNow);
+
+    // Marcar el reset como procesado
+    localStorage.setItem(lsKey, todayKey);
+    console.log(`[DailyReset] 🌅 Nuevo día Venezuela (${todayKey}). Refrescando datos...`);
+
+    // Refrescar datos desde Supabase para mostrar el nuevo día limpio
+    await refreshData();
+
+    toast.success('¡Nuevo día! Contadores reiniciados a las 12:00 AM 🌅', { duration: 4000 });
+  }, [currentUser, checkAndSaveMonthSnapshot, refreshData]);
+
+  // ─── Intervalo cada 30 segundos: actualizar `now` y chequear reset ─────────
+  useEffect(() => {
+    const tick = async () => {
+      const currentNow = new Date();
+      setNow(currentNow);
+      await checkDailyReset(currentNow);
+    };
+
+    // Ejecutar inmediatamente al montar
+    tick();
+
+    // Luego cada 30 segundos
+    const interval = setInterval(tick, 30_000);
+    return () => clearInterval(interval);
+  }, [checkDailyReset]);
+
+  // ─── Verificar cierre de mes al cargar (si la app estuvo cerrada) ──────────
+  useEffect(() => {
+    if (!currentUser || cycles.length === 0) return;
+
+    const currentNow = new Date();
+    // Si es el primer día del mes, verificar snapshot independientemente del horario
+    if (isFirstDayOfVenezuelaMonth(currentNow)) {
+      checkAndSaveMonthSnapshot(currentNow);
+    }
+  }, [currentUser, cycles.length, checkAndSaveMonthSnapshot]);
+
+  // ─── Cálculos del Dashboard usando `now` reactivo ─────────────────────────
+
+  const todayStart = getVenezuelaToday(now);
+  const weekStart  = getVenezuelaWeekStart(now);
+  const monthStart = getVenezuelaMonthStart(now);
+
   console.log('[Dashboard] todayStart UTC:', todayStart.toISOString());
-  
-  // Filtrar ciclos de hoy — incluir Completado, Con pérdida y Neutral (todo lo que no sea 'En curso')
-  // Usamos closedAt porque la ganancia se consolida al cerrar el ciclo.
-  const completedToday = cycles.filter(c => c.status && c.status.toLowerCase() !== 'en curso' && c.closedAt && new Date(c.closedAt) >= todayStart);
+
+  // Ciclos completados hoy (closedAt >= inicio del día Venezuela)
+  const completedToday = cycles.filter(c =>
+    c.status && c.status.toLowerCase() !== 'en curso' &&
+    c.closedAt && new Date(c.closedAt) >= todayStart
+  );
   console.log('[Dashboard] Ciclos completados hoy:', completedToday.length);
-  console.log('[Dashboard] Detalles ciclos:', completedToday.map(c => ({
-    num: c.cycleNumber,
-    openedAt: c.openedAt,
-    closedAt: c.closedAt,
-    ganancia_usdt: c.ganancia_usdt,
-    ganancia_ves: c.ganancia_ves,
-    tasa_venta: c.tasa_venta_prom,
-    tasa_compra: c.tasa_compra_prom
-  })));
-  
-  const profitTodayUsdt = completedToday.reduce((sum, c) => sum + c.ganancia_usdt, 0);
-  const profitTodayVes = completedToday.reduce((sum, c) => sum + (c.ganancia_usdt * (c.tasa_compra_prom || 1)), 0);
-  console.log('[Dashboard] profitTodayUsdt:', profitTodayUsdt, 'profitTodayVes:', profitTodayVes);
 
+  const profitTodayUsdt = completedToday.reduce((sum, c) => sum + (c.ganancia_usdt ?? 0), 0);
+  const profitTodayVes  = completedToday.reduce((sum, c) => sum + (c.ganancia_usdt * (c.tasa_compra_prom || 1)), 0);
 
-
+  // Órdenes de hoy
   const ordersToday = orders.filter(o => {
     if (o.orderStatus !== 'COMPLETED') return false;
-    // El volumen diario debe basarse exclusivamente en cuándo se ejecutó la orden
     return new Date(o.createTime_utc) >= todayStart;
   });
 
-  // ✅ USDT neto real = amount - commission (lo que realmente se entregó/recibió)
-  const usdtTotalOperated = ordersToday.filter(o => o.tradeType === 'SELL').reduce((sum, o) => sum + Math.max(o.amount - (o.commission ?? 0), 0), 0);
+  // Volumen USDT operado hoy (ventas)
+  const usdtTotalOperated = ordersToday
+    .filter(o => o.tradeType === 'SELL')
+    .reduce((sum, o) => sum + Math.max(o.amount - (o.commission ?? 0), 0), 0);
 
-  // Semana (Lunes a Domingo)
-  let currentDayOfWeek = todayStart.getUTCDay(); // 0 es Domingo, 1 es Lunes
-  if (currentDayOfWeek === 0) currentDayOfWeek = 7; 
-  const weekStart = new Date(todayStart.getTime());
-  weekStart.setUTCDate(weekStart.getUTCDate() - (currentDayOfWeek - 1));
-  
-  const completedWeek = cycles.filter(c => c.status && c.status.toLowerCase() !== 'en curso' && c.closedAt && new Date(c.closedAt) >= weekStart);
-  const profitWeekUsdt = completedWeek.reduce((sum, c) => sum + c.ganancia_usdt, 0);
+  // Semana
+  const completedWeek = cycles.filter(c =>
+    c.status && c.status.toLowerCase() !== 'en curso' &&
+    c.closedAt && new Date(c.closedAt) >= weekStart
+  );
+  const profitWeekUsdt = completedWeek.reduce((sum, c) => sum + (c.ganancia_usdt ?? 0), 0);
 
   // Mes
-  const monthStart = new Date(todayStart.getTime());
-  monthStart.setUTCDate(1);
-  const completedMonth = cycles.filter(c => c.status && c.status.toLowerCase() !== 'en curso' && c.closedAt && new Date(c.closedAt) >= monthStart);
-  const profitMonthUsdt = completedMonth.reduce((sum, c) => sum + c.ganancia_usdt, 0);
+  const completedMonth = cycles.filter(c =>
+    c.status && c.status.toLowerCase() !== 'en curso' &&
+    c.closedAt && new Date(c.closedAt) >= monthStart
+  );
+  const profitMonthUsdt = completedMonth.reduce((sum, c) => sum + (c.ganancia_usdt ?? 0), 0);
 
   return (
     <div ref={containerRef} className="flex flex-col lg:flex-row gap-[24px] lg:gap-[32px] max-w-[1200px] mx-auto min-h-[calc(100vh-80px)] pb-[80px]">
