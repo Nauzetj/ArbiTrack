@@ -32,20 +32,18 @@ export const Dashboard: React.FC = () => {
 
 
 
-// FIX: "Hoy" empieza a las 4 AM Venezuela = 8 AM UTC
+// "Hoy" empieza a las 12:00 AM Venezuela = 4:00 AM UTC
   const now = new Date(); 
   const horaUTC = now.getUTCHours(); 
   
-  // Calcular inicio del día en UTC (8 AM UTC = 4 AM Venezuela)
+  // Calcular inicio del día en UTC (4 AM UTC = 12 AM Venezuela)
   let todayStart = new Date(now.getTime());
   
-  // Si son las 00-07 UTC (es decir, antes de las 4 AM Venezuela)
-  // pertenece al "día" (turno) anterior.
-  if (horaUTC < 8) {
+  if (horaUTC < 4) {
     todayStart.setUTCDate(todayStart.getUTCDate() - 1);
-    todayStart.setUTCHours(8, 0, 0, 0);
+    todayStart.setUTCHours(4, 0, 0, 0);
   } else {
-    todayStart.setUTCHours(8, 0, 0, 0);
+    todayStart.setUTCHours(4, 0, 0, 0);
   }
   
   console.log('[Dashboard] todayStart UTC:', todayStart.toISOString());
