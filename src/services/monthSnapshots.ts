@@ -113,7 +113,12 @@ export async function saveMonthSnapshot(
     if (error.code === '42P01') {
       console.warn('[MonthSnapshot] La tabla month_snapshots no existe. Ejecuta create_month_snapshots.sql en Supabase.');
     }
-    return { saved: false, yearMonth, snapshot: payload };
+    // Retornar con las claves camelCase para respetar Partial<MonthSnapshot>
+    return {
+      saved: false,
+      yearMonth,
+      snapshot: { yearMonth, totalCycles, profitUsdt, profitVes, volumeUsdt } as Partial<MonthSnapshot>,
+    };
   }
 
   console.log(`[MonthSnapshot] ✅ Snapshot ${yearMonth} guardado exitosamente.`);
@@ -126,7 +131,7 @@ export async function saveMonthSnapshot(
       profitUsdt,
       profitVes,
       volumeUsdt,
-    }
+    } as Partial<MonthSnapshot>,
   };
 }
 
