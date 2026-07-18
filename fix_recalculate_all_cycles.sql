@@ -32,7 +32,7 @@ BEGIN
   SELECT
     COALESCE(SUM(CASE WHEN operation_type = 'VENTA_USDT' THEN amount ELSE 0 END), 0),
     COALESCE(SUM(CASE WHEN operation_type IN ('COMPRA_USDT','RECOMPRA','SOBRANTE') THEN amount ELSE 0 END), 0),
-    COALESCE(SUM(CASE WHEN operation_type IN ('VENTA_USDT','RECOMPRA') THEN total_price ELSE 0 END), 0),
+    COALESCE(SUM(CASE WHEN operation_type = 'VENTA_USDT' THEN total_price ELSE 0 END), 0),
     COALESCE(SUM(CASE WHEN operation_type IN ('COMPRA_USDT','COMPRA_USD','RECOMPRA','SOBRANTE') THEN total_price ELSE 0 END), 0),
     COALESCE(SUM(COALESCE(commission, 0)), 0)
   INTO v_usdt_vendido, v_usdt_recomprado, v_ves_recibido, v_ves_pagado, v_comision_total

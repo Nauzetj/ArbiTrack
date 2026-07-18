@@ -39,7 +39,7 @@ BEGIN
     COALESCE(SUM(CASE WHEN operation_type IN ('COMPRA_USDT', 'RECOMPRA', 'SOBRANTE')
                       THEN amount ELSE 0 END), 0),
 
-    COALESCE(SUM(CASE WHEN operation_type IN ('VENTA_USDT', 'RECOMPRA')
+    COALESCE(SUM(CASE WHEN operation_type = 'VENTA_USDT'
                       THEN total_price ELSE 0 END), 0),
 
     COALESCE(SUM(CASE WHEN operation_type IN ('COMPRA_USDT', 'COMPRA_USD', 'RECOMPRA', 'SOBRANTE')

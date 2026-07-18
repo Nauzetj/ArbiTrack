@@ -864,7 +864,7 @@ const MetricsBar: React.FC<{ activeCycle?: Cycle; orders: Order[] }> = ({ orders
     switch (opType) {
       case 'VENTA_USDT':  usdt_vendido    += o.amount;     ves_recibido += o.totalPrice; break;
       case 'COMPRA_USDT': usdt_recomprado += o.amount;     ves_pagado   += o.totalPrice; break;
-      case 'RECOMPRA':    usdt_recomprado += o.amount;     ves_pagado   += o.totalPrice; ves_recibido += o.totalPrice; break;
+      case 'RECOMPRA':    usdt_recomprado += o.amount;     ves_pagado   += o.totalPrice; break;
       case 'COMPRA_USD':  ves_pagado      += o.totalPrice; break;
       case 'SOBRANTE':    usdt_recomprado += o.amount;     ves_pagado   += o.totalPrice; break;
     }
