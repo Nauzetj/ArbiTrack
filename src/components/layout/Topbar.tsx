@@ -61,8 +61,8 @@ export const Topbar: React.FC = () => {
       
       // Obtener órdenes de Binance EN PARALELO (más rápido)
       // Optimización Extrema: Auto-sync (cada 10s) SÓLO necesita 1 página (las más recientes).
-      // Solo buscamos profundo (3 páginas) si el usuario hace clic manualmente.
-      const maxPages = (activeCycle && isManual) ? 3 : 1;
+      // Solo buscamos profundo (hasta 10 páginas) si el usuario hace clic manualmente.
+      const maxPages = isManual ? 10 : 2;
       const requests = [];
       
       for (let page = 1; page <= maxPages; page++) {
@@ -88,16 +88,8 @@ export const Topbar: React.FC = () => {
       });
       let uniqueBinanceOrders = Array.from(uniqueOrdersMap.values());
       
-      // Filtrar órdenes anteriores a la apertura del ciclo (con margen de 60min)
-      // para capturar órdenes que se registraron justo antes de abrir formalmente el ciclo.
-      const filterStartMs = cycleOpenedAtVal ? cycleOpenedAtVal - (60 * 60 * 1000) : null;
-      if (filterStartMs) {
-        uniqueBinanceOrders = uniqueBinanceOrders.filter(o => {
-          const orderTime = new Date(o.createTime).getTime();
-          return orderTime >= filterStartMs;
-        });
-        console.log('[SYNC] Órdenes desde 60min antes de apertura:', uniqueBinanceOrders.length);
-      }
+      // Se eliminó filterStartMs para permitir que órdenes antiguas se actualicen 
+      // a COMPLETED en la base de datos sin ser descartadas prematuramente.
       
       // Debug: contar tipos de órdenes
       const sellCount = uniqueBinanceOrders.filter(o => o.tradeType === 'SELL').length;
@@ -156,9 +148,11 @@ export const Topbar: React.FC = () => {
               }
 
               // FIX: Auto-assign if it was saved without cycle but belongs to the active cycle's timeframe
+              // Margen amplio (15 días) porque las órdenes en Binance pueden dejarse abiertas varios días.
               if (!existingOrder.cycleId && activeCycle && cycleOpenedAtVal) {
                 const orderTime = new Date(o.createTime).getTime();
-                if (orderTime >= cycleOpenedAtVal - (60 * 60 * 1000)) {
+                const margin15Days = 15 * 24 * 60 * 60 * 1000;
+                if (orderTime >= cycleOpenedAtVal - margin15Days) {
                   updatedOrder.cycleId = activeCycle.id;
                   isUpdated = true;
                 }
@@ -176,7 +170,11 @@ export const Topbar: React.FC = () => {
 
             let autoAssignedCycleId: string | null = null;
             if (activeCycle && cycleOpenedAtVal) {
-              autoAssignedCycleId = activeCycle.id;
+              const orderTime = new Date(o.createTime).getTime();
+              const margin15Days = 15 * 24 * 60 * 60 * 1000;
+              if (orderTime >= cycleOpenedAtVal - margin15Days) {
+                autoAssignedCycleId = activeCycle.id;
+              }
             }
 
             const importedOrder: Order = {
