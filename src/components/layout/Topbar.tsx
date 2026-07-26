@@ -158,6 +158,12 @@ export const Topbar: React.FC = () => {
                 }
               }
 
+              // FIX: Ensure operationType is set for older orders that might have it as null
+              if (!existingOrder.operationType) {
+                updatedOrder.operationType = o.tradeType === 'SELL' ? 'VENTA_USDT' : 'COMPRA_USDT';
+                isUpdated = true;
+              }
+
               if (isUpdated) {
                 ordersToUpsert.push(updatedOrder);
                 addedCount++;
@@ -194,7 +200,8 @@ export const Topbar: React.FC = () => {
               createTime_local: new Date(o.createTime).toLocaleString(),
               cycleId: autoAssignedCycleId,
               importedAt: new Date().toISOString(),
-              userId: user.id
+              userId: user.id,
+              operationType: o.tradeType === 'SELL' ? 'VENTA_USDT' : 'COMPRA_USDT'
             };
             ordersToUpsert.push(importedOrder);
             addedCount++;
