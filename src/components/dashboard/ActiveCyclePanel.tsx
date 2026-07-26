@@ -719,6 +719,20 @@ const CycleSummary: React.FC<{
           })}
         </div>
       </div>
+
+      {/* DEBUG PANEL */}
+      <div className="mt-8 p-4 bg-gray-900 border border-red-500 rounded-lg text-xs font-mono text-gray-300">
+        <h4 className="text-red-400 font-bold mb-2">DEBUG INFO (Por favor, envíame captura de esto):</h4>
+        <p>Total órdenes globales en DB: {orders.length}</p>
+        <p>Órdenes en este ciclo (# {cycle.id.slice(0, 8)}...): {orders.filter(o => o.cycleId === cycle.id).length}</p>
+        <ul className="mt-2 flex flex-col gap-1">
+          {orders.slice(0, 5).map(o => (
+            <li key={o.id} className="border-b border-gray-700 pb-1">
+              Order: {o.orderNumber} | Status: {o.orderStatus} | CycleId: {o.cycleId?.slice(0, 8)}... | OpType: {o.operationType} | Date: {new Date(o.createTime_utc).toLocaleString()}
+            </li>
+          ))}
+        </ul>
+      </div>
     </div>
   );
 };
