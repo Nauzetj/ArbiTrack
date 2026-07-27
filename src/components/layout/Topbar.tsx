@@ -214,6 +214,22 @@ export const Topbar: React.FC = () => {
         if (ordersToUpsert.length > 0) {
           try {
             await saveOrdersBulk(ordersToUpsert);
+            
+            if (activeCycle) {
+              // Obtener todos los cycleIds únicos que fueron afectados por esta actualización
+              const affectedCycleIds = new Set<string>();
+              affectedCycleIds.add(activeCycle.id); // Siempre recalculamos el activo por si acaso
+              
+              ordersToUpsert.forEach(o => {
+                if (o.cycleId) affectedCycleIds.add(o.cycleId);
+              });
+
+              // Recalcular todos los ciclos afectados
+              const recalculatePromises = Array.from(affectedCycleIds).map(cId => 
+                recalculateCycleMetrics(cId, user.id)
+              );
+              await Promise.all(recalculatePromises);
+            }
           } catch (bulkErr: any) {
             console.error('Error en saveOrdersBulk:', bulkErr);
             throw new Error(`Error guardando en BD: ${bulkErr.message}`);
@@ -222,7 +238,6 @@ export const Topbar: React.FC = () => {
 
         if (addedCount > 0) {
           if (activeCycle) {
-            await recalculateCycleMetrics(activeCycle.id, user.id);
             console.log('[SYNC] Recálculo completado, actualizando UI...');
             
             // Obtener datos frescos sin vaciar el estado para evitar parpadeos/congelamientos
