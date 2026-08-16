@@ -2,7 +2,6 @@
   "regions": ["gru1"],
   "functions": {
     "api/binance.ts": {
-      "runtime": "nodejs22.x",
       "maxDuration": 30
     }
   },
