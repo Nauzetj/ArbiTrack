@@ -2,18 +2,24 @@ import type { VercelRequest, VercelResponse } from '@vercel/node';
 import crypto from 'crypto';
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
-  // Only allow POST  
+  // ─── CORS Headers ────────────────────────────────────────────────────────────
+  res.setHeader('Access-Control-Allow-Origin', '*');
+  res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
+
+  // Handle CORS preflight (browsers send OPTIONS before POST)
+  if (req.method === 'OPTIONS') {
+    return res.status(204).end();
+  }
+
+  // Only allow POST
   if (req.method !== 'POST') {
     return res.status(405).json({ error: 'Method not allowed' });
   }
 
-  res.setHeader('Access-Control-Allow-Origin', '*');
-  res.setHeader('Access-Control-Allow-Methods', 'POST');
-  res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
-
   try {
     let { apiKey, secretKey, page = 1, tradeType = '' } = req.body;
-    
+
     // Sanitize keys - remove any whitespace that may cause signature errors
     if (typeof apiKey === 'string') apiKey = apiKey.trim();
     if (typeof secretKey === 'string') secretKey = secretKey.trim();
@@ -52,13 +58,23 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
     const fetchUrl = `https://api.binance.com/sapi/v1/c2c/orderMatch/listUserOrderHistory?${queryString}&signature=${signature}`;
 
-    const binanceRes = await fetch(fetchUrl, {
-      method: 'GET',
-      headers: { 'X-MBX-APIKEY': apiKey },
-    });
+    // AbortController para timeout de 25s (la función tiene maxDuration=30s)
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 25_000);
+
+    let binanceRes: Response;
+    try {
+      binanceRes = await fetch(fetchUrl, {
+        method: 'GET',
+        headers: { 'X-MBX-APIKEY': apiKey },
+        signal: controller.signal,
+      });
+    } finally {
+      clearTimeout(timeoutId);
+    }
 
     const data = await binanceRes.json();
-    
+
     console.log(`[BINANCE PROXY] Status: ${binanceRes.status}`);
     console.log(`[BINANCE PROXY] Response:`, JSON.stringify(data).substring(0, 500));
     console.log(`[BINANCE PROXY] Payload length: ${data?.data?.length || 0}, Error Code: ${data?.code || 'none'}`);
@@ -67,16 +83,19 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     }
 
     if (!binanceRes.ok) {
-      return res.status(binanceRes.status).json({ 
+      return res.status(binanceRes.status).json({
         error: data?.msg || `Binance error: ${binanceRes.status}`,
         code: data?.code,
-        details: data
+        details: data,
       });
     }
 
     return res.json(data);
   } catch (error: any) {
     console.error('Proxy error:', error);
+    if (error.name === 'AbortError') {
+      return res.status(504).json({ error: 'Timeout: Binance no respondió en 25s' });
+    }
     return res.status(500).json({ error: 'Internal server error', details: error.message });
   }
 }
