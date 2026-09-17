@@ -1,8 +1,9 @@
 import React, { useState, useEffect } from 'react';
-import { Shield, Users, Tag, Plus, Trash2, Copy, Check, RefreshCw, FileImage, X, CheckCircle, XCircle } from 'lucide-react';
+import { Shield, Users, Tag, Plus, Trash2, Copy, Check, RefreshCw, FileImage, X, CheckCircle, XCircle, Lock, Unlock } from 'lucide-react';
 import {
   getAllUsers, getAllPromoCodes, createPromoCode, deletePromoCode,
-  updateUserRole, getAllPaymentRequests, updatePaymentRequestStatus
+  updateUserRole, getAllPaymentRequests, updatePaymentRequestStatus,
+  suspendUser, unsuspendUser,
 } from '../services/dbOperations';
 import type { User, PromoCode, UserRole, PaymentRequest } from '../types';
 import { generateUUID } from '../crypto/auth';
@@ -113,6 +114,18 @@ export const AdminPanel: React.FC = () => {
     await reload();
   };
 
+  const handleSuspend = async (userId: string) => {
+    if (!confirm('¿Suspender el acceso de este usuario? Verá la pantalla de "Plan Vencido" al iniciar sesión.')) return;
+    await suspendUser(userId);
+    await reload();
+  };
+
+  const handleUnsuspend = async (userId: string) => {
+    await unsuspendUser(userId);
+    await reload();
+  };
+
+
   const codeStatus = (c: PromoCode) => {
     if (c.usedAt) return { label: 'Usado', color: 'text-[var(--text-tertiary)]', bg: 'bg-[var(--bg-surface-4)]' };
     if (new Date(c.expiresAt) < new Date()) return { label: 'Expirado', color: 'text-[var(--loss)]', bg: 'bg-[var(--loss-bg)]' };
@@ -167,15 +180,19 @@ export const AdminPanel: React.FC = () => {
                 <th className="py-[12px] px-[20px] border-b border-[var(--border-strong)]">Vence</th>
                 <th className="py-[12px] px-[20px] border-b border-[var(--border-strong)]">Registrado</th>
                 <th className="py-[12px] px-[20px] border-b border-[var(--border-strong)] text-center">Cambiar Plan</th>
+                <th className="py-[12px] px-[20px] border-b border-[var(--border-strong)] text-center">Acceso</th>
               </tr>
             </thead>
             <tbody>
               {users.length === 0 ? (
-                <tr><td colSpan={6} className="py-[32px] text-center text-[var(--text-secondary)]">Sin usuarios registrados.</td></tr>
+                <tr><td colSpan={7} className="py-[32px] text-center text-[var(--text-secondary)]">Sin usuarios registrados.</td></tr>
               ) : users.map(u => {
                 const isExpired = u.planExpiresAt && new Date(u.planExpiresAt) < new Date();
+                const isAdmin = u.username === ADMIN_USERNAME || u.role === 'admin';
+                // Suspendido = plan vencido Y no es admin/free
+                const isSuspended = !isAdmin && u.role !== 'free' && !!isExpired;
                 return (
-                  <tr key={u.id} className="table-glass-row border-b border-[var(--border)]">
+                  <tr key={u.id} className={`table-glass-row border-b border-[var(--border)] ${isSuspended ? 'opacity-60' : ''}`}>
                     <td className="py-[14px] px-[20px] font-mono text-[13px] font-semibold text-[var(--text-primary)]">@{u.username}</td>
                     <td className="py-[14px] px-[20px] text-[13px] text-[var(--text-secondary)]">{u.fullName}</td>
                     <td className="py-[14px] px-[20px]">
@@ -190,7 +207,7 @@ export const AdminPanel: React.FC = () => {
                     </td>
                     <td className="py-[14px] px-[20px] text-[12px] text-[var(--text-tertiary)]">{new Date(u.createdAt).toLocaleDateString()}</td>
                     <td className="py-[14px] px-[20px]">
-                      {u.username !== ADMIN_USERNAME ? (
+                      {!isAdmin ? (
                         <select value={u.role} onChange={e => handleChangeRole(u.id, e.target.value as UserRole)}
                           className="bg-[var(--bg-surface-3)] border border-[var(--border-strong)] rounded-[6px] text-[12px] px-[8px] py-[5px] text-[var(--text-primary)] outline-none focus:border-[var(--accent)] transition-colors cursor-pointer">
                           <option value="free">🆓 Gratuito</option>
@@ -202,6 +219,28 @@ export const AdminPanel: React.FC = () => {
                         </select>
                       ) : (
                         <span className="text-[11px] text-[var(--text-tertiary)] italic">Admin protegido</span>
+                      )}
+                    </td>
+                    {/* ── Columna Acceso: suspender / restaurar ── */}
+                    <td className="py-[14px] px-[20px] text-center">
+                      {isAdmin ? (
+                        <span className="text-[11px] text-[var(--text-tertiary)] italic">—</span>
+                      ) : isSuspended ? (
+                        <button
+                          onClick={() => handleUnsuspend(u.id)}
+                          title="Restaurar acceso"
+                          className="inline-flex items-center gap-[5px] px-[10px] py-[5px] rounded-[6px] text-[11px] font-semibold bg-[var(--profit-bg)] text-[var(--profit)] border border-[var(--profit)]/30 hover:opacity-80 transition-all"
+                        >
+                          <Unlock size={12} /> Restaurar
+                        </button>
+                      ) : (
+                        <button
+                          onClick={() => handleSuspend(u.id)}
+                          title="Suspender acceso por falta de pago"
+                          className="inline-flex items-center gap-[5px] px-[10px] py-[5px] rounded-[6px] text-[11px] font-semibold bg-[var(--loss-bg)] text-[var(--loss)] border border-[var(--loss)]/30 hover:opacity-80 transition-all"
+                        >
+                          <Lock size={12} /> Suspender
+                        </button>
                       )}
                     </td>
                   </tr>

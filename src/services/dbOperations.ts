@@ -129,6 +129,30 @@ export const updateUserRole = async (userId: string, role: string, planExpiresAt
   if (error) throw error;
 };
 
+/** Suspende el acceso de un usuario colocando plan_expires_at en el pasado.
+ *  El rol se preserva (sigue siendo vip_monthly, etc.) pero isPlanExpired()
+ *  en AppLayout detectará la fecha vencida y mostrará el ExpiredWall. */
+export const suspendUser = async (userId: string): Promise<void> => {
+  // Fecha en el pasado (ayer) para disparar la lógica de plan vencido
+  const yesterday = new Date();
+  yesterday.setDate(yesterday.getDate() - 1);
+  const { error } = await supabase
+    .from('profiles')
+    .update({ plan_expires_at: yesterday.toISOString() })
+    .eq('id', userId);
+  if (error) throw error;
+};
+
+/** Restaura el acceso de un usuario dejando plan_expires_at en null
+ *  (nunca expira) hasta que el admin asigne un plan con fecha real. */
+export const unsuspendUser = async (userId: string): Promise<void> => {
+  const { error } = await supabase
+    .from('profiles')
+    .update({ plan_expires_at: null })
+    .eq('id', userId);
+  if (error) throw error;
+};
+
 // ─── PROMO CODES ─────────────────────────────────────────────────────────────
 
 export const createPromoCode = async (code: PromoCode) => {
