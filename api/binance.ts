@@ -44,7 +44,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     const timestamp = Date.now();
     const rows = 100;
 
-    let queryString = `timestamp=${timestamp}&page=${pageNum}&rows=${rows}`;
+    // recvWindow=60000 es crítico para evitar error -1021 (desfase de reloj/red)
+    let queryString = `timestamp=${timestamp}&recvWindow=60000&page=${pageNum}&rows=${rows}`;
     if (tradeType) queryString += `&tradeType=${tradeType}`;
 
     console.log('[BINANCE PROXY] QueryString:', queryString);
@@ -58,9 +59,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
     const fetchUrl = `https://api.binance.com/sapi/v1/c2c/orderMatch/listUserOrderHistory?${queryString}&signature=${signature}`;
 
-    // AbortController para timeout de 25s (la función tiene maxDuration=30s)
+    // AbortController para timeout de 12s (evita colapsar Vercel serverless)
     const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 25_000);
+    const timeoutId = setTimeout(() => controller.abort(), 12_000);
 
     let binanceRes: Response;
     try {
@@ -76,16 +77,22 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     const data = await binanceRes.json();
 
     console.log(`[BINANCE PROXY] Status: ${binanceRes.status}`);
-    console.log(`[BINANCE PROXY] Response:`, JSON.stringify(data).substring(0, 500));
-    console.log(`[BINANCE PROXY] Payload length: ${data?.data?.length || 0}, Error Code: ${data?.code || 'none'}`);
-    if (data?.data && data.data.length > 0) {
-      console.log(`[BINANCE PROXY] First Order sample:`, JSON.stringify(data.data[0]).substring(0, 300));
-    }
+    console.log(`[BINANCE PROXY] Payload length: ${data?.data?.length ?? 0}, Code: ${data?.code ?? 'none'}`);
 
+    // Si Binance devuelve error HTTP
     if (!binanceRes.ok) {
       return res.status(binanceRes.status).json({
-        error: data?.msg || `Binance error: ${binanceRes.status}`,
+        error: data?.msg || data?.message || `Binance HTTP ${binanceRes.status}`,
         code: data?.code,
+        details: data,
+      });
+    }
+
+    // Si Binance responde HTTP 200 pero con error en cuerpo (code !== '000000')
+    if (data && data.code && data.code !== '000000') {
+      return res.status(400).json({
+        error: data.msg || data.message || `Binance C2C code: ${data.code}`,
+        code: data.code,
         details: data,
       });
     }

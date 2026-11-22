@@ -2,6 +2,7 @@ import { lazy, Suspense, useEffect, useState } from 'react';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { AppLayout } from './components/layout/AppLayout';
 import { Login } from './pages/Login';
+import { ResetPassword } from './pages/ResetPassword';
 import { supabase } from './lib/supabase';
 import { useAppStore } from './store/useAppStore';
 import { getUserProfile } from './services/dbOperations';
@@ -236,6 +237,7 @@ function App() {
     <BrowserRouter>
       <Routes>
         <Route path="/login" element={<Login />} />
+        <Route path="/reset-password" element={<ResetPassword />} />
 
         <Route element={<AppLayout />}>
           <Route path="/" element={<Dashboard />} />

@@ -720,19 +720,7 @@ const CycleSummary: React.FC<{
         </div>
       </div>
 
-      {/* DEBUG PANEL */}
-      <div className="mt-8 p-4 bg-gray-900 border border-red-500 rounded-lg text-xs font-mono text-gray-300">
-        <h4 className="text-red-400 font-bold mb-2">DEBUG INFO (Por favor, envíame captura de esto):</h4>
-        <p>Total órdenes globales en DB: {orders.length}</p>
-        <p>Órdenes en este ciclo (# {cycle.id.slice(0, 8)}...): {orders.filter(o => o.cycleId === cycle.id).length}</p>
-        <ul className="mt-2 flex flex-col gap-1">
-          {orders.slice(0, 5).map(o => (
-            <li key={o.id} className="border-b border-gray-700 pb-1">
-              Order: {o.orderNumber} | Status: {o.orderStatus} | CycleId: {o.cycleId?.slice(0, 8)}... | OpType: {o.operationType} | Date: {new Date(o.createTime_utc).toLocaleString()}
-            </li>
-          ))}
-        </ul>
-      </div>
+
     </div>
   );
 };
@@ -1080,12 +1068,33 @@ export const ActiveCyclePanel: React.FC = () => {
     if (!activeCycle || !currentUser) return;
     setIsProcessing(true);
     try {
+      // CORRECCIÓN CRÍTICA: Recalcular métricas ANTES de cerrar para garantizar
+      // que ganancia_ves/ganancia_usdt estén actualizados en DB.
+      // El valor en el store (activeCycle) puede estar desactualizado si hubo
+      // algún lag de sincronización entre operaciones.
+      await recalculateCycleMetrics(activeCycle.id, currentUser.id);
+
+      // Fetch fresco del ciclo para obtener los valores reales de DB post-recalculo
+      const { data: freshRows } = await (await import('../../lib/supabase')).supabase
+        .from('cycles')
+        .select('*')
+        .eq('id', activeCycle.id)
+        .single();
+
+      const latestGananciaVes = freshRows ? Number(freshRows.ganancia_ves) : activeCycle.ganancia_ves;
+
+      const closedAt = new Date().toISOString();
       const closed: Cycle = {
         ...activeCycle,
-        status: activeCycle.ganancia_ves < 0 ? 'Con pérdida' : 'Completado',
-        closedAt: new Date().toISOString(),
+        // Usamos el valor FRESCO de DB para determinar el estado correcto
+        status: latestGananciaVes < 0 ? 'Con pérdida' : 'Completado',
+        closedAt,
         tasa_bcv_dia: bcvRate?.tasa_bcv ?? activeCycle.tasa_bcv_dia,
+        ganancia_ves: latestGananciaVes,
+        ganancia_usdt: freshRows ? Number(freshRows.ganancia_usdt) : activeCycle.ganancia_usdt,
+        roi_percent:   freshRows ? Number(freshRows.roi_percent)   : activeCycle.roi_percent,
       };
+
       await saveCycle(closed);
       setClosedCycleOrders(cycleOrders);
       setActiveCycle(null);
@@ -1118,8 +1127,13 @@ export const ActiveCyclePanel: React.FC = () => {
   };
 
   const handleReopenCycle = async () => {
-    const lastClosed = cycles.find(c => c.closedAt && cycleOrders.length > 0) ??
-      cycles.find(c => closedCycleOrders.some(o => o.cycleId === c.id));
+    // CORRECCIÓN: Usar directamente closedCycleOrders para identificar
+    // el ciclo a reabrir, evitando buscar el primero con closedAt (incorrecto)
+    const targetCycleId = closedCycleOrders[0]?.cycleId;
+    const lastClosed = targetCycleId
+      ? cycles.find(c => c.id === targetCycleId)
+      : undefined;
+
     if (!lastClosed || !currentUser) {
       toast.error('No se encontró el ciclo para reabrir.');
       return;
@@ -1214,13 +1228,12 @@ export const ActiveCyclePanel: React.FC = () => {
 
     setSobraSaving(true);
     try {
-      // Guardar y recalcular en paralelo
-      await Promise.all([
-        saveOrder(order),
-        recalculateCycleMetrics(activeCycle.id, currentUser.id).catch(() => {})
-      ]);
-      
-      // Solo actualizar store, no hace falta recalcular de nuevo
+      // CORRECCIÓN: Guardar PRIMERO y luego recalcular (no en paralelo).
+      // Si se ejecutaban en paralelo, el recalculo podía correr antes de que
+      // la orden estuviera confirmada en DB, generando métricas incorrectas.
+      await saveOrder(order);
+      await recalculateCycleMetrics(activeCycle.id, currentUser.id);
+
       const { setOrders, setActiveCycle: sAC, setCycles } = useAppStore.getState();
       const [freshOrders, freshActive, freshCycles] = await Promise.all([
         getOrdersForUser(currentUser.id),

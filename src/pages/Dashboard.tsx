@@ -1,5 +1,4 @@
 import React, { useRef, useState, useEffect, useCallback } from 'react';
-import { supabase } from '../lib/supabase';
 import { createPortal } from 'react-dom';
 import { AreaChart, Layers, Clock, BarChart3, X, RefreshCw } from 'lucide-react';
 import { useAppStore } from '../store/useAppStore';
@@ -28,24 +27,6 @@ export const Dashboard: React.FC = () => {
 
   // ─── Estado reactivo del "ahora" — se actualiza cada minuto ────────────────
   const [now, setNow] = useState(() => new Date());
-
-  // ─── Fix puntual del ciclo 2425 ────────────────────────────────────────────
-  useEffect(() => {
-    const forceFix2425 = async () => {
-      const match = cycles.find(c => String(c.cycleNumber).endsWith('2425'));
-      if (match && match.closedAt && !match.closedAt.startsWith('2026-05-22')) {
-        console.log('Forzando actualización del ciclo 2425 al 22 de mayo...');
-        const newClosed = '2026-05-22T23:59:00.000Z';
-        const { error } = await supabase.from('cycles').update({ closed_at: newClosed }).eq('id', match.id);
-        if (error) {
-           alert("ERROR ACTUALIZANDO: " + error.message + " -> Por favor, ejecuta el script en Supabase manualmente.");
-        } else {
-           window.location.reload();
-        }
-      }
-    };
-    if (cycles.length > 0) forceFix2425();
-  }, [cycles]);
 
   // ─── Función para refrescar los datos desde Supabase ──────────────────────
   const refreshData = useCallback(async () => {
@@ -169,14 +150,11 @@ export const Dashboard: React.FC = () => {
   const weekStart  = getVenezuelaWeekStart(now);
   const monthStart = getVenezuelaMonthStart(now);
 
-  console.log('[Dashboard] todayStart UTC:', todayStart.toISOString());
-
   // Ciclos completados hoy (closedAt >= inicio del día Venezuela)
   const completedToday = cycles.filter(c =>
     c.status && c.status.toLowerCase() !== 'en curso' &&
     c.closedAt && new Date(c.closedAt) >= todayStart
   );
-  console.log('[Dashboard] Ciclos completados hoy:', completedToday.length);
 
   const profitTodayUsdt = completedToday.reduce((sum, c) => sum + (c.ganancia_usdt ?? 0), 0);
   const profitTodayVes  = completedToday.reduce((sum, c) => sum + (c.ganancia_usdt * (c.tasa_compra_prom || 1)), 0);

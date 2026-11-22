@@ -21,6 +21,7 @@ export const Topbar: React.FC = () => {
     const user = currentState.currentUser;
     if (!currentState.binanceKeys || !user) {
       if (isManual) toast.error('Sesión de Binance expirada. Por favor cierra sesión y vuelve a entrar.');
+      setIsSyncing(false);
       syncInProgress.current = false;
       return;
     }
@@ -59,26 +60,62 @@ export const Topbar: React.FC = () => {
       console.log('[SYNC] Ciclo activo:', activeCycle ? 'sí' : 'no');
       console.log('[SYNC] cycleOpenedAtVal:', cycleOpenedAtVal ? new Date(cycleOpenedAtVal).toISOString() : 'sin ciclo');
       
-      // Obtener órdenes de Binance EN PARALELO (más rápido)
-      // Optimización Extrema: Auto-sync (cada 10s) SÓLO necesita 1 página (las más recientes).
-      // Solo buscamos profundo (hasta 10 páginas) si el usuario hace clic manualmente.
-      const maxPages = isManual ? 20 : 5;
-      const requests = [];
-      
-      for (let page = 1; page <= maxPages; page++) {
-        requests.push(fetchP2POrders(currentState.binanceKeys!.apiKey, currentState.binanceKeys!.secretKey, page, 'BUY'));
-        requests.push(fetchP2POrders(currentState.binanceKeys!.apiKey, currentState.binanceKeys!.secretKey, page, 'SELL'));
-      }
-      
-      // Ejecutar TODAS las requests en paralelo
-      const responses = await Promise.all(requests);
+      // Obtener órdenes de Binance con carga inteligente y resiliente
       let allBinanceOrders: any[] = [];
-      responses.forEach(res => {
-         if (res && res.data) {
-            allBinanceOrders = allBinanceOrders.concat(res.data);
-         }
-      });
-      
+      const apiKey = currentState.binanceKeys!.apiKey;
+      const secretKey = currentState.binanceKeys!.secretKey;
+
+      if (!isManual) {
+        // En auto-sync de fondo: solo página 1 (las 100 más recientes de BUY y SELL)
+        const [buyRes, sellRes] = await Promise.allSettled([
+          fetchP2POrders(apiKey, secretKey, 1, 'BUY'),
+          fetchP2POrders(apiKey, secretKey, 1, 'SELL'),
+        ]);
+
+        if (buyRes.status === 'fulfilled' && Array.isArray(buyRes.value?.data)) {
+          allBinanceOrders.push(...buyRes.value.data);
+        }
+        if (sellRes.status === 'fulfilled' && Array.isArray(sellRes.value?.data)) {
+          allBinanceOrders.push(...sellRes.value.data);
+        }
+      } else {
+        // En sync manual: recorrer hasta 5 páginas de forma controlada y con parada temprana
+        let hasMoreBuy = true;
+        let hasMoreSell = true;
+        const maxPages = 5;
+
+        for (let page = 1; page <= maxPages; page++) {
+          if (!hasMoreBuy && !hasMoreSell) break;
+
+          const batchPromises: Promise<any>[] = [];
+          if (hasMoreBuy) batchPromises.push(fetchP2POrders(apiKey, secretKey, page, 'BUY'));
+          if (hasMoreSell) batchPromises.push(fetchP2POrders(apiKey, secretKey, page, 'SELL'));
+
+          const results = await Promise.allSettled(batchPromises);
+          let resultIdx = 0;
+
+          if (hasMoreBuy) {
+            const r = results[resultIdx++];
+            if (r.status === 'fulfilled' && Array.isArray(r.value?.data)) {
+              allBinanceOrders.push(...r.value.data);
+              if (r.value.data.length < 100) hasMoreBuy = false;
+            } else {
+              hasMoreBuy = false;
+            }
+          }
+
+          if (hasMoreSell) {
+            const r = results[resultIdx++];
+            if (r.status === 'fulfilled' && Array.isArray(r.value?.data)) {
+              allBinanceOrders.push(...r.value.data);
+              if (r.value.data.length < 100) hasMoreSell = false;
+            } else {
+              hasMoreSell = false;
+            }
+          }
+        }
+      }
+
       // Deduplicate orders
       const uniqueOrdersMap = new Map();
       allBinanceOrders.forEach(o => {
