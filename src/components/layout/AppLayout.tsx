@@ -1,4 +1,4 @@
-import React, { useEffect, useRef } from 'react';
+﻿import React, { useEffect, useRef } from 'react';
 import { Outlet, useNavigate, useLocation } from 'react-router-dom';
 import toast from 'react-hot-toast';
 import { gsap } from 'gsap';
@@ -7,7 +7,7 @@ import { Topbar } from './Topbar';
 import { BottomNav } from './BottomNav';
 import { useAppStore } from '../../store/useAppStore';
 import { supabase } from '../../lib/supabase';
-import { getOrdersForUser, getCyclesForUser, getActiveCycleForUser } from '../../services/dbOperations';
+import { getOrdersForUser, getCyclesForUser, getActiveCycleForUser, getUserProfile } from '../../services/dbOperations';
 import { fetchBCVRate } from '../../services/bcv';
 import { AlertTriangle, Clock, ArrowRight } from 'lucide-react';
 import { AssistantBot } from '../ui/AssistantBot';
@@ -82,10 +82,10 @@ const ExpiredWall: React.FC<{ role: string; planExpiresAt: string | null; onLogo
 
 // ─────────────────────────────────────────────────────────────────────────────
 export const AppLayout: React.FC = () => {
-  const { currentUser, setOrders, setCycles, setActiveCycle, setBcvRate, logout } = useAppStore();
+  const { currentUser, setCurrentUser, setOrders, setCycles, setActiveCycle, setBcvRate, logout } = useAppStore();
   const navigate = useNavigate();
   const location = useLocation();
-  const hasHydrated = useRef(false);
+  const hasHydrated = useRef<string | null>(null); // guarda el userId que ya hidrató
   const pageRef = useRef<HTMLDivElement>(null);
 
   // ── Page transition on every route change ──────────────────────────────────
@@ -108,8 +108,8 @@ export const AppLayout: React.FC = () => {
 
     if (isPlanExpired(currentUser.planExpiresAt, currentUser.role)) return;
 
-    if (!hasHydrated.current) {
-      hasHydrated.current = true;
+    if (!hasHydrated.current || hasHydrated.current !== currentUser.id) {
+      hasHydrated.current = currentUser.id;
       (async () => {
         try {
           const [orders, cycles, activeCycle] = await Promise.all([
@@ -173,8 +173,20 @@ export const AppLayout: React.FC = () => {
           setCycles(freshCycles);
           // Guard: no sobreescribir un ciclo activo confirmado localmente con null
           // si hay un pequeño lag de consistencia en la DB.
+          // CORRECCIÓN: El guard anterior bloqueaba la actualización de activeCycle
+          // a null cuando el ciclo era cerrado, causando que el store mostrara
+          // el ciclo como "En curso" aunque ya estuviera cerrado en la DB.
+          // Ahora: solo protegemos contra el caso donde la DB aún no refleja
+          // el nuevo ciclo que acabamos de crear (para evitar flickering).
           const storeActive = useAppStore.getState().activeCycle;
-          if (storeActive && !freshActiveCycle) return;
+          const storeActiveIsReallyActive = storeActive?.status === 'En curso';
+          if (storeActiveIsReallyActive && !freshActiveCycle) {
+            // La DB puede tener un pequeño lag al confirmar un ciclo recién creado.
+            // Solo ignoramos el null si el store dice que hay un ciclo activo
+            // Y ese ciclo NO aparece en los freshCycles como cerrado.
+            const isTrulyActive = freshCycles.some(c => c.id === storeActive.id && c.status === 'En curso');
+            if (isTrulyActive) return;
+          }
           setActiveCycle(freshActiveCycle);
         } catch (err) {
           console.error('[Realtime] Error al refrescar datos:', err);
@@ -213,7 +225,33 @@ export const AppLayout: React.FC = () => {
     };
   }, [currentUser?.id]);
 
+  // -- Realtime: detectar cambios en el perfil (suspension/restauracion por el admin) --
+  useEffect(() => {
+    if (!currentUser) return;
+
+    const ch = supabase
+      .channel('arbitrack-profile-' + currentUser.id)
+      .on('postgres_changes', {
+        event: 'UPDATE',
+        schema: 'public',
+        table: 'profiles',
+        filter: 'id=eq.' + currentUser.id,
+      }, async () => {
+        // El admin cambio el plan de este usuario. Recargar para activar/desactivar acceso.
+        try {
+          const updated = await getUserProfile(currentUser.id);
+          if (updated) setCurrentUser(updated);
+        } catch (err) {
+          console.error('[Realtime] Error actualizando perfil:', err);
+        }
+      })
+      .subscribe();
+
+    return () => { supabase.removeChannel(ch); };
+  }, [currentUser?.id]);
+
   if (!currentUser) return null;
+
 
   if (isPlanExpired(currentUser.planExpiresAt, currentUser.role)) {
     return (
