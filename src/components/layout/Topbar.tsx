@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+﻿import React, { useState, useEffect, useRef } from 'react';
 import { RefreshCw, User, CheckCircle2 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { useAppStore } from '../../store/useAppStore';
@@ -62,7 +62,7 @@ export const Topbar: React.FC = () => {
       // Obtener órdenes de Binance EN PARALELO (más rápido)
       // Optimización Extrema: Auto-sync (cada 10s) SÓLO necesita 1 página (las más recientes).
       // Solo buscamos profundo (hasta 10 páginas) si el usuario hace clic manualmente.
-      const maxPages = isManual ? 10 : 2;
+      const maxPages = isManual ? 20 : 5;
       const requests = [];
       
       for (let page = 1; page <= maxPages; page++) {
