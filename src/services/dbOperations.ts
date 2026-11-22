@@ -245,7 +245,7 @@ export const saveOrder = async (order: Order) => {
     origin_mode: order.originMode ?? null,
     exchange: order.exchange ?? null,
     notas: order.notas ?? null,
-  });
+  }, { onConflict: 'order_number' });
   if (error) throw error;
 };
 
@@ -275,7 +275,7 @@ export const saveOrdersBulk = async (orders: Order[]) => {
     exchange: order.exchange ?? null,
     notas: order.notas ?? null,
   }));
-  const { error } = await supabase.from('orders').upsert(payload);
+  const { error } = await supabase.from('orders').upsert(payload, { onConflict: 'order_number' });
   if (error) throw error;
 };
 

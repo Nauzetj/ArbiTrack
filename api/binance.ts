@@ -41,40 +41,63 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       return res.status(400).json({ error: 'Parámetro "tradeType" inválido.' });
     }
 
-    const timestamp = Date.now();
+    // Restamos 1000ms al timestamp local para garantizar que NUNCA esté en el futuro
+    // respecto a los servidores de Binance (evita permanentemente el error -1021)
+    const timestamp = Date.now() - 1000;
     const rows = 100;
 
-    // recvWindow=60000 es crítico para evitar error -1021 (desfase de reloj/red)
+    // recvWindow=60000 es crítico para evitar error -1021 por latencia de red
     let queryString = `timestamp=${timestamp}&recvWindow=60000&page=${pageNum}&rows=${rows}`;
     if (tradeType) queryString += `&tradeType=${tradeType}`;
-
-    console.log('[BINANCE PROXY] QueryString:', queryString);
 
     const signature = crypto
       .createHmac('sha256', secretKey)
       .update(queryString)
       .digest('hex');
 
-    console.log('[BINANCE PROXY] Signature长度:', signature.length);
+    // Lista de dominios oficiales de Binance para tolerancia a fallos
+    const binanceHosts = [
+      'https://api.binance.com',
+      'https://api1.binance.com',
+      'https://api2.binance.com',
+      'https://api3.binance.com',
+    ];
 
-    const fetchUrl = `https://api.binance.com/sapi/v1/c2c/orderMatch/listUserOrderHistory?${queryString}&signature=${signature}`;
+    let lastError: any = null;
+    let data: any = null;
+    let binanceRes: Response | null = null;
 
-    // AbortController para timeout de 12s (evita colapsar Vercel serverless)
-    const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 12_000);
+    // Intentar con el host principal, y si hay fallo de red/timeout, usar fallbacks oficiales
+    for (const host of binanceHosts) {
+      const fetchUrl = `${host}/sapi/v1/c2c/orderMatch/listUserOrderHistory?${queryString}&signature=${signature}`;
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 10_000);
 
-    let binanceRes: Response;
-    try {
-      binanceRes = await fetch(fetchUrl, {
-        method: 'GET',
-        headers: { 'X-MBX-APIKEY': apiKey },
-        signal: controller.signal,
-      });
-    } finally {
-      clearTimeout(timeoutId);
+      try {
+        binanceRes = await fetch(fetchUrl, {
+          method: 'GET',
+          headers: { 'X-MBX-APIKEY': apiKey },
+          signal: controller.signal,
+        });
+
+        data = await binanceRes.json();
+        lastError = null;
+        break; // Éxito en conectar con Binance
+      } catch (err: any) {
+        lastError = err;
+        console.warn(`[BINANCE PROXY] Falló host ${host}:`, err.message);
+      } finally {
+        clearTimeout(timeoutId);
+      }
     }
 
-    const data = await binanceRes.json();
+    if (!binanceRes || lastError) {
+      return res.status(504).json({
+        error: lastError?.name === 'AbortError'
+          ? 'Timeout: Binance no respondió en el tiempo límite.'
+          : `Error de conexión con Binance: ${lastError?.message || 'Host no disponible'}`
+      });
+    }
 
     console.log(`[BINANCE PROXY] Status: ${binanceRes.status}`);
     console.log(`[BINANCE PROXY] Payload length: ${data?.data?.length ?? 0}, Code: ${data?.code ?? 'none'}`);
@@ -100,9 +123,6 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     return res.json(data);
   } catch (error: any) {
     console.error('Proxy error:', error);
-    if (error.name === 'AbortError') {
-      return res.status(504).json({ error: 'Timeout: Binance no respondió en 25s' });
-    }
     return res.status(500).json({ error: 'Internal server error', details: error.message });
   }
 }

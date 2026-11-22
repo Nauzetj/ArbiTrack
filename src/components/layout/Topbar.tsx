@@ -273,11 +273,11 @@ export const Topbar: React.FC = () => {
           }
         }
 
-        if (addedCount > 0) {
+        // Si se agregaron/actualizaron órdenes O si el usuario presionó el botón Sync manual,
+        // SIEMPRE refrescamos desde Supabase para garantizar que la UI muestre todo actualizado.
+        if (addedCount > 0 || isManual) {
           if (activeCycle) {
             console.log('[SYNC] Recálculo completado, actualizando UI...');
-            
-            // Obtener datos frescos sin vaciar el estado para evitar parpadeos/congelamientos
             const [freshActiveCycle, freshCycles, freshOrders] = await Promise.all([
               getActiveCycleForUser(user.id),
               getCyclesForUser(user.id),
@@ -287,12 +287,27 @@ export const Topbar: React.FC = () => {
             setActiveCycle(freshActiveCycle);
             setCycles(freshCycles);
             setOrders(freshOrders);
-            console.log('[SYNC] UI actualizada');
+            console.log('[SYNC] UI actualizada con ciclo activo');
           } else {
-            const freshOrders = await getOrdersForUser(user.id);
+            const [freshCycles, freshOrders] = await Promise.all([
+              getCyclesForUser(user.id),
+              getOrdersForUser(user.id),
+            ]);
+            setCycles(freshCycles);
             setOrders(freshOrders);
           }
         }
+      } else if (isManual) {
+        // Aunque Binance no haya devuelto órdenes nuevas en este instante,
+        // en sync manual refrescamos la UI desde Supabase
+        const [freshActiveCycle, freshCycles, freshOrders] = await Promise.all([
+          getActiveCycleForUser(user.id),
+          getCyclesForUser(user.id),
+          getOrdersForUser(user.id),
+        ]);
+        setActiveCycle(freshActiveCycle);
+        setCycles(freshCycles);
+        setOrders(freshOrders);
       }
 
       setSyncStatus('success');
@@ -305,20 +320,23 @@ export const Topbar: React.FC = () => {
         unique: uniqueBinanceOrders.length,
       });
       
-      if (isManual && uniqueBinanceOrders.length > 0) {
-        toast.success(`Sincronización exitosa. Órdenes sincronizadas.`);
-      } else if (isManual) {
-        toast.success(`Sincronización exitosa. Cero órdenes retornadas usando tus llaves API: revisa si están activas o si tienen permisos.`);
+      if (isManual) {
+        if (uniqueBinanceOrders.length > 0) {
+          toast.success(`Sincronización completa. Datos actualizados.`);
+        } else {
+          toast('Todo al día. No hay órdenes nuevas en Binance.', { icon: '✅' });
+        }
       }
     } catch (e: any) {
       console.error('Excepción global en Sync:', e);
       setSyncStatus('error');
       setIsSyncing(false);
       if (isManual) {
-        toast.error(`ERROR CRÍTICO: ${e.message}`, { duration: 6000 });
+        toast.error(`Error al sincronizar: ${e.message}`, { duration: 6000 });
       }
       setTimeout(() => setSyncStatus('idle'), 3000);
     } finally {
+      setIsSyncing(false);
       syncInProgress.current = false;
     }
   };
@@ -326,18 +344,24 @@ export const Topbar: React.FC = () => {
   useEffect(() => {
     if (!currentUser || !binanceKeys) return;
 
-    // Sync inmediato al montar
+    // Sync inicial al montar la vista
     handleSync(false);
 
-    // OPTIMIZACIÓN EXTREMA: Intervalo reducido a 10s (Tiempo Real)
-    // Con ciclo activo → cada 10s (ahora ultra rápido porque solo pide 1 página)
-    // Sin ciclo activo → cada 30s
+    // Intervalo de auto-sync seguro para evitar rate limits de Binance C2C:
+    // Con ciclo activo: cada 35 segundos.
+    // Sin ciclo activo: cada 60 segundos.
     let timeoutId: ReturnType<typeof setTimeout>;
 
-    const scheduleNext = async () => {
+    const scheduleNext = () => {
       const { activeCycle } = useAppStore.getState();
-      const delay = activeCycle ? 10_000 : 30_000;
+      const delay = activeCycle ? 35_000 : 60_000;
       timeoutId = setTimeout(async () => {
+        // Si la pestaña no está visible (minimizada o en segundo plano),
+        // no gastamos cuota de peticiones de Binance.
+        if (typeof document !== 'undefined' && document.hidden) {
+          scheduleNext();
+          return;
+        }
         await handleSync(false);
         scheduleNext();
       }, delay);
